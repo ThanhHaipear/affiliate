@@ -1,0 +1,12 @@
+﻿const express = require("express");
+
+const controller = require("./order.controller");
+const { authenticate } = require("../../middlewares/auth.middleware");
+
+const router = express.Router();
+
+router.use(authenticate);
+router.get("/", controller.listOrders);
+router.get("/:orderId", controller.getOrder);
+
+module.exports = router;

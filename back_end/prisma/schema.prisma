@@ -1,0 +1,953 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountStatus {
+  ACTIVE
+  LOCKED
+  PENDING
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ProductStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  LOCKED
+}
+
+enum OrderStatus {
+  CREATED
+  PENDING_PAYMENT
+  PAID
+  PROCESSING
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum CommissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  WALLET_CREDITED
+  PAID_OUT
+}
+
+enum WalletOwnerType {
+  AFFILIATE
+  SELLER
+  PLATFORM
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PROCESSING
+  PAID
+}
+
+model Role {
+  id           Int           @id @default(autoincrement())
+  code         String        @unique @db.VarChar(255)
+  name         String        @db.VarChar(255)
+  createdAt    DateTime?     @map("created_at") @db.Timestamp(0)
+  accountRoles AccountRole[]
+
+  @@map("roles")
+}
+
+model Account {
+  id                        Int                       @id @default(autoincrement())
+  email                     String?                   @unique @db.VarChar(255)
+  phone                  String?                    @db.VarChar(255)
+  passwordHash              String                    @map("password_hash") @db.VarChar(255)
+  status                    AccountStatus             @default(ACTIVE)
+  lockReason                String?                   @map("lock_reason") @db.Text
+  lockedAt                  DateTime?                 @map("locked_at") @db.Timestamp(0)
+  lockedBy                  Int?                      @map("locked_by")
+  lastLoginAt               DateTime?                 @map("last_login_at") @db.Timestamp(0)
+  createdAt                 DateTime?                 @map("created_at") @db.Timestamp(0)
+  updatedAt                 DateTime?                 @map("updated_at") @db.Timestamp(0)
+  accountRoles              AccountRole[]
+  customerProfile           CustomerProfile?
+  adminProfile              AdminProfile?
+  affiliate                 Affiliate?
+  sellers                   Seller[]                  @relation("SellerOwner")
+  approvedSellers           Seller[]                  @relation("SellerApprovedBy")
+  lockedSellers             Seller[]                  @relation("SellerLockedBy")
+  reviewedProducts          Product[]                 @relation("ProductReviewedBy")
+  lockedProducts            Product[]                 @relation("ProductLockedBy")
+  reviewedAffiliateKyc      AffiliateKyc[]            @relation("AffiliateKycReviewedBy")
+  reviewedSellerKyc         SellerKyc[]               @relation("SellerKycReviewedBy")
+  reviewedAffiliateCfgs     ProductAffiliateSetting[] @relation("ProductAffiliateSettingReviewedBy")
+  revokedLinks              AffiliateLink[]           @relation("AffiliateLinkRevokedBy")
+  clicks                    AffiliateClick[]          @relation("AffiliateClickViewer")
+  viewedAttributionSessions AttributionSession[]      @relation("AttributionSessionViewer")
+  carts                     Cart[]
+  buyerOrders               Order[]                   @relation("OrderBuyer")
+  ordersConfirmed           Order[]                   @relation("OrderSellerConfirmedBy")
+  orderStatusChanges        OrderStatusHistory[]      @relation("OrderStatusChangedBy")
+  refundsRequested          Refund[]                  @relation("RefundRequestedBy")
+  refundsReviewed           Refund[]                  @relation("RefundReviewedBy")
+  withdrawalsProcessed      Withdrawal[]              @relation("WithdrawalProcessedBy")
+  payoutBatchesCreated      PayoutBatch[]             @relation("PayoutBatchCreatedBy")
+  payoutBatchesProcessed    PayoutBatch[]             @relation("PayoutBatchProcessedBy")
+  notifications             Notification[]
+  customerAddresses        CustomerAddress[]
+  activityLogs              ActivityLog[]
+  fraudAlertsProcessed      FraudAlert[]              @relation("FraudAlertProcessedBy")
+  affiliateLockedBy         Affiliate[]               @relation("AffiliateLockedBy")
+
+  @@index([status, createdAt])
+  @@map("accounts")
+}
+
+model AccountRole {
+  accountId Int     @map("account_id")
+  roleId    Int     @map("role_id")
+  account   Account @relation(fields: [accountId], references: [id])
+  role      Role    @relation(fields: [roleId], references: [id])
+
+  @@id([accountId, roleId])
+  @@map("account_roles")
+}
+
+model CustomerProfile {
+  accountId   Int       @id @map("account_id")
+  fullName    String?   @map("full_name") @db.VarChar(255)
+  dateOfBirth DateTime? @map("date_of_birth") @db.Date
+  avatarUrl   String?   @map("avatar_url") @db.VarChar(255)
+  createdAt   DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime? @map("updated_at") @db.Timestamp(0)
+  account     Account   @relation(fields: [accountId], references: [id])
+
+  @@map("customer_profiles")
+}
+
+model CustomerAddress {
+  id            BigInt    @id @default(autoincrement())
+  accountId     Int       @map("account_id")
+  recipientName String    @map("recipient_name") @db.VarChar(255)
+  phone         String    @db.VarChar(255)
+  province      String    @db.VarChar(255)
+  district      String    @db.VarChar(255)
+  ward          String    @db.VarChar(255)
+  detail        String    @db.Text
+  isDefault     Boolean   @default(false) @map("is_default")
+  createdAt     DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime? @map("updated_at") @db.Timestamp(0)
+  account       Account   @relation(fields: [accountId], references: [id])
+  orders        Order[]
+
+  @@index([accountId])
+  @@map("customer_addresses")
+}
+
+model AdminProfile {
+  accountId Int       @id @map("account_id")
+  fullName  String?   @map("full_name") @db.VarChar(255)
+  avatarUrl String?   @map("avatar_url") @db.VarChar(255)
+  createdAt DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @map("updated_at") @db.Timestamp(0)
+  account   Account   @relation(fields: [accountId], references: [id])
+
+  @@map("admin_profiles")
+}
+
+model Affiliate {
+  accountId               Int                       @id @map("account_id")
+  fullName                String?                   @map("full_name") @db.VarChar(255)
+  dateOfBirth             DateTime?                 @map("date_of_birth") @db.Date
+  avatarUrl               String?                   @map("avatar_url") @db.VarChar(255)
+  kycStatus               ReviewStatus              @default(PENDING) @map("kyc_status")
+  activityStatus          String                    @default("ACTIVE") @map("activity_status") @db.VarChar(255)
+  defaultPaymentAccountId BigInt?                   @map("default_payment_account_id")
+  lockReason              String?                   @map("lock_reason") @db.Text
+  lockedAt                DateTime?                 @map("locked_at") @db.Timestamp(0)
+  lockedBy                Int?                      @map("locked_by")
+  createdAt               DateTime?                 @map("created_at") @db.Timestamp(0)
+  updatedAt               DateTime?                 @map("updated_at") @db.Timestamp(0)
+  account                 Account                   @relation(fields: [accountId], references: [id])
+  lockedByAccount         Account?                  @relation("AffiliateLockedBy", fields: [lockedBy], references: [id])
+  kyc                     AffiliateKyc?
+  paymentAccounts         AffiliatePaymentAccount[]
+  links                   AffiliateLink[]
+  clicks                  AffiliateClick[]
+  attributionSessions     AttributionSession[]
+  cartItems               CartItem[]
+  orderItems              OrderItem[]
+  commissions             AffiliateCommission[]
+  wallets                 Wallet[]
+
+  @@map("affiliates")
+}
+
+model AffiliateChannel {
+  id          BigInt    @id @default(autoincrement())
+  affiliateId Int       @map("affiliate_id")
+  platform    String    @db.VarChar(255)
+  url         String    @db.VarChar(255)
+  description String?   @db.Text
+  status      String    @default("ACTIVE") @db.VarChar(255)
+  createdAt   DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime? @map("updated_at") @db.Timestamp(0)
+
+  @@map("affiliate_channels")
+}
+
+model Seller {
+  id                       Int                       @id @default(autoincrement())
+  ownerAccountId           Int                       @map("owner_account_id")
+  shopName                 String                    @map("shop_name") @db.VarChar(255)
+  ownerType                String                    @default("INDIVIDUAL") @map("owner_type") @db.VarChar(255)
+  email                    String?                   @db.VarChar(255)
+  phone                    String?                   @db.VarChar(255)
+  address                  String?                   @db.Text
+  taxCode                  String?                   @map("tax_code") @db.VarChar(255)
+  shopDescription          String?                   @map("shop_description") @db.Text
+  businessField            String?                   @map("business_field") @db.VarChar(255)
+  approvalStatus           ReviewStatus              @default(PENDING) @map("approval_status")
+  approvedBy               Int?                      @map("approved_by")
+  approvedAt               DateTime?                 @map("approved_at") @db.Timestamp(0)
+  rejectReason             String?                   @map("reject_reason") @db.Text
+  lockReason               String?                   @map("lock_reason") @db.Text
+  lockedAt                 DateTime?                 @map("locked_at") @db.Timestamp(0)
+  lockedBy                 Int?                      @map("locked_by")
+  defaultPaymentAccountId  BigInt?                   @map("default_payment_account_id")
+  createdAt                DateTime?                 @map("created_at") @db.Timestamp(0)
+  updatedAt                DateTime?                 @map("updated_at") @db.Timestamp(0)
+  ownerAccount             Account                   @relation("SellerOwner", fields: [ownerAccountId], references: [id])
+  approvedByAccount        Account?                  @relation("SellerApprovedBy", fields: [approvedBy], references: [id])
+  lockedByAccount          Account?                  @relation("SellerLockedBy", fields: [lockedBy], references: [id])
+  kyc                      SellerKyc?
+  paymentAccounts          SellerPaymentAccount[]
+  products                 Product[]
+  productAffiliateSettings ProductAffiliateSetting[]
+  orders                   Order[]
+  commissions              AffiliateCommission[]
+  wallets                  Wallet[]
+
+  @@index([ownerAccountId])
+  @@index([approvalStatus, createdAt])
+  @@map("sellers")
+}
+
+model AffiliateKyc {
+  id                 BigInt        @id @default(autoincrement())
+  affiliateId        Int           @unique @map("affiliate_id")
+  documentType       String        @map("document_type") @db.VarChar(255)
+  documentNumber     String        @unique @map("document_number") @db.VarChar(255)
+  fullNameOnDocument String?       @map("full_name_on_document") @db.VarChar(255)
+  dateOfBirth        DateTime?     @map("date_of_birth") @db.Date
+  nationality        String?       @db.VarChar(255)
+  permanentAddress   String?       @map("permanent_address") @db.Text
+  issuedDate         DateTime?     @map("issued_date") @db.Date
+  issuedPlace        String?       @map("issued_place") @db.VarChar(255)
+  status             ReviewStatus  @default(PENDING)
+  reviewedBy         Int?          @map("reviewed_by")
+  reviewedAt         DateTime?     @map("reviewed_at") @db.Timestamp(0)
+  rejectReason       String?       @map("reject_reason") @db.Text
+  createdAt          DateTime?     @map("created_at") @db.Timestamp(0)
+  updatedAt          DateTime?     @map("updated_at") @db.Timestamp(0)
+  affiliate          Affiliate     @relation(fields: [affiliateId], references: [accountId])
+  reviewedByAccount  Account?      @relation("AffiliateKycReviewedBy", fields: [reviewedBy], references: [id])
+  documents          KycDocument[] @relation("AffiliateKycDocuments")
+
+  @@index([reviewedBy])
+  @@map("affiliate_kyc")
+}
+
+model SellerKyc {
+  id                 BigInt        @id @default(autoincrement())
+  sellerId           Int           @unique @map("seller_id")
+  documentType       String        @map("document_type") @db.VarChar(255)
+  documentNumber     String        @unique @map("document_number") @db.VarChar(255)
+  fullNameOnDocument String?       @map("full_name_on_document") @db.VarChar(255)
+  dateOfBirth        DateTime?     @map("date_of_birth") @db.Date
+  permanentAddress   String?       @map("permanent_address") @db.Text
+  issuedDate         DateTime?     @map("issued_date") @db.Date
+  issuedPlace        String?       @map("issued_place") @db.VarChar(255)
+  status             ReviewStatus  @default(PENDING)
+  reviewedBy         Int?          @map("reviewed_by")
+  reviewedAt         DateTime?     @map("reviewed_at") @db.Timestamp(0)
+  rejectReason       String?       @map("reject_reason") @db.Text
+  createdAt          DateTime?     @map("created_at") @db.Timestamp(0)
+  updatedAt          DateTime?     @map("updated_at") @db.Timestamp(0)
+  seller             Seller        @relation(fields: [sellerId], references: [id])
+  reviewedByAccount  Account?      @relation("SellerKycReviewedBy", fields: [reviewedBy], references: [id])
+  documents          KycDocument[] @relation("SellerKycDocuments")
+
+  @@index([reviewedBy])
+  @@map("seller_kyc")
+}
+
+model KycDocument {
+  id             BigInt        @id @default(autoincrement())
+  affiliateKycId BigInt?       @map("affiliate_kyc_id")
+  sellerKycId    BigInt?       @map("seller_kyc_id")
+  documentKind   String        @map("document_kind") @db.VarChar(255)
+  fileUrl        String        @map("file_url") @db.VarChar(255)
+  note           String?       @db.Text
+  createdAt      DateTime?     @map("created_at") @db.Timestamp(0)
+  affiliateKyc   AffiliateKyc? @relation("AffiliateKycDocuments", fields: [affiliateKycId], references: [id])
+  sellerKyc      SellerKyc?    @relation("SellerKycDocuments", fields: [sellerKycId], references: [id])
+
+  @@map("kyc_documents")
+}
+
+model AffiliatePaymentAccount {
+  id            BigInt       @id @default(autoincrement())
+  affiliateId   Int          @map("affiliate_id")
+  type          String       @db.VarChar(255)
+  accountName   String?      @map("account_name") @db.VarChar(255)
+  accountNumber String?      @map("account_number") @db.VarChar(255)
+  bankName      String?      @map("bank_name") @db.VarChar(255)
+  branch        String?      @db.VarChar(255)
+  status        String       @default("ACTIVE") @db.VarChar(255)
+  createdAt     DateTime?    @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime?    @map("updated_at") @db.Timestamp(0)
+  affiliate     Affiliate    @relation(fields: [affiliateId], references: [accountId])
+  withdrawals   Withdrawal[]
+
+  @@index([affiliateId])
+  @@map("affiliate_payment_accounts")
+}
+
+model SellerPaymentAccount {
+  id            BigInt       @id @default(autoincrement())
+  sellerId      Int          @map("seller_id")
+  type          String       @db.VarChar(255)
+  accountName   String?      @map("account_name") @db.VarChar(255)
+  accountNumber String?      @map("account_number") @db.VarChar(255)
+  bankName      String?      @map("bank_name") @db.VarChar(255)
+  branch        String?      @db.VarChar(255)
+  status        String       @default("ACTIVE") @db.VarChar(255)
+  createdAt     DateTime?    @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime?    @map("updated_at") @db.Timestamp(0)
+  seller        Seller       @relation(fields: [sellerId], references: [id])
+  withdrawals   Withdrawal[]
+
+  @@index([sellerId])
+  @@map("seller_payment_accounts")
+}
+
+model Category {
+  id        Int        @id @default(autoincrement())
+  parentId  Int?       @map("parent_id")
+  name      String     @db.VarChar(255)
+  slug      String?    @unique @db.VarChar(255)
+  createdAt DateTime?  @map("created_at") @db.Timestamp(0)
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+  products  Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id                  Int                       @id @default(autoincrement())
+  sellerId            Int                       @map("seller_id")
+  categoryId          Int?                      @map("category_id")
+  name                String                    @db.VarChar(255)
+  slug                String?                   @unique @db.VarChar(255)
+  description         String?                   @db.Text
+  basePrice           BigInt                    @default(0) @map("base_price")
+  status              ProductStatus             @default(DRAFT)
+  reviewedBy          Int?                      @map("reviewed_by")
+  reviewedAt          DateTime?                 @map("reviewed_at") @db.Timestamp(0)
+  rejectReason        String?                   @map("reject_reason") @db.Text
+  lockReason          String?                   @map("lock_reason") @db.Text
+  lockedAt            DateTime?                 @map("locked_at") @db.Timestamp(0)
+  lockedBy            Int?                      @map("locked_by")
+  createdAt           DateTime?                 @map("created_at") @db.Timestamp(0)
+  updatedAt           DateTime?                 @map("updated_at") @db.Timestamp(0)
+  seller              Seller                    @relation(fields: [sellerId], references: [id])
+  category            Category?                 @relation(fields: [categoryId], references: [id])
+  reviewedByAccount   Account?                  @relation("ProductReviewedBy", fields: [reviewedBy], references: [id])
+  lockedByAccount     Account?                  @relation("ProductLockedBy", fields: [lockedBy], references: [id])
+  images              ProductImage[]
+  variants            ProductVariant[]
+  affiliateSetting    ProductAffiliateSetting?
+  affiliateLinks      AffiliateLink[]
+  clicks              AffiliateClick[]
+  attributionSessions AttributionSession[]
+  cartItems           CartItem[]
+  orderItems          OrderItem[]
+  commissionItems     AffiliateCommissionItem[]
+
+  @@index([sellerId, createdAt])
+  @@index([status, createdAt])
+  @@map("products")
+}
+
+model ProductImage {
+  id        Int       @id @default(autoincrement())
+  productId Int       @map("product_id")
+  url       String    @db.VarChar(255)
+  sortOrder Int       @default(0) @map("sort_order")
+  createdAt DateTime? @map("created_at") @db.Timestamp(0)
+  product   Product   @relation(fields: [productId], references: [id])
+
+  @@map("product_images")
+}
+
+model ProductVariant {
+  id                    Int                    @id @default(autoincrement())
+  productId             Int                    @map("product_id")
+  sku                   String?                @unique @db.VarChar(255)
+  variantName           String?                @map("variant_name") @db.VarChar(255)
+  options               Json?
+  price                 BigInt
+  status                String                 @default("ACTIVE") @db.VarChar(255)
+  createdAt             DateTime?              @map("created_at") @db.Timestamp(0)
+  updatedAt             DateTime?              @map("updated_at") @db.Timestamp(0)
+  product               Product                @relation(fields: [productId], references: [id])
+  inventory             Inventory?
+  inventoryTransactions InventoryTransaction[]
+  cartItems             CartItem[]
+  orderItems            OrderItem[]
+
+  @@map("product_variants")
+}
+
+model Inventory {
+  variantId        Int            @id @map("variant_id")
+  quantity         Int            @default(0)
+  reservedQuantity Int            @default(0) @map("reserved_quantity")
+  updatedAt        DateTime?      @map("updated_at") @db.Timestamp(0)
+  variant          ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@map("inventories")
+}
+
+model InventoryTransaction {
+  id             BigInt         @id @default(autoincrement())
+  variantId      Int            @map("variant_id")
+  type           String         @db.VarChar(255)
+  quantity       Int
+  stockAfter     Int?           @map("stock_after")
+  reservedAfter  Int?           @map("reserved_after")
+  referenceType  String?        @map("reference_type") @db.VarChar(255)
+  referenceId    BigInt?        @map("reference_id")
+  idempotencyKey String?        @unique @map("idempotency_key") @db.VarChar(255)
+  note           String?        @db.Text
+  createdAt      DateTime?      @map("created_at") @db.Timestamp(0)
+  variant        ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@index([variantId])
+  @@map("inventory_transactions")
+}
+
+model ProductAffiliateSetting {
+  id                BigInt       @id @default(autoincrement())
+  productId         Int          @unique @map("product_id")
+  sellerId          Int          @map("seller_id")
+  isEnabled         Boolean      @default(true) @map("is_enabled")
+  approvalStatus    ReviewStatus @default(PENDING) @map("approval_status")
+  reviewedBy        Int?         @map("reviewed_by")
+  reviewedAt        DateTime?    @map("reviewed_at") @db.Timestamp(0)
+  rejectReason      String?      @map("reject_reason") @db.Text
+  commissionType    String       @map("commission_type") @db.VarChar(255)
+  commissionValue   BigInt       @map("commission_value")
+  createdAt         DateTime?    @map("created_at") @db.Timestamp(0)
+  updatedAt         DateTime?    @map("updated_at") @db.Timestamp(0)
+  product           Product      @relation(fields: [productId], references: [id])
+  seller            Seller       @relation(fields: [sellerId], references: [id])
+  reviewedByAccount Account?     @relation("ProductAffiliateSettingReviewedBy", fields: [reviewedBy], references: [id])
+
+  @@index([sellerId])
+  @@index([reviewedBy])
+  @@map("product_affiliate_settings")
+}
+
+model AffiliateLink {
+  id                  BigInt               @id @default(autoincrement())
+  shortCode           String               @unique @map("short_code") @db.VarChar(255)
+  affiliateId         Int                  @map("affiliate_id")
+  productId           Int                  @map("product_id")
+  status              String               @default("ACTIVE") @db.VarChar(255)
+  revokedAt           DateTime?            @map("revoked_at") @db.Timestamp(0)
+  revokedBy           Int?                 @map("revoked_by")
+  createdAt           DateTime?            @map("created_at") @db.Timestamp(0)
+  updatedAt           DateTime?            @map("updated_at") @db.Timestamp(0)
+  affiliate           Affiliate            @relation(fields: [affiliateId], references: [accountId])
+  product             Product              @relation(fields: [productId], references: [id])
+  revokedByAccount    Account?             @relation("AffiliateLinkRevokedBy", fields: [revokedBy], references: [id])
+  clicks              AffiliateClick[]
+  attributionSessions AttributionSession[]
+  cartItems           CartItem[]
+  orderItems          OrderItem[]
+
+  @@unique([affiliateId, productId])
+  @@index([productId, createdAt])
+  @@index([revokedBy])
+  @@map("affiliate_links")
+}
+
+model AffiliateClick {
+  id              BigInt               @id @default(autoincrement())
+  affiliateLinkId BigInt               @map("affiliate_link_id")
+  viewerId        Int?                 @map("viewer_id")
+  affiliateId     Int                  @map("affiliate_id")
+  productId       Int                  @map("product_id")
+  ip              String?              @db.VarChar(255)
+  userAgent       String?              @map("user_agent") @db.Text
+  referrer        String?              @db.VarChar(255)
+  deviceId        String?              @map("device_id") @db.VarChar(255)
+  clickedAt       DateTime?            @map("clicked_at") @db.Timestamp(0)
+  affiliateLink   AffiliateLink        @relation(fields: [affiliateLinkId], references: [id])
+  viewer          Account?             @relation("AffiliateClickViewer", fields: [viewerId], references: [id])
+  affiliate       Affiliate            @relation(fields: [affiliateId], references: [accountId])
+  product         Product              @relation(fields: [productId], references: [id])
+  firstSessionOf  AttributionSession[] @relation("FirstClickSession")
+  lastSessionOf   AttributionSession[] @relation("LastClickSession")
+
+  @@index([affiliateLinkId, clickedAt])
+  @@index([affiliateId, clickedAt])
+  @@index([productId, clickedAt])
+  @@index([viewerId])
+  @@map("affiliate_clicks")
+}
+
+model AttributionSession {
+  id              BigInt          @id @default(autoincrement())
+  token           String          @unique @db.VarChar(255)
+  viewerId        Int?            @map("viewer_id")
+  affiliateId     Int             @map("affiliate_id")
+  productId       Int             @map("product_id")
+  affiliateLinkId BigInt          @map("affiliate_link_id")
+  firstClickId    BigInt          @map("first_click_id")
+  lastClickId     BigInt?         @map("last_click_id")
+  startedAt       DateTime?       @map("started_at") @db.Timestamp(0)
+  expiresAt       DateTime?       @map("expires_at") @db.Timestamp(0)
+  createdAt       DateTime?       @map("created_at") @db.Timestamp(0)
+  viewer          Account?        @relation("AttributionSessionViewer", fields: [viewerId], references: [id])
+  affiliate       Affiliate       @relation(fields: [affiliateId], references: [accountId])
+  product         Product         @relation(fields: [productId], references: [id])
+  affiliateLink   AffiliateLink   @relation(fields: [affiliateLinkId], references: [id])
+  firstClick      AffiliateClick  @relation("FirstClickSession", fields: [firstClickId], references: [id])
+  lastClick       AffiliateClick? @relation("LastClickSession", fields: [lastClickId], references: [id])
+  cartItems       CartItem[]
+  orderItems      OrderItem[]
+
+  @@index([viewerId])
+  @@index([affiliateId])
+  @@index([productId])
+  @@index([affiliateLinkId])
+  @@index([firstClickId])
+  @@index([lastClickId])
+  @@map("attribution_sessions")
+}
+
+model Cart {
+  id        BigInt     @id @default(autoincrement())
+  accountId Int        @map("account_id")
+  createdAt DateTime?  @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime?  @map("updated_at") @db.Timestamp(0)
+  account   Account    @relation(fields: [accountId], references: [id])
+  items     CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id                   BigInt              @id @default(autoincrement())
+  cartId               BigInt              @map("cart_id")
+  productId            Int                 @map("product_id")
+  variantId            Int                 @map("variant_id")
+  quantity             Int
+  affiliateId          Int?                @map("affiliate_id")
+  attributionSessionId BigInt?             @map("attribution_session_id")
+  affiliateLinkId      BigInt?             @map("affiliate_link_id")
+  createdAt            DateTime?           @map("created_at") @db.Timestamp(0)
+  updatedAt            DateTime?           @map("updated_at") @db.Timestamp(0)
+  cart                 Cart                @relation(fields: [cartId], references: [id])
+  product              Product             @relation(fields: [productId], references: [id])
+  variant              ProductVariant      @relation(fields: [variantId], references: [id])
+  affiliate            Affiliate?          @relation(fields: [affiliateId], references: [accountId])
+  attributionSession   AttributionSession? @relation(fields: [attributionSessionId], references: [id])
+  affiliateLink        AffiliateLink?      @relation(fields: [affiliateLinkId], references: [id])
+
+  @@index([cartId])
+  @@index([productId])
+  @@index([variantId])
+  @@index([affiliateId])
+  @@index([attributionSessionId])
+  @@index([affiliateLinkId])
+  @@map("cart_items")
+}
+
+model PlatformFeeConfig {
+  id            BigInt    @id @default(autoincrement())
+  feeType       String    @map("fee_type") @db.VarChar(255)
+  feeValue      BigInt    @map("fee_value")
+  effectiveFrom DateTime  @map("effective_from") @db.Timestamp(0)
+  effectiveTo   DateTime? @map("effective_to") @db.Timestamp(0)
+  createdAt     DateTime? @map("created_at") @db.Timestamp(0)
+
+  @@map("platform_fee_configs")
+}
+
+model Order {
+  id                           BigInt                @id @default(autoincrement())
+  orderCode                    String                @unique @map("order_code") @db.VarChar(255)
+  buyerId                      Int                   @map("buyer_id")
+  buyerName                    String?               @map("buyer_name") @db.VarChar(255)
+  buyerEmail                   String?               @map("buyer_email") @db.VarChar(255)
+  buyerPhone                   String?               @map("buyer_phone") @db.VarChar(255)
+  shippingAddressId            BigInt?               @map("shipping_address_id")
+  shippingRecipientName        String?               @map("shipping_recipient_name") @db.VarChar(255)
+  shippingPhone                String?               @map("shipping_phone") @db.VarChar(255)
+  shippingProvince             String?               @map("shipping_province") @db.VarChar(255)
+  shippingDistrict             String?               @map("shipping_district") @db.VarChar(255)
+  shippingWard                 String?               @map("shipping_ward") @db.VarChar(255)
+  shippingDetail               String?               @map("shipping_detail") @db.Text
+  shippingMethod               String?               @map("shipping_method") @db.VarChar(255)
+  sellerId                     Int                   @map("seller_id")
+  status                       OrderStatus           @default(CREATED)
+  subtotal                     BigInt                @default(0)
+  shippingFee                  BigInt                @default(0) @map("shipping_fee")
+  discountAmount               BigInt                @default(0) @map("discount_amount")
+  totalAmount                  BigInt                @default(0) @map("total_amount")
+  sellerConfirmedReceivedMoney Boolean               @default(false) @map("seller_confirmed_received_money")
+  sellerConfirmedAt            DateTime?             @map("seller_confirmed_at") @db.Timestamp(0)
+  sellerConfirmedBy            Int?                  @map("seller_confirmed_by")
+  sellerConfirmNote            String?               @map("seller_confirm_note") @db.Text
+  platformFeeType              String?               @map("platform_fee_type") @db.VarChar(255)
+  platformFeeValue             BigInt?               @map("platform_fee_value")
+  platformFeeAmount            BigInt                @default(0) @map("platform_fee_amount")
+  createdAt                    DateTime?             @map("created_at") @db.Timestamp(0)
+  updatedAt                    DateTime?             @map("updated_at") @db.Timestamp(0)
+  buyer                        Account               @relation("OrderBuyer", fields: [buyerId], references: [id])
+  shippingAddress              CustomerAddress?      @relation(fields: [shippingAddressId], references: [id])
+  seller                       Seller                @relation(fields: [sellerId], references: [id])
+  sellerConfirmedByAccount     Account?              @relation("OrderSellerConfirmedBy", fields: [sellerConfirmedBy], references: [id])
+  items                        OrderItem[]
+  payments                     Payment[]
+  histories                    OrderStatusHistory[]
+  refunds                      Refund[]
+  commissions                  AffiliateCommission[]
+
+  @@index([buyerId])
+  @@index([shippingAddressId])
+  @@index([sellerId])
+  @@index([sellerConfirmedBy])
+  @@map("orders")
+}
+
+model OrderItem {
+  id                       BigInt                   @id @default(autoincrement())
+  orderId                  BigInt                   @map("order_id")
+  productId                Int                      @map("product_id")
+  variantId                Int                      @map("variant_id")
+  productNameSnapshot      String                   @map("product_name_snapshot") @db.VarChar(255)
+  variantNameSnapshot      String?                  @map("variant_name_snapshot") @db.VarChar(255)
+  skuSnapshot              String?                  @map("sku_snapshot") @db.VarChar(255)
+  quantity                 Int
+  price                    BigInt
+  lineTotal                BigInt                   @map("line_total")
+  affiliateId              Int?                     @map("affiliate_id")
+  attributionSessionId     BigInt?                  @map("attribution_session_id")
+  affiliateLinkId          BigInt?                  @map("affiliate_link_id")
+  commissionTypeSnapshot   String?                  @map("commission_type_snapshot") @db.VarChar(255)
+  commissionValueSnapshot  BigInt?                  @map("commission_value_snapshot")
+  commissionAmount         BigInt                   @default(0) @map("commission_amount")
+  platformFeeTypeSnapshot  String?                  @map("platform_fee_type_snapshot") @db.VarChar(255)
+  platformFeeValueSnapshot BigInt?                  @map("platform_fee_value_snapshot")
+  platformFeeAmount        BigInt                   @default(0) @map("platform_fee_amount")
+  sellerNetAmount          BigInt                   @default(0) @map("seller_net_amount")
+  createdAt                DateTime?                @map("created_at") @db.Timestamp(0)
+  updatedAt                DateTime?                @map("updated_at") @db.Timestamp(0)
+  order                    Order                    @relation(fields: [orderId], references: [id])
+  product                  Product                  @relation(fields: [productId], references: [id])
+  variant                  ProductVariant           @relation(fields: [variantId], references: [id])
+  affiliate                Affiliate?               @relation(fields: [affiliateId], references: [accountId])
+  attributionSession       AttributionSession?      @relation(fields: [attributionSessionId], references: [id])
+  affiliateLink            AffiliateLink?           @relation(fields: [affiliateLinkId], references: [id])
+  commissionItem           AffiliateCommissionItem?
+
+  @@map("order_items")
+}
+
+model Payment {
+  id              BigInt        @id @default(autoincrement())
+  orderId         BigInt        @map("order_id")
+  method          String        @db.VarChar(255)
+  status          PaymentStatus @default(PENDING)
+  amount          BigInt        @default(0)
+  transactionCode String?       @unique @map("transaction_code") @db.VarChar(255)
+  paidAt          DateTime?     @map("paid_at") @db.Timestamp(0)
+  createdAt       DateTime?     @map("created_at") @db.Timestamp(0)
+  order           Order         @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@map("payments")
+}
+
+model OrderStatusHistory {
+  id        BigInt    @id @default(autoincrement())
+  orderId   BigInt    @map("order_id")
+  oldStatus String?   @map("old_status") @db.VarChar(255)
+  newStatus String    @map("new_status") @db.VarChar(255)
+  note      String?   @db.Text
+  changedBy Int?      @map("changed_by")
+  changedAt DateTime? @map("changed_at") @db.Timestamp(0)
+  order     Order     @relation(fields: [orderId], references: [id])
+  changer   Account?  @relation("OrderStatusChangedBy", fields: [changedBy], references: [id])
+
+  @@index([orderId])
+  @@index([changedBy])
+  @@map("order_status_histories")
+}
+
+model Refund {
+  id          BigInt    @id @default(autoincrement())
+  orderId     BigInt    @map("order_id")
+  reason      String?   @db.Text
+  status      String    @default("PENDING") @db.VarChar(255)
+  amount      BigInt    @default(0)
+  requestedBy Int       @map("requested_by")
+  reviewedBy  Int?      @map("reviewed_by")
+  createdAt   DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime? @map("updated_at") @db.Timestamp(0)
+  order       Order     @relation(fields: [orderId], references: [id])
+  requester   Account   @relation("RefundRequestedBy", fields: [requestedBy], references: [id])
+  reviewer    Account?  @relation("RefundReviewedBy", fields: [reviewedBy], references: [id])
+
+  @@index([orderId])
+  @@index([requestedBy])
+  @@index([reviewedBy])
+  @@map("refunds")
+}
+
+model AffiliateCommission {
+  id               BigInt                    @id @default(autoincrement())
+  orderId          BigInt                    @map("order_id")
+  affiliateId      Int                       @map("affiliate_id")
+  sellerId         Int                       @map("seller_id")
+  totalCommission  BigInt                    @default(0) @map("total_commission")
+  status           CommissionStatus          @default(PENDING)
+  fraudCheckStatus String                    @default("PENDING") @map("fraud_check_status") @db.VarChar(255)
+  rejectReason     String?                   @map("reject_reason") @db.Text
+  fraudCheckedAt   DateTime?                 @map("fraud_checked_at") @db.Timestamp(0)
+  walletCreditedAt DateTime?                 @map("wallet_credited_at") @db.Timestamp(0)
+  note             String?                   @db.Text
+  createdAt        DateTime?                 @map("created_at") @db.Timestamp(0)
+  order            Order                     @relation(fields: [orderId], references: [id])
+  affiliate        Affiliate                 @relation(fields: [affiliateId], references: [accountId])
+  seller           Seller                    @relation(fields: [sellerId], references: [id])
+  items            AffiliateCommissionItem[]
+
+  @@unique([orderId, affiliateId])
+  @@index([affiliateId])
+  @@index([sellerId])
+  @@map("affiliate_commissions")
+}
+
+model AffiliateCommissionItem {
+  id           BigInt              @id @default(autoincrement())
+  commissionId BigInt              @map("commission_id")
+  orderItemId  BigInt              @unique @map("order_item_id")
+  productId    Int                 @map("product_id")
+  amount       BigInt              @default(0)
+  commission   AffiliateCommission @relation(fields: [commissionId], references: [id])
+  orderItem    OrderItem           @relation(fields: [orderItemId], references: [id])
+  product      Product             @relation(fields: [productId], references: [id])
+
+  @@index([commissionId])
+  @@index([productId])
+  @@map("affiliate_commission_items")
+}
+
+model Wallet {
+  id           BigInt              @id @default(autoincrement())
+  ownerType    WalletOwnerType     @map("owner_type")
+  affiliateId  Int?                @map("affiliate_id")
+  sellerId     Int?                @map("seller_id")
+  platformKey  String?             @map("platform_key") @db.VarChar(255)
+  balance      BigInt              @default(0)
+  updatedAt    DateTime?           @map("updated_at") @db.Timestamp(0)
+  affiliate    Affiliate?          @relation(fields: [affiliateId], references: [accountId])
+  seller       Seller?             @relation(fields: [sellerId], references: [id])
+  transactions WalletTransaction[]
+  withdrawals  Withdrawal[]
+
+  @@index([affiliateId])
+  @@index([sellerId])
+  @@map("wallets")
+}
+
+model WalletTransaction {
+  id             BigInt    @id @default(autoincrement())
+  walletId       BigInt    @map("wallet_id")
+  type           String    @db.VarChar(255)
+  amount         BigInt
+  referenceType  String?   @map("reference_type") @db.VarChar(255)
+  referenceId    BigInt?   @map("reference_id")
+  idempotencyKey String?   @unique @map("idempotency_key") @db.VarChar(255)
+  description    String?   @db.Text
+  createdAt      DateTime? @map("created_at") @db.Timestamp(0)
+  wallet         Wallet    @relation(fields: [walletId], references: [id])
+
+  @@index([walletId])
+  @@map("wallet_transactions")
+}
+
+model WithdrawalConfig {
+  id            BigInt    @id @default(autoincrement())
+  targetType    String    @map("target_type") @db.VarChar(255)
+  minAmount     BigInt    @map("min_amount")
+  maxAmount     BigInt    @map("max_amount")
+  effectiveFrom DateTime  @map("effective_from") @db.Timestamp(0)
+  effectiveTo   DateTime? @map("effective_to") @db.Timestamp(0)
+  createdAt     DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime? @map("updated_at") @db.Timestamp(0)
+
+  @@map("withdrawal_configs")
+}
+
+model Withdrawal {
+  id                        BigInt                   @id @default(autoincrement())
+  walletId                  BigInt                   @map("wallet_id")
+  ownerType                 WalletOwnerType          @map("owner_type")
+  amount                    BigInt
+  status                    WithdrawalStatus         @default(PENDING)
+  affiliatePaymentAccountId BigInt?                  @map("affiliate_payment_account_id")
+  sellerPaymentAccountId    BigInt?                  @map("seller_payment_account_id")
+  payoutBatchId             BigInt?                  @map("payout_batch_id")
+  appliedMin                BigInt?                  @map("applied_min")
+  appliedMax                BigInt?                  @map("applied_max")
+  requestedAt               DateTime?                @map("requested_at") @db.Timestamp(0)
+  processedAt               DateTime?                @map("processed_at") @db.Timestamp(0)
+  processedBy               Int?                     @map("processed_by")
+  note                      String?                  @db.Text
+  wallet                    Wallet                   @relation(fields: [walletId], references: [id])
+  affiliatePaymentAccount   AffiliatePaymentAccount? @relation(fields: [affiliatePaymentAccountId], references: [id])
+  sellerPaymentAccount      SellerPaymentAccount?    @relation(fields: [sellerPaymentAccountId], references: [id])
+  payoutBatch               PayoutBatch?             @relation(fields: [payoutBatchId], references: [id])
+  processedByAccount        Account?                 @relation("WithdrawalProcessedBy", fields: [processedBy], references: [id])
+  payoutBatchItem           PayoutBatchItem?
+
+  @@index([walletId])
+  @@index([affiliatePaymentAccountId])
+  @@index([sellerPaymentAccountId])
+  @@index([processedBy])
+  @@index([payoutBatchId])
+  @@map("withdrawals")
+}
+
+model PayoutBatch {
+  id            BigInt            @id @default(autoincrement())
+  payoutDate    DateTime          @map("payout_date") @db.Date
+  type          String            @db.VarChar(255)
+  bankName      String?           @map("bank_name") @db.VarChar(255)
+  branch        String?           @db.VarChar(255)
+  status        String            @default("CREATED") @db.VarChar(255)
+  totalRequests Int               @default(0) @map("total_requests")
+  totalAmount   BigInt            @default(0) @map("total_amount")
+  createdAt     DateTime?         @map("created_at") @db.Timestamp(0)
+  processedAt   DateTime?         @map("processed_at") @db.Timestamp(0)
+  completedAt   DateTime?         @map("completed_at") @db.Timestamp(0)
+  createdBy     Int?              @map("created_by")
+  processedBy   Int?              @map("processed_by")
+  note          String?           @db.Text
+  creator       Account?          @relation("PayoutBatchCreatedBy", fields: [createdBy], references: [id])
+  processor     Account?          @relation("PayoutBatchProcessedBy", fields: [processedBy], references: [id])
+  withdrawals   Withdrawal[]
+  items         PayoutBatchItem[]
+
+  @@index([createdBy])
+  @@index([processedBy])
+  @@map("payout_batches")
+}
+
+model PayoutBatchItem {
+  id              BigInt      @id @default(autoincrement())
+  payoutBatchId   BigInt      @map("payout_batch_id")
+  withdrawalId    BigInt      @unique @map("withdrawal_id")
+  type            String      @db.VarChar(255)
+  bankName        String?     @map("bank_name") @db.VarChar(255)
+  accountNumber   String?     @map("account_number") @db.VarChar(255)
+  accountName     String?     @map("account_name") @db.VarChar(255)
+  status          String      @default("PENDING") @db.VarChar(255)
+  transactionCode String?     @map("transaction_code") @db.VarChar(255)
+  errorMessage    String?     @map("error_message") @db.Text
+  createdAt       DateTime?   @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime?   @map("updated_at") @db.Timestamp(0)
+  payoutBatch     PayoutBatch @relation(fields: [payoutBatchId], references: [id])
+  withdrawal      Withdrawal  @relation(fields: [withdrawalId], references: [id])
+
+  @@map("payout_batch_items")
+}
+
+model Notification {
+  id         BigInt    @id @default(autoincrement())
+  accountId  Int       @map("account_id")
+  title      String    @db.VarChar(255)
+  content    String?   @db.Text
+  type       String    @db.VarChar(255)
+  isRead     Boolean   @default(false) @map("is_read")
+  targetType String?   @map("target_type") @db.VarChar(255)
+  targetId   BigInt?   @map("target_id")
+  createdAt  DateTime? @map("created_at") @db.Timestamp(0)
+  readAt     DateTime? @map("read_at") @db.Timestamp(0)
+  account    Account   @relation(fields: [accountId], references: [id])
+
+  @@index([accountId])
+  @@map("notifications")
+}
+
+model ActivityLog {
+  id          BigInt    @id @default(autoincrement())
+  accountId   Int       @map("account_id")
+  action      String    @db.VarChar(255)
+  targetType  String?   @map("target_type") @db.VarChar(255)
+  targetId    BigInt?   @map("target_id")
+  ip          String?   @db.VarChar(255)
+  userAgent   String?   @map("user_agent") @db.Text
+  description String?   @db.Text
+  createdAt   DateTime? @map("created_at") @db.Timestamp(0)
+  account     Account   @relation(fields: [accountId], references: [id])
+
+  @@index([accountId])
+  @@map("activity_logs")
+}
+
+model FraudAlert {
+  id                 BigInt    @id @default(autoincrement())
+  targetType         String    @map("target_type") @db.VarChar(255)
+  targetId           BigInt    @map("target_id")
+  alertType          String    @map("alert_type") @db.VarChar(255)
+  severity           String    @default("MEDIUM") @db.VarChar(255)
+  description        String?   @db.Text
+  processStatus      String    @default("OPEN") @map("process_status") @db.VarChar(255)
+  processedBy        Int?      @map("processed_by")
+  processedAt        DateTime? @map("processed_at") @db.Timestamp(0)
+  createdAt          DateTime? @map("created_at") @db.Timestamp(0)
+  processedByAccount Account?  @relation("FraudAlertProcessedBy", fields: [processedBy], references: [id])
+
+  @@index([processedBy])
+  @@map("fraud_alerts")
+}
+
+
