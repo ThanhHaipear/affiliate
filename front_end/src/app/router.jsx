@@ -13,6 +13,7 @@ import DashboardLayout from "../components/layout/DashboardLayout";
 import MainLayout from "../components/layout/MainLayout";
 import UnauthorizedPage from "../pages/shared/UnauthorizedPage";
 import NotFoundPage from "../pages/shared/NotFoundPage";
+import VnpayReturnPage from "../pages/shared/VnpayReturnPage";
 import HomePage from "../pages/public/HomePage";
 import ProductListPage from "../pages/public/ProductListPage";
 import ProductDetailPage from "../pages/public/ProductDetailPage";
@@ -365,6 +366,7 @@ const routes = [
       { path: "seller/profile", element: <Navigate to="/dashboard/seller/shop" replace /> },
       { path: "seller/change-password", element: <Navigate to="/dashboard/seller/change-password" replace /> },
       { path: "seller/notifications", element: <Navigate to="/dashboard/seller/notifications" replace /> },
+      { path: "payment/vnpay-return", element: <VnpayReturnPage /> },
       { path: "unauthorized", element: <UnauthorizedPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],

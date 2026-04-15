@@ -1,5 +1,6 @@
 const prisma = require("../../config/prisma");
 const { summarizeOrderFinancialStats } = require("../../utils/order-financial-stats");
+const paymentRepository = require("../payment/payment.repository");
 
 function buildAccountWhere({ q, role, status }) {
   const where = {};
@@ -276,6 +277,13 @@ exports.listOrders = ({ status, sellerConfirmed }) => {
       },
       payments: true,
       commissions: true,
+      refunds: {
+        include: {
+          requester: true,
+          reviewer: true,
+        },
+        orderBy: { createdAt: "desc" },
+      },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -648,4 +656,7 @@ exports.reviewProductAffiliate = ({ settingId, adminId, status, rejectReason }) 
 
     return setting;
   });
+
+exports.reviewRefund = ({ refundId, adminId, status, rejectReason }) =>
+  paymentRepository.reviewRefundRequest({ refundId, adminId, status, rejectReason });
 

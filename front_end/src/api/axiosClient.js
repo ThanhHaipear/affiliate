@@ -4,7 +4,11 @@ import { mockRefreshToken } from "../mock/authMock";
 import { normalizeAuthPayload, unwrapResponseData } from "./response";
 import { useAuthStore } from "../store/authStore";
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+const backendHost = import.meta.env.VITE_BACKEND_HOST;
+const backendPort = import.meta.env.VITE_BACKEND_PORT || "4000";
+const baseURL =
+  import.meta.env.VITE_API_BASE_URL ||
+  (backendHost ? `http://${backendHost}:${backendPort}` : "");
 const useMockAuth = import.meta.env.VITE_USE_MOCK_AUTH === "true";
 
 const axiosClient = axios.create({

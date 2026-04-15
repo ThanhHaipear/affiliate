@@ -60,3 +60,13 @@ exports.withdrawalConfigSchema = z.object({
     path: ["maxAmount"],
   }),
 });
+
+exports.refundReviewSchema = z.object({
+  body: z.object({
+    status: z.enum(["APPROVED", "REJECTED"]),
+    rejectReason: z.string().trim().max(500).optional(),
+  }),
+  params: z.object({
+    refundId: z.coerce.number().int().positive(),
+  }),
+});

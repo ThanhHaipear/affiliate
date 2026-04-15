@@ -20,6 +20,8 @@ const statusLabelMap = {
   COMPLETED: "Đã chốt tiền",
   CANCELLED: "Đã hủy",
   REFUNDED: "Đã hoàn tiền",
+  ORDER_REFUND_REQUESTED: "Đang chờ duyệt hoàn tiền",
+  ORDER_REFUND_REJECTED: "Yêu cầu hoàn tiền bị từ chối",
   WALLET_CREDITED: "Đã cộng ví",
   PAID_OUT: "Đã chi trả",
   OPEN: "Đang mở",

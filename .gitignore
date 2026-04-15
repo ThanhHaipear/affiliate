@@ -1,6 +1,11 @@
-# secrets
+# env files
 .env
 .env.*
+back_end/.env
+back_end/.env.docker
+front_end/.env
+
+# only allow safe templates
 !.env.example
 !back_end/.env.example
 !front_end/.env.example

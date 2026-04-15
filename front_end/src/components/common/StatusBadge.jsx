@@ -13,6 +13,8 @@ const statusStyles = {
   COMPLETED: "bg-emerald-50 text-emerald-800",
   CANCELLED: "bg-slate-100 text-slate-700",
   REFUNDED: "bg-orange-50 text-orange-800",
+  ORDER_REFUND_REQUESTED: "bg-amber-50 text-amber-800",
+  ORDER_REFUND_REJECTED: "bg-rose-50 text-rose-800",
   WALLET_CREDITED: "bg-violet-50 text-violet-800",
   PAID_OUT: "bg-fuchsia-50 text-fuchsia-800",
   OPEN: "bg-rose-50 text-rose-800",

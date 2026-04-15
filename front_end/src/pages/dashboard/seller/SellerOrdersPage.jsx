@@ -9,7 +9,26 @@ import StatusBadge from "../../../components/common/StatusBadge";
 import { useToast } from "../../../hooks/useToast";
 import { formatDateTime } from "../../../lib/format";
 import { mapOrderDto } from "../../../lib/apiMappers";
-import { confirmSellerReceivedMoney, getSellerOrders, refundSellerOrder } from "../../../api/sellerApi";
+import {
+  cancelSellerOrder,
+  confirmSellerReceivedMoney,
+  getSellerOrders,
+  refundSellerOrder,
+} from "../../../api/sellerApi";
+
+function getSellerOrderActions(order) {
+  const isTerminal = ["CANCELLED", "REFUNDED", "COMPLETED"].includes(order.order_status);
+  const hasPendingRefundRequest = order.raw?.refunds?.some((refund) => refund.status === "PENDING");
+  const isPaidOrder = order.order_status === "PAID" && order.payment_status === "PAID" && !order.seller_confirmed_received_money;
+  const isUnpaidOrder = order.order_status === "PENDING_PAYMENT" && order.payment_status === "PENDING";
+
+  return {
+    canConfirmComplete: !isTerminal && !order.seller_confirmed_received_money && !hasPendingRefundRequest,
+    canRefund: isPaidOrder && !hasPendingRefundRequest,
+    canCancel: isUnpaidOrder,
+    hasPendingRefundRequest,
+  };
+}
 
 function SellerOrdersPage({ orders: initialOrders, onConfirmReceivedMoney }) {
   const toast = useToast();
@@ -19,8 +38,11 @@ function SellerOrdersPage({ orders: initialOrders, onConfirmReceivedMoney }) {
   const [error, setError] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [refundTarget, setRefundTarget] = useState(null);
+  const [cancelTarget, setCancelTarget] = useState(null);
   const [refundReason, setRefundReason] = useState("");
   const [refundReasonError, setRefundReasonError] = useState("");
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelReasonError, setCancelReasonError] = useState("");
 
   useEffect(() => {
     if (initialOrders) {
@@ -40,12 +62,12 @@ function SellerOrdersPage({ orders: initialOrders, onConfirmReceivedMoney }) {
         (response || []).map((item) => ({
           ...mapOrderDto(item),
           raw: item,
-          affiliate_name: item.items?.some((entry) => entry.affiliateId) ? "Đơn qua affiliate" : "Đơn trực tiếp",
+          affiliate_name: item.items?.some((entry) => entry.affiliateId) ? "Don qua affiliate" : "Don truc tiep",
           has_affiliate_attribution: item.items?.some((entry) => entry.affiliateId),
         })),
       );
     } catch (loadError) {
-      setError(loadError.response?.data?.message || "Không tải được đơn hàng của shop.");
+      setError(loadError.response?.data?.message || "Khong tai duoc don hang cua shop.");
     } finally {
       setLoading(false);
     }
@@ -59,24 +81,19 @@ function SellerOrdersPage({ orders: initialOrders, onConfirmReceivedMoney }) {
           : {
               ...mapOrderDto(order),
               raw: order,
-              affiliate_name: order.items?.some((entry) => entry.affiliateId) ? "Đơn qua affiliate" : "Đơn trực tiếp",
+              affiliate_name: order.items?.some((entry) => entry.affiliateId) ? "Don qua affiliate" : "Don truc tiep",
               has_affiliate_attribution: order.items?.some((entry) => entry.affiliateId),
             };
 
-      const paymentAwaitingSeller = ["PENDING", "PAID"].includes(normalized.payment_status);
-      const terminalOrder = ["CANCELLED", "REFUNDED", "COMPLETED"].includes(normalized.order_status);
-      const canTakeSettlementAction = paymentAwaitingSeller && !normalized.seller_confirmed_received_money && !terminalOrder;
       const hasAffiliateAttribution =
         normalized.has_affiliate_attribution ?? normalized.raw?.items?.some((entry) => entry.affiliateId) ?? false;
 
       return {
         ...normalized,
         affiliate_name:
-          normalized.affiliate_name ||
-          (hasAffiliateAttribution ? "Đơn qua affiliate" : "Đơn trực tiếp"),
+          normalized.affiliate_name || (hasAffiliateAttribution ? "Don qua affiliate" : "Don truc tiep"),
         has_affiliate_attribution: hasAffiliateAttribution,
-        can_confirm_seller_received_money: canTakeSettlementAction,
-        can_refund_order: canTakeSettlementAction,
+        ...getSellerOrderActions(normalized),
       };
     });
   }, [orders]);
@@ -93,13 +110,13 @@ function SellerOrdersPage({ orders: initialOrders, onConfirmReceivedMoney }) {
       } else {
         await confirmSellerReceivedMoney(selectedOrder.id);
       }
-      toast.success("Đã xác nhận shop đã nhận thanh toán.");
+      toast.success("Da xac nhan hoan tat don hang.");
       setSelectedOrder(null);
       if (!initialOrders) {
         await loadOrders();
       }
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Không xác nhận được đơn hàng.");
+      toast.error(submitError.response?.data?.message || "Khong xac nhan duoc don hang.");
     } finally {
       setSubmitting(false);
     }
@@ -112,7 +129,7 @@ function SellerOrdersPage({ orders: initialOrders, onConfirmReceivedMoney }) {
 
     const normalizedReason = refundReason.trim();
     if (normalizedReason.length < 3) {
-      setRefundReasonError("Lý do hoàn tiền phải từ 3 ký tự trở lên.");
+      setRefundReasonError("Ly do hoan tien phai tu 3 ky tu tro len.");
       return;
     }
 
@@ -120,14 +137,42 @@ function SellerOrdersPage({ orders: initialOrders, onConfirmReceivedMoney }) {
       setSubmitting(true);
       setRefundReasonError("");
       await refundSellerOrder(refundTarget.id, { reason: normalizedReason });
-      toast.success("Đã hoàn tiền đơn hàng.");
+      toast.success("Da gui yeu cau hoan tien cho admin duyet.");
       setRefundTarget(null);
       setRefundReason("");
       if (!initialOrders) {
         await loadOrders();
       }
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Không hoàn tiền được đơn hàng.");
+      toast.error(submitError.response?.data?.message || "Khong hoan tien duoc don hang.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleCancelOrder() {
+    if (!cancelTarget) {
+      return;
+    }
+
+    const normalizedReason = cancelReason.trim();
+    if (normalizedReason.length < 3) {
+      setCancelReasonError("Ly do huy don phai tu 3 ky tu tro len.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setCancelReasonError("");
+      await cancelSellerOrder(cancelTarget.id, { reason: normalizedReason });
+      toast.success("Da huy don hang.");
+      setCancelTarget(null);
+      setCancelReason("");
+      if (!initialOrders) {
+        await loadOrders();
+      }
+    } catch (submitError) {
+      toast.error(submitError.response?.data?.message || "Khong huy duoc don hang.");
     } finally {
       setSubmitting(false);
     }
@@ -145,45 +190,53 @@ function SellerOrdersPage({ orders: initialOrders, onConfirmReceivedMoney }) {
     setRefundReasonError("");
   }
 
+  function openCancelModal(order) {
+    setCancelTarget(order);
+    setCancelReason("");
+    setCancelReasonError("");
+  }
+
+  function closeCancelModal() {
+    setCancelTarget(null);
+    setCancelReason("");
+    setCancelReasonError("");
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Seller"
-        title="Đơn hàng của shop"
-        description="Khi đơn đang chờ thanh toán, chính shop là bên xác nhận đã nhận tiền hoặc chọn hoàn tiền. Sau khi shop xác nhận, hệ thống mới chốt tiền và hoa hồng."
+        title="Don hang cua shop"
+        description="Don da thanh toan se cho phep hoan tien hoac xac nhan hoan tat. Don chua thanh toan se cho phep xac nhan hoan tat hoac huy don."
       />
-      {loading ? <EmptyState title="Đang tải đơn hàng của shop" description="Hệ thống đang lấy danh sách đơn hàng từ backend." /> : null}
-      {!loading && error ? <EmptyState title="Không tải được đơn hàng" description={error} /> : null}
+      {loading ? <EmptyState title="Dang tai don hang cua shop" description="He thong dang lay danh sach don hang tu backend." /> : null}
+      {!loading && error ? <EmptyState title="Khong tai duoc don hang" description={error} /> : null}
       {!loading && !error ? (
         <DataTable
           columns={[
-            { key: "code", title: "Đơn hàng" },
-            { key: "product_name", title: "Sản phẩm" },
-            { key: "affiliate_name", title: "Nguồn đơn" },
+            { key: "code", title: "Don hang" },
+            { key: "product_name", title: "San pham" },
+            { key: "affiliate_name", title: "Nguon don" },
             {
               key: "affiliate_attribution_label",
               title: "Affiliate",
               render: (row) => (
-                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${row.has_affiliate_attribution ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
-                  {row.has_affiliate_attribution ? "Có" : "Không"}
+                <span
+                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                    row.has_affiliate_attribution ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {row.has_affiliate_attribution ? "Co" : "Khong"}
                 </span>
               ),
             },
-            { key: "amount", title: "Giá trị", render: (row) => <MoneyText value={row.amount} /> },
-            { key: "order_status", title: "Trạng thái đơn", render: (row) => <StatusBadge status={row.order_status} /> },
-            {
-              key: "payment_status",
-              title: "Thanh toán",
-              render: (row) => (
-                <span title={row.payment_status === "PENDING" ? "Đang chờ shop xác nhận đã nhận tiền" : undefined}>
-                  <StatusBadge status={row.payment_status} />
-                </span>
-              ),
-            },
-            { key: "created_at", title: "Ngày tạo", render: (row) => formatDateTime(row.created_at) },
+            { key: "amount", title: "Gia tri", render: (row) => <MoneyText value={row.amount} /> },
+            { key: "order_status", title: "Trang thai don", render: (row) => <StatusBadge status={row.order_status} /> },
+            { key: "payment_status", title: "Thanh toan", render: (row) => <StatusBadge status={row.payment_status} /> },
+            { key: "created_at", title: "Ngay tao", render: (row) => formatDateTime(row.created_at) },
             {
               key: "actions",
-              title: "Tác vụ",
+              title: "Tac vu",
               render: (row) => {
                 if (row.seller_confirmed_received_money) {
                   return <StatusBadge status="COMPLETED" />;
@@ -193,18 +246,35 @@ function SellerOrdersPage({ orders: initialOrders, onConfirmReceivedMoney }) {
                   return <StatusBadge status="REFUNDED" />;
                 }
 
-                if (!row.can_confirm_seller_received_money) {
-                  return <span className="text-sm text-slate-500">Không còn thao tác</span>;
+                if (row.order_status === "CANCELLED") {
+                  return <StatusBadge status="CANCELLED" />;
+                }
+
+                if (row.hasPendingRefundRequest) {
+                  return <StatusBadge status="PENDING" />;
+                }
+
+                if (!row.canConfirmComplete && !row.canRefund && !row.canCancel) {
+                  return <span className="text-sm text-slate-500">Khong con thao tac</span>;
                 }
 
                 return (
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => setSelectedOrder(row)}>
-                      Xác nhận đã nhận tiền
-                    </Button>
-                    <Button size="sm" variant="danger" onClick={() => openRefundModal(row)}>
-                      Hoàn tiền
-                    </Button>
+                    {row.canConfirmComplete ? (
+                      <Button size="sm" onClick={() => setSelectedOrder(row)}>
+                        Xac nhan hoan tat don
+                      </Button>
+                    ) : null}
+                    {row.canRefund ? (
+                      <Button size="sm" variant="danger" onClick={() => openRefundModal(row)}>
+                        Hoan tien
+                      </Button>
+                    ) : null}
+                    {row.canCancel ? (
+                      <Button size="sm" variant="danger" onClick={() => openCancelModal(row)}>
+                        Huy don
+                      </Button>
+                    ) : null}
                   </div>
                 );
               },
@@ -215,25 +285,25 @@ function SellerOrdersPage({ orders: initialOrders, onConfirmReceivedMoney }) {
       ) : null}
       <ConfirmModal
         open={Boolean(selectedOrder)}
-        title="Xác nhận đã nhận tiền"
-        description={`Nếu xác nhận đơn ${selectedOrder?.code}, hệ thống sẽ coi shop đã nhận thanh toán, chốt tiền cho shop và phí sàn. Đơn có affiliate mới cộng hoa hồng tiếp thị.`}
-        confirmLabel="Xác nhận"
+        title="Xac nhan hoan tat don"
+        description={`Neu xac nhan don ${selectedOrder?.code}, he thong se chot don sang trang thai hoan tat va thuc hien doi soat tien cho shop, phi san, hoa hong affiliate neu co.`}
+        confirmLabel="Xac nhan"
         loading={submitting}
         onClose={() => setSelectedOrder(null)}
         onConfirm={handleConfirmReceivedMoney}
       />
       <ConfirmModal
         open={Boolean(refundTarget)}
-        title="Hoàn tiền đơn hàng"
-        description={`Nếu hoàn tiền đơn ${refundTarget?.code}, hệ thống sẽ không cộng tiền cho shop và cũng không phát sinh hoa hồng affiliate.`}
-        confirmLabel="Hoàn tiền"
+        title="Hoan tien don hang"
+        description={`Neu hoan tien don ${refundTarget?.code}, he thong se dao trang thai thanh toan va khong cong tien cho shop.`}
+        confirmLabel="Hoan tien"
         confirmVariant="danger"
         loading={submitting}
         onClose={closeRefundModal}
         onConfirm={handleRefundOrder}
       >
         <label className="block text-sm font-medium text-slate-200" htmlFor="seller-refund-reason">
-          Lý do hoàn tiền
+          Ly do hoan tien
         </label>
         <textarea
           id="seller-refund-reason"
@@ -246,9 +316,37 @@ function SellerOrdersPage({ orders: initialOrders, onConfirmReceivedMoney }) {
           }}
           rows={4}
           className="mt-2 w-full rounded-2xl border border-slate-600 bg-slate-900/70 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400"
-          placeholder="Nhập lý do hoàn tiền"
+          placeholder="Nhap ly do hoan tien"
         />
         {refundReasonError ? <p className="mt-2 text-sm text-rose-300">{refundReasonError}</p> : null}
+      </ConfirmModal>
+      <ConfirmModal
+        open={Boolean(cancelTarget)}
+        title="Huy don hang"
+        description={`Neu huy don ${cancelTarget?.code}, he thong se huy don chua thanh toan va giai phong so luong dang giu cho don nay.`}
+        confirmLabel="Huy don"
+        confirmVariant="danger"
+        loading={submitting}
+        onClose={closeCancelModal}
+        onConfirm={handleCancelOrder}
+      >
+        <label className="block text-sm font-medium text-slate-200" htmlFor="seller-cancel-reason">
+          Ly do huy don
+        </label>
+        <textarea
+          id="seller-cancel-reason"
+          value={cancelReason}
+          onChange={(event) => {
+            setCancelReason(event.target.value);
+            if (cancelReasonError) {
+              setCancelReasonError("");
+            }
+          }}
+          rows={4}
+          className="mt-2 w-full rounded-2xl border border-slate-600 bg-slate-900/70 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400"
+          placeholder="Nhap ly do huy don"
+        />
+        {cancelReasonError ? <p className="mt-2 text-sm text-rose-300">{cancelReasonError}</p> : null}
       </ConfirmModal>
     </div>
   );

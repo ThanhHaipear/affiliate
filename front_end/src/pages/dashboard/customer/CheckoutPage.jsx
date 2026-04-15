@@ -1,7 +1,7 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getCustomerAddresses } from "../../../api/customerAddressApi";
-import { createCheckoutOrder, getCart } from "../../../api/orderApi";
+import { createCheckoutOrder, createVnpayPaymentUrl, getCart } from "../../../api/orderApi";
 import Button from "../../../components/common/Button";
 import EmptyState from "../../../components/common/EmptyState";
 import Input from "../../../components/common/Input";
@@ -29,7 +29,7 @@ function CheckoutPage() {
     buyerEmail: currentUser?.email || "",
     shippingFee: 30000,
     discountAmount: 0,
-    paymentMethod: "BANK_TRANSFER",
+    paymentMethod: "VNPAY",
     shippingMethod: "EXPRESS",
   });
 
@@ -55,7 +55,7 @@ function CheckoutPage() {
       setAddresses(nextAddresses);
       setSelectedAddressId(defaultAddress ? String(defaultAddress.id) : "");
     } catch (loadError) {
-      setError(loadError.response?.data?.message || "Không tải được dữ liệu checkout.");
+      setError(loadError.response?.data?.message || "Khong tai duoc du lieu checkout.");
     } finally {
       setLoading(false);
     }
@@ -97,12 +97,12 @@ function CheckoutPage() {
 
   async function handleSubmit() {
     if (!selectedAddress) {
-      toast.error("Vui lòng chọn địa chỉ giao hàng trước khi đặt đơn.");
+      toast.error("Vui long chon dia chi giao hang truoc khi dat don.");
       return;
     }
 
     if (!checkoutItems.length) {
-      toast.error("Không có sản phẩm nào được chọn để thanh toán.");
+      toast.error("Khong co san pham nao duoc chon de thanh toan.");
       return;
     }
 
@@ -118,10 +118,17 @@ function CheckoutPage() {
         }),
       );
       const order = mapOrderDto(response);
-      toast.success("Đã tạo đơn hàng từ giỏ hàng.");
+
+      if (["VNPAY", "CARD"].includes(form.paymentMethod)) {
+        const vnpay = await createVnpayPaymentUrl(order.id, {});
+        window.location.href = vnpay.paymentUrl;
+        return;
+      }
+
+      toast.success("Da tao don hang tu gio hang.");
       navigate(`/dashboard/customer/orders/${order.id}`);
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Không tạo được đơn hàng.");
+      toast.error(submitError.response?.data?.message || "Khong tao duoc don hang.");
     } finally {
       setSubmitting(false);
     }
@@ -130,24 +137,24 @@ function CheckoutPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Khách hàng"
-        title="Thanh toán"
-        description="Chọn địa chỉ giao hàng đã lưu, kiểm tra sản phẩm đã chọn và xác nhận phương thức thanh toán trước khi đặt đơn."
+        eyebrow="Khach hang"
+        title="Thanh toan"
+        description="Chon dia chi giao hang, kiem tra san pham da chon va xac nhan phuong thuc thanh toan truoc khi dat don."
         action={
           <Button variant="secondary" onClick={() => navigate("/dashboard/customer/address")}>
-            Quản lý địa chỉ
+            Quan ly dia chi
           </Button>
         }
       />
-      {loading ? <EmptyState title="Đang tải giỏ hàng" description="Hệ thống đang chuẩn bị dữ liệu checkout." /> : null}
-      {!loading && error ? <EmptyState title="Không thể thanh toán" description={error} /> : null}
+      {loading ? <EmptyState title="Dang tai gio hang" description="He thong dang chuan bi du lieu checkout." /> : null}
+      {!loading && error ? <EmptyState title="Khong the thanh toan" description={error} /> : null}
       {!loading && !error ? (
         <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
           <div className="space-y-6">
             <StepSection
               index="01"
-              title="Chọn địa chỉ giao hàng"
-              description="Bạn có thể chọn một trong các địa chỉ đã lưu của mình ngay tại đây. Địa chỉ đang chọn sẽ được cập nhật sang phần xác nhận đơn hàng bên phải."
+              title="Chon dia chi giao hang"
+              description="Ban co the chon mot trong cac dia chi da luu. Dia chi dang chon se duoc dua vao don hang."
             >
               {addresses.length ? (
                 <div className="grid gap-4">
@@ -156,9 +163,8 @@ function CheckoutPage() {
                     return (
                       <div
                         key={address.id}
-                        className={`rounded-[1.5rem] border p-4 transition ${active
-                          ? "border-sky-500 bg-sky-50 shadow-sm"
-                          : "border-slate-200 bg-white"
+                        className={`rounded-[1.5rem] border p-4 transition ${
+                          active ? "border-sky-500 bg-sky-50 shadow-sm" : "border-slate-200 bg-white"
                         }`}
                       >
                         <div className="flex items-start gap-4">
@@ -181,12 +187,12 @@ function CheckoutPage() {
                               <div className="flex flex-col items-end gap-2">
                                 {address.isDefault ? (
                                   <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
-                                    Mặc định
+                                    Mac dinh
                                   </span>
                                 ) : null}
                                 {active ? (
                                   <span className="rounded-full bg-sky-600 px-3 py-1 text-xs font-semibold text-white">
-                                    Đang chọn
+                                    Dang chon
                                   </span>
                                 ) : null}
                               </div>
@@ -197,7 +203,7 @@ function CheckoutPage() {
                                 variant={active ? "secondary" : "primary"}
                                 onClick={() => handleSelectAddress(address.id)}
                               >
-                                {active ? "Địa chỉ đang chọn" : "Chọn địa chỉ này"}
+                                {active ? "Dia chi dang chon" : "Chon dia chi nay"}
                               </Button>
                             </div>
                           </div>
@@ -208,47 +214,46 @@ function CheckoutPage() {
                 </div>
               ) : (
                 <EmptyState
-                  title="Chưa có địa chỉ giao hàng"
-                  description="Bạn cần thêm ít nhất một địa chỉ trước khi đặt đơn hàng."
-                  action={
-                    <Button onClick={() => navigate("/dashboard/customer/address")}>Thêm địa chỉ ngay</Button>
-                  }
+                  title="Chua co dia chi giao hang"
+                  description="Ban can them it nhat mot dia chi truoc khi dat don hang."
+                  action={<Button onClick={() => navigate("/dashboard/customer/address")}>Them dia chi ngay</Button>}
                 />
               )}
             </StepSection>
+
             <StepSection
               index="02"
-              title="Liên hệ và vận chuyển"
-              description="Email, hình thức giao hàng và thanh toán sẽ đi cùng đơn hàng đã chọn ở trên."
+              title="Lien he va van chuyen"
+              description="Email, hinh thuc giao hang va thanh toan se di cung don hang da chon."
             >
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="md:col-span-2">
-                  <Input label="Email nhận thông báo" name="buyerEmail" value={form.buyerEmail} onChange={handleChange} />
+                  <Input label="Email nhan thong bao" name="buyerEmail" value={form.buyerEmail} onChange={handleChange} />
                 </div>
                 <Select
-                  label="Phương thức giao hàng"
+                  label="Phuong thuc giao hang"
                   name="shippingMethod"
                   value={form.shippingMethod}
                   onChange={handleChange}
                   options={shippingMethods}
                 />
                 <Select
-                  label="Phương thức thanh toán"
+                  label="Phuong thuc thanh toan"
                   name="paymentMethod"
                   value={form.paymentMethod}
                   onChange={handleChange}
                   options={[
-                    { label: "Chuyển khoản", value: "BANK_TRANSFER" },
-                    { label: "Thanh toán khi nhận hàng", value: "COD" },
-                    { label: "Thẻ ngân hàng", value: "CARD" },
+                    { label: "VNPAY sandbox", value: "VNPAY" },
+                    { label: "Thanh toan khi nhan hang", value: "COD" },
                   ]}
                 />
               </div>
             </StepSection>
+
             <StepSection
               index="03"
-              title="Sản phẩm đã chọn"
-              description="Chỉ các sản phẩm được chọn ở giỏ hàng mới đi tiếp sang đơn hàng này."
+              title="San pham da chon"
+              description="Chi cac san pham duoc chon o gio hang moi di tiep sang don hang nay."
             >
               <div className="space-y-4">
                 {groupedCheckoutItems.map((group) => (
@@ -258,17 +263,22 @@ function CheckoutPage() {
                       <div className="flex-1">
                         <p className="font-medium text-slate-900">{group.product.name}</p>
                         <p className="mt-1 text-sm text-slate-500">
-                          {group.variant} | Tổng x{group.quantity}
+                          {group.variant} | Tong x{group.quantity}
                         </p>
                         <p className={`mt-1 text-sm ${group.hasAffiliateAttributed ? "text-emerald-700" : "text-slate-500"}`}>
-                          {group.hasAffiliateAttributed ? "Block này có cả phần direct và/hoặc phần gắn affiliate." : "Block này là đơn trực tiếp."}
+                          {group.hasAffiliateAttributed
+                            ? "Block nay co phan direct va/hoac phan gan affiliate."
+                            : "Block nay la don truc tiep."}
                         </p>
                       </div>
                       <MoneyText value={group.lineTotal} />
                     </div>
                     <div className="mt-3 space-y-2">
                       {group.allocations.map((allocation) => (
-                        <div key={allocation.id} className="flex items-center justify-between rounded-[1rem] border border-slate-200 bg-white px-3 py-2 text-sm">
+                        <div
+                          key={allocation.id}
+                          className="flex items-center justify-between rounded-[1rem] border border-slate-200 bg-white px-3 py-2 text-sm"
+                        >
                           <span className={allocation.isAffiliateAttributed ? "text-emerald-700" : "text-slate-600"}>
                             {allocation.label} | x{allocation.quantity}
                           </span>
@@ -281,26 +291,27 @@ function CheckoutPage() {
               </div>
             </StepSection>
           </div>
+
           <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-            <p className="text-xs uppercase tracking-[0.3em] text-cyan-700">Đơn hàng</p>
+            <p className="text-xs uppercase tracking-[0.3em] text-cyan-700">Don hang</p>
             <p className="mt-4 text-3xl font-semibold text-slate-900">
               <MoneyText value={total} />
             </p>
             <div className="mt-5 space-y-3 text-sm text-slate-600">
               <div className="flex justify-between">
-                <span>Số sản phẩm đã chọn</span>
+                <span>So san pham da chon</span>
                 <span>{groupedCheckoutItems.length}</span>
               </div>
               <div className="flex justify-between">
-                <span>Tạm tính</span>
+                <span>Tam tinh</span>
                 <MoneyText value={subtotal} />
               </div>
               <div className="flex justify-between">
-                <span>Phí giao hàng</span>
+                <span>Phi giao hang</span>
                 <MoneyText value={form.shippingFee} />
               </div>
               <div className="flex justify-between">
-                <span>Giảm giá</span>
+                <span>Giam gia</span>
                 <MoneyText value={form.discountAmount} />
               </div>
             </div>
@@ -314,7 +325,7 @@ function CheckoutPage() {
                   </p>
                 </>
               ) : (
-                "Chưa chọn địa chỉ giao hàng."
+                "Chua chon dia chi giao hang."
               )}
             </div>
             <Button
@@ -324,7 +335,7 @@ function CheckoutPage() {
               disabled={!checkoutItems.length || !selectedAddress}
               onClick={handleSubmit}
             >
-              Xác nhận đặt hàng
+              {form.paymentMethod === "VNPAY" ? "Sang VNPAY de thanh toan" : "Xac nhan dat hang"}
             </Button>
           </div>
         </div>

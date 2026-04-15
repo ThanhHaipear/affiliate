@@ -1,17 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { getAdminFinancialStats, getAdminOrders } from "../../api/adminApi";
+import { getAdminFinancialStats, getAdminOrders, reviewRefundRequest } from "../../api/adminApi";
 import AdminStatCard from "../../components/admin/AdminStatCard";
+import Button from "../../components/common/Button";
+import ConfirmModal from "../../components/common/ConfirmModal";
 import DataTable from "../../components/common/DataTable";
 import EmptyState from "../../components/common/EmptyState";
 import Input from "../../components/common/Input";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import PageHeader from "../../components/common/PageHeader";
 import StatusBadge from "../../components/common/StatusBadge";
+import { useToast } from "../../hooks/useToast";
 import { mapAdminOrderDto } from "../../lib/adminMappers";
 import { formatCurrency, formatDateTime } from "../../lib/format";
 
 function AdminOrdersPage() {
+  const toast = useToast();
   const [searchParams] = useSearchParams();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,6 +24,8 @@ function AdminOrdersPage() {
   const [status, setStatus] = useState("ALL");
   const [sellerConfirmed, setSellerConfirmed] = useState("ALL");
   const [financialStats, setFinancialStats] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [reviewTarget, setReviewTarget] = useState(null);
   const spotlightOrderId = searchParams.get("orderId") || "";
 
   useEffect(() => {
@@ -63,6 +69,27 @@ function AdminOrdersPage() {
     } catch (loadError) {
       setFinancialStats(null);
       setError(loadError.response?.data?.message || "Khong tai duoc thong ke tai chinh admin.");
+    }
+  }
+
+  async function handleReviewRefund(statusValue) {
+    if (!reviewTarget?.latestRefundId) {
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await reviewRefundRequest(reviewTarget.latestRefundId, {
+        status: statusValue,
+        ...(statusValue === "REJECTED" ? { rejectReason: reviewTarget.latestRefundReason || "Rejected by admin" } : {}),
+      });
+      toast.success(statusValue === "APPROVED" ? "Da duyet yeu cau hoan tien." : "Da tu choi yeu cau hoan tien.");
+      setReviewTarget(null);
+      await loadOrders();
+    } catch (submitError) {
+      toast.error(submitError.response?.data?.message || "Khong review duoc yeu cau hoan tien.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -115,7 +142,7 @@ function AdminOrdersPage() {
       <PageHeader
         eyebrow="Orders"
         title="Revenue and order monitoring"
-        description="Trang nay dang tong hop don hang that tren toan he thong, gom order status, payment status, affiliate attribution va seller settlement."
+        description="Admin theo doi don hang, thanh toan, settlement va cac yeu cau huy/hoan tien cho don VNPAY."
       />
 
       {spotlightOrderId ? (
@@ -124,11 +151,6 @@ function AdminOrdersPage() {
           <h3 className="mt-2 text-lg font-semibold text-slate-900">
             {spotlightOrder ? `Dang nhan manh don ${spotlightOrder.code}` : `Khong tim thay don #${spotlightOrderId}`}
           </h3>
-          <p className="mt-2 text-sm leading-7 text-slate-600">
-            {spotlightOrder
-              ? "Bang du lieu da tu dong loc theo order id tu notification, va dong lien quan duoc to noi bat o ben duoi."
-              : "Don co the da bi loai bo boi bo loc hien tai hoac backend khong tra ve trong danh sach."}
-          </p>
         </div>
       ) : null}
 
@@ -138,7 +160,6 @@ function AdminOrdersPage() {
         <AdminStatCard label="Hoa hong tam tinh" value={formatCurrency(summary.pendingCommission)} meta="Chua vao vi that" tone="amber" />
         <AdminStatCard label="Hoa hong da ghi nhan" value={formatCurrency(summary.settledCommission)} meta="Da vao vi sau settlement" tone="amber" />
         <AdminStatCard label="Phi nen tang tam tinh" value={formatCurrency(summary.pendingPlatformFee)} meta="Chua vao vi nen tang" tone="rose" />
-        <AdminStatCard label="Phi nen tang da ghi nhan" value={formatCurrency(summary.settledPlatformFee)} meta="Da vao vi nen tang" tone="rose" />
         <AdminStatCard label="Seller da xac nhan" value={summary.confirmed.toLocaleString("vi-VN")} meta="Dieu kien ghi nhan hoa hong" tone="rose" />
       </div>
 
@@ -199,13 +220,27 @@ function AdminOrdersPage() {
             ),
           },
           { key: "totalAmount", title: "Tong tien", render: (row) => formatCurrency(row.totalAmount) },
-          { key: "commissionTotal", title: "Hoa hong", render: (row) => formatCurrency(row.commissionTotal) },
           { key: "paymentStatus", title: "Thanh toan", render: (row) => <StatusBadge status={row.paymentStatus} /> },
           { key: "orderStatus", title: "Don hang", render: (row) => <StatusBadge status={row.orderStatus} /> },
           {
-            key: "sellerConfirmedReceivedMoney",
-            title: "Settlement",
-            render: (row) => <StatusBadge status={row.sellerConfirmedReceivedMoney ? "APPROVED" : "PENDING"} />,
+            key: "refund",
+            title: "Refund request",
+            render: (row) =>
+              row.latestRefundStatus ? <StatusBadge status={row.latestRefundStatus} /> : <span className="text-sm text-slate-500">--</span>,
+          },
+          {
+            key: "actions",
+            title: "Tac vu",
+            render: (row) =>
+              row.latestRefundStatus === "PENDING" ? (
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" onClick={() => setReviewTarget(row)}>
+                    Duyet refund
+                  </Button>
+                </div>
+              ) : (
+                <span className="text-sm text-slate-500">--</span>
+              ),
           },
         ]}
         rows={filtered}
@@ -213,6 +248,22 @@ function AdminOrdersPage() {
         emptyTitle="Khong co don hang phu hop"
         emptyDescription="Thu doi bo loc theo status hoac search theo ma don."
       />
+
+      <ConfirmModal
+        open={Boolean(reviewTarget)}
+        title="Duyet yeu cau hoan tien"
+        description={`Don ${reviewTarget?.code} dang co yeu cau refund pending. Chon duyet de hoan tien, hoac dong modal va tu choi.`}
+        confirmLabel="Duyet"
+        loading={submitting}
+        onClose={() => setReviewTarget(null)}
+        onConfirm={() => handleReviewRefund("APPROVED")}
+      >
+        <div className="mt-4 flex justify-end">
+          <Button variant="danger" loading={submitting} onClick={() => handleReviewRefund("REJECTED")}>
+            Tu choi
+          </Button>
+        </div>
+      </ConfirmModal>
     </div>
   );
 }

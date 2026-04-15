@@ -71,3 +71,8 @@ exports.reviewProductAffiliate = asyncHandler(async (req, res) => {
   const data = await adminService.reviewProductAffiliate(req.params.settingId, req.user.id, req.validated.body);
   successResponse(res, data, "Product affiliate setting reviewed");
 });
+
+exports.reviewRefund = asyncHandler(async (req, res) => {
+  const data = await adminService.reviewRefund(req.params.refundId, req.user.id, req.validated.body);
+  successResponse(res, data, "Refund request reviewed");
+});

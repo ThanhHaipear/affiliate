@@ -45,9 +45,21 @@ async function createCheckoutOrder(payload) {
   return unwrapResponseData(response);
 }
 
+async function createVnpayPaymentUrl(orderId, payload) {
+  const response = await axiosClient.post(`/api/payments/${orderId}/vnpay-url`, payload || {});
+  return unwrapResponseData(response);
+}
+
+async function confirmVnpayReturn(payload) {
+  const response = await axiosClient.post("/api/payments/vnpay-return/confirm", payload);
+  return unwrapResponseData(response);
+}
+
 export {
   createCheckoutOrder,
+  createVnpayPaymentUrl,
   cancelCustomerOrder,
+  confirmVnpayReturn,
   getCart,
   getCustomerOrderDetail,
   getCustomerOrders,

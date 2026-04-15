@@ -407,6 +407,7 @@ function mapAdminAccountDto(account) {
 
 function mapAdminOrderDto(order) {
   const payment = order.payments?.[0];
+  const latestRefund = order.refunds?.[0] || null;
   const attributedItems = (order.items || []).filter((item) => item.affiliateId);
   const commissionTotal = (order.commissions || []).reduce(
     (sum, item) => sum + (item.status === "REJECTED" ? 0 : toNumber(item.totalCommission)),
@@ -423,6 +424,9 @@ function mapAdminOrderDto(order) {
     orderStatus: toText(order.status, "CREATED"),
     paymentStatus: toText(payment?.status, "PENDING"),
     paymentMethod: toText(payment?.method),
+    latestRefundId: latestRefund?.id ? String(latestRefund.id) : "",
+    latestRefundStatus: latestRefund?.status || "",
+    latestRefundReason: latestRefund?.reason || "",
     sellerConfirmedReceivedMoney: Boolean(order.sellerConfirmedReceivedMoney),
     affiliateOrders: attributedItems.length,
     hasAffiliateAttribution,

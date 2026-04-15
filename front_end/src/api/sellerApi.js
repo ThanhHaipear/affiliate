@@ -46,6 +46,11 @@ async function refundSellerOrder(orderId, payload) {
   return unwrapResponseData(response);
 }
 
+async function cancelSellerOrder(orderId, payload) {
+  const response = await axiosClient.post(`/api/payments/${orderId}/seller-cancel`, payload || {});
+  return unwrapResponseData(response);
+}
+
 async function getSellerWithdrawals(params) {
   const response = await axiosClient.get("/api/withdrawals/me", { params });
   return unwrapResponseData(response);
@@ -53,6 +58,7 @@ async function getSellerWithdrawals(params) {
 
 export {
   confirmSellerReceivedMoney,
+  cancelSellerOrder,
   getSellerOrders,
   getSellerOverview,
   getSellerProfile,

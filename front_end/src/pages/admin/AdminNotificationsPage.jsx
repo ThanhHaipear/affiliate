@@ -29,6 +29,10 @@ function resolveAdminNotificationLink(item) {
     return null;
   }
 
+  if (item.type === "ORDER_REFUND_REQUESTED" || item.type === "ORDER_REFUND_REJECTED") {
+    return `/admin/orders?orderId=${targetId}`;
+  }
+
   if (item.type === "PLATFORM_FEE_CREDIT" || item.type === "PLATFORM_FEE_REVERSAL") {
     return `/admin/platform-fees?orderId=${targetId}`;
   }

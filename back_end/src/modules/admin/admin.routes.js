@@ -12,6 +12,7 @@ const {
   adminOrdersQuerySchema,
   fraudAlertsQuerySchema,
   platformFeeSchema,
+  refundReviewSchema,
   withdrawalConfigSchema,
 } = require("./admin.schema");
 
@@ -32,5 +33,6 @@ router.patch("/sellers/:sellerId/review", validate(reviewSchema), controller.rev
 router.patch("/affiliates/:affiliateId/review", validate(reviewSchema), controller.reviewAffiliate);
 router.patch("/products/:productId/review", validate(reviewSchema), controller.reviewProduct);
 router.patch("/product-affiliate-settings/:settingId/review", validate(reviewSchema), controller.reviewProductAffiliate);
+router.patch("/refunds/:refundId/review", validate(refundReviewSchema), controller.reviewRefund);
 
 module.exports = router;

@@ -131,6 +131,11 @@ async function reviewWithdrawal(withdrawalId, payload) {
   return unwrapResponseData(response);
 }
 
+async function reviewRefundRequest(refundId, payload) {
+  const response = await axiosClient.patch(`/api/admin/refunds/${refundId}/review`, payload);
+  return unwrapResponseData(response);
+}
+
 async function getFraudAlerts(params) {
   const response = await axiosClient.get("/api/admin/fraud-alerts", { params });
   return unwrapResponseData(response);
@@ -156,6 +161,7 @@ export {
   rejectAffiliateSetting,
   rejectProduct,
   rejectSeller,
+  reviewRefundRequest,
   reviewWithdrawal,
   unlockUser,
   updatePlatformFee,

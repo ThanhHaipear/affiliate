@@ -31,6 +31,24 @@ const createNotifications = async (tx, notifications) => {
   }
 };
 
+const dedupeNotificationsByAccount = (notifications = []) => {
+  const seen = new Set();
+
+  return notifications.filter((notification) => {
+    if (!notification?.accountId) {
+      return false;
+    }
+
+    const key = `${notification.accountId}:${notification.type}:${notification.targetId || ""}`;
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+};
+
 const notifyAdmins = async (tx, buildNotification) => {
   const adminAccountIds = await listAdminAccountIds(tx);
   await createNotifications(
@@ -193,6 +211,152 @@ const reverseSettledOrder = async (tx, order, actorId, reason) => {
       createdAt: reversedAt
     }
   });
+};
+
+const applyRefundOrder = async (tx, { orderId, actorId, reason, refundId, requestedBy, reviewedBy }) => {
+  const order = await tx.order.findUnique({
+    where: { id: BigInt(orderId) },
+    include: { items: true, payments: true, seller: true, commissions: true }
+  });
+
+  const refundedAt = new Date();
+  let refund;
+
+  if (refundId) {
+    refund = await tx.refund.update({
+      where: { id: BigInt(refundId) },
+      data: {
+        reason,
+        status: "APPROVED",
+        reviewedBy,
+        updatedAt: refundedAt
+      }
+    });
+  } else {
+    refund = await tx.refund.create({
+      data: {
+        orderId: order.id,
+        reason,
+        status: "APPROVED",
+        amount: order.totalAmount,
+        requestedBy: requestedBy || actorId,
+        reviewedBy: reviewedBy || null,
+        createdAt: refundedAt,
+        updatedAt: refundedAt
+      }
+    });
+  }
+
+  await tx.payment.updateMany({ where: { orderId: order.id, status: { in: ["PENDING", "PAID"] } }, data: { status: "REFUNDED" } });
+
+  if (!order.sellerConfirmedReceivedMoney) {
+    for (const item of order.items) {
+      const inventory = await tx.inventory.findUnique({ where: { variantId: item.variantId } });
+      const nextReserved = Math.max(0, inventory.reservedQuantity - item.quantity);
+
+      await tx.inventory.update({
+        where: { variantId: item.variantId },
+        data: { reservedQuantity: nextReserved, updatedAt: new Date() }
+      });
+
+      await tx.inventoryTransaction.create({
+        data: {
+          variantId: item.variantId,
+          type: "RESERVE_RELEASE",
+          quantity: item.quantity,
+          stockAfter: inventory.quantity,
+          reservedAfter: nextReserved,
+          referenceType: "ORDER",
+          referenceId: order.id,
+          idempotencyKey: `RESERVE_RELEASE_${order.id}_${item.id}`,
+          note: "Release reserved stock due to refund before settlement",
+          createdAt: new Date()
+        }
+      });
+    }
+
+    await tx.affiliateCommission.updateMany({
+      where: { orderId: order.id, status: "PENDING" },
+      data: {
+        status: "REJECTED",
+        fraudCheckStatus: "REFUNDED",
+        rejectReason: reason || "Refunded before settlement",
+        note: appendReason("Pending commission cancelled due to refund", reason),
+      }
+    });
+
+    for (const commission of order.commissions) {
+      await createNotifications(tx, [{
+        accountId: commission.affiliateId,
+        title: "Commission cancelled",
+        content: `Pending commission for order ${order.orderCode} has been cancelled because the order was refunded.`,
+        type: "COMMISSION_REVERSED",
+        targetType: "ORDER",
+        targetId: order.id,
+        createdAt: refundedAt,
+      }]);
+    }
+  } else {
+    await reverseSettledOrder(tx, order, actorId, reason);
+  }
+
+  await tx.order.update({
+    where: { id: order.id },
+    data: {
+      status: "REFUNDED",
+      sellerConfirmedReceivedMoney: false,
+      sellerConfirmedAt: null,
+      sellerConfirmedBy: null,
+      sellerConfirmNote: order.sellerConfirmedReceivedMoney
+        ? appendReason("Settlement reversed after refund", reason)
+        : order.sellerConfirmNote,
+      updatedAt: refundedAt
+    }
+  });
+  await tx.orderStatusHistory.create({
+    data: {
+      orderId: order.id,
+      oldStatus: order.status,
+      newStatus: "REFUNDED",
+      note: reason || "Refund order",
+      changedBy: actorId,
+      changedAt: refundedAt
+    }
+  });
+
+  await tx.activityLog.create({
+    data: {
+      accountId: actorId,
+      action: "ORDER_REFUNDED",
+      targetType: "ORDER",
+      targetId: order.id,
+      description: `Refund created for order ${order.orderCode}`,
+      createdAt: refundedAt
+    }
+  });
+
+  await createNotifications(tx, [
+    {
+      accountId: order.buyerId,
+      title: "Order refunded",
+      content: `Order ${order.orderCode} has been refunded.`,
+      type: "ORDER_REFUNDED",
+      targetType: "ORDER",
+      targetId: order.id,
+      createdAt: refundedAt,
+    },
+    {
+      accountId: order.seller.ownerAccountId,
+      title: "Order refunded",
+      content: `Order ${order.orderCode} has been refunded.`,
+      type: "ORDER_REFUNDED",
+      targetType: "ORDER",
+      targetId: order.id,
+      createdAt: refundedAt,
+    },
+  ]);
+
+  return { orderId: order.id, refundId: refund.id };
 };
 
 exports.markPaid = (orderId, transactionCode) => prisma.$transaction(async (tx) => {
@@ -483,135 +647,166 @@ exports.confirmSellerReceivedMoney = (orderId, actorId, note) => prisma.$transac
   return tx.order.findUnique({ where: { id: order.id }, include: { items: true, payments: true, commissions: true } });
 });
 
-exports.refundOrder = (orderId, actorId, reason) => prisma.$transaction(async (tx) => {
+exports.refundOrder = ({ orderId, actorId, reason, refundId, requestedBy, reviewedBy }) =>
+  prisma.$transaction(async (tx) =>
+    applyRefundOrder(tx, { orderId, actorId, reason, refundId, requestedBy, reviewedBy }));
+
+exports.createRefundRequest = ({ orderId, actorId, reason }) => prisma.$transaction(async (tx) => {
   const order = await tx.order.findUnique({
     where: { id: BigInt(orderId) },
-    include: { items: true, payments: true, seller: true, commissions: true }
+    include: {
+      seller: { select: { ownerAccountId: true } },
+      refunds: { where: { status: "PENDING" } }
+    }
   });
 
-  const refundedAt = new Date();
+  if (order.refunds.length) {
+    throw new Error("A refund request is already pending review for this order");
+  }
+
+  const now = new Date();
   const refund = await tx.refund.create({
     data: {
       orderId: order.id,
       reason,
-      status: "APPROVED",
+      status: "PENDING",
       amount: order.totalAmount,
       requestedBy: actorId,
-      createdAt: refundedAt,
-      updatedAt: refundedAt
-    }
-  });
-
-  await tx.payment.updateMany({ where: { orderId: order.id, status: { in: ["PENDING", "PAID"] } }, data: { status: "REFUNDED" } });
-
-  if (!order.sellerConfirmedReceivedMoney) {
-    for (const item of order.items) {
-      const inventory = await tx.inventory.findUnique({ where: { variantId: item.variantId } });
-      const nextReserved = Math.max(0, inventory.reservedQuantity - item.quantity);
-
-      await tx.inventory.update({
-        where: { variantId: item.variantId },
-        data: { reservedQuantity: nextReserved, updatedAt: new Date() }
-      });
-
-      await tx.inventoryTransaction.create({
-        data: {
-          variantId: item.variantId,
-          type: "RESERVE_RELEASE",
-          quantity: item.quantity,
-          stockAfter: inventory.quantity,
-          reservedAfter: nextReserved,
-          referenceType: "ORDER",
-          referenceId: order.id,
-          idempotencyKey: `RESERVE_RELEASE_${order.id}_${item.id}`,
-          note: "Release reserved stock due to refund before settlement",
-          createdAt: new Date()
-        }
-      });
-    }
-
-    await tx.affiliateCommission.updateMany({
-      where: { orderId: order.id, status: "PENDING" },
-      data: {
-        status: "REJECTED",
-        fraudCheckStatus: "REFUNDED",
-        rejectReason: reason || "Refunded before settlement",
-        note: appendReason("Pending commission cancelled due to refund", reason),
-      }
-    });
-
-    for (const commission of order.commissions) {
-      await createNotifications(tx, [{
-        accountId: commission.affiliateId,
-        title: "Commission cancelled",
-        content: `Pending commission for order ${order.orderCode} has been cancelled because the order was refunded.`,
-        type: "COMMISSION_REVERSED",
-        targetType: "ORDER",
-        targetId: order.id,
-        createdAt: refundedAt,
-      }]);
-    }
-  } else {
-    await reverseSettledOrder(tx, order, actorId, reason);
-  }
-
-  await tx.order.update({
-    where: { id: order.id },
-    data: {
-      status: "REFUNDED",
-      sellerConfirmedReceivedMoney: false,
-      sellerConfirmedAt: null,
-      sellerConfirmedBy: null,
-      sellerConfirmNote: order.sellerConfirmedReceivedMoney
-        ? appendReason("Settlement reversed after refund", reason)
-        : order.sellerConfirmNote,
-      updatedAt: refundedAt
-    }
-  });
-  await tx.orderStatusHistory.create({
-    data: {
-      orderId: order.id,
-      oldStatus: order.status,
-      newStatus: "REFUNDED",
-      note: reason || "Refund order",
-      changedBy: actorId,
-      changedAt: refundedAt
+      createdAt: now,
+      updatedAt: now
     }
   });
 
   await tx.activityLog.create({
     data: {
       accountId: actorId,
-      action: "ORDER_REFUNDED",
+      action: "ORDER_REFUND_REQUESTED",
       targetType: "ORDER",
       targetId: order.id,
-      description: `Refund created for order ${order.orderCode}`,
-      createdAt: refundedAt
+      description: `Refund request submitted for order ${order.orderCode}`,
+      createdAt: now
     }
   });
 
-  await createNotifications(tx, [
+  await notifyAdmins(tx, (accountId) => ({
+    accountId,
+    title: "Refund request waiting for review",
+    content: `Order ${order.orderCode} has a VNPAY cancel/refund request waiting for admin review.`,
+    type: "ORDER_REFUND_REQUESTED",
+    targetType: "ORDER",
+    targetId: order.id,
+    createdAt: now,
+  }));
+
+  await createNotifications(tx, dedupeNotificationsByAccount([
     {
       accountId: order.buyerId,
-      title: "Order refunded",
-      content: `Order ${order.orderCode} has been refunded.`,
-      type: "ORDER_REFUNDED",
+      title: "Cancellation request submitted",
+      content: `Your request for order ${order.orderCode} has been sent to admin for review.`,
+      type: "ORDER_REFUND_REQUESTED",
       targetType: "ORDER",
       targetId: order.id,
-      createdAt: refundedAt,
+      createdAt: now,
     },
     {
       accountId: order.seller.ownerAccountId,
-      title: "Order refunded",
-      content: `Order ${order.orderCode} has been refunded.`,
-      type: "ORDER_REFUNDED",
+      title: "Refund request submitted",
+      content: `Order ${order.orderCode} has a refund request waiting for admin review.`,
+      type: "ORDER_REFUND_REQUESTED",
       targetType: "ORDER",
       targetId: order.id,
-      createdAt: refundedAt,
+      createdAt: now,
     },
-  ]);
+  ]));
 
-  return { orderId: order.id, refundId: refund.id };
+  return refund;
+});
+
+exports.reviewRefundRequest = ({ refundId, adminId, status, rejectReason }) => prisma.$transaction(async (tx) => {
+  const refund = await tx.refund.findUnique({
+    where: { id: BigInt(refundId) },
+    include: {
+      order: {
+        include: {
+          seller: { select: { ownerAccountId: true } }
+        }
+      }
+    }
+  });
+
+  if (!refund) {
+    throw new Error("Refund request not found");
+  }
+
+  if (refund.status !== "PENDING") {
+    throw new Error("Refund request has already been reviewed");
+  }
+
+  const reviewedAt = new Date();
+
+    if (status === "REJECTED") {
+      const updated = await tx.refund.update({
+        where: { id: refund.id },
+        data: {
+          status: "REJECTED",
+        reviewedBy: adminId,
+        reason: rejectReason || refund.reason,
+        updatedAt: reviewedAt
+      }
+    });
+
+    await tx.activityLog.create({
+      data: {
+        accountId: adminId,
+        action: "ORDER_REFUND_REJECTED",
+        targetType: "ORDER",
+        targetId: refund.orderId,
+        description: `Refund request rejected for order ${refund.order.orderCode}`,
+        createdAt: reviewedAt
+      }
+    });
+
+      await createNotifications(tx, dedupeNotificationsByAccount([
+        {
+          accountId: refund.requestedBy,
+          title: "Refund request rejected",
+          content: rejectReason || `Admin rejected the refund request for order ${refund.order.orderCode}.`,
+          type: "ORDER_REFUND_REJECTED",
+          targetType: "ORDER",
+          targetId: refund.orderId,
+          createdAt: reviewedAt,
+        },
+        {
+          accountId: refund.order.buyerId,
+          title: "Refund request rejected",
+          content: rejectReason || `Admin rejected the refund request for order ${refund.order.orderCode}.`,
+          type: "ORDER_REFUND_REJECTED",
+          targetType: "ORDER",
+          targetId: refund.orderId,
+          createdAt: reviewedAt,
+        },
+        {
+          accountId: refund.order.seller.ownerAccountId,
+          title: "Refund request rejected",
+          content: rejectReason || `Admin rejected the refund request for order ${refund.order.orderCode}.`,
+          type: "ORDER_REFUND_REJECTED",
+          targetType: "ORDER",
+          targetId: refund.orderId,
+          createdAt: reviewedAt,
+        },
+      ]));
+
+    return updated;
+  }
+
+  return applyRefundOrder(tx, {
+    orderId: refund.orderId,
+    actorId: adminId,
+    reason: refund.reason,
+    refundId: refund.id,
+    requestedBy: refund.requestedBy,
+    reviewedBy: adminId,
+  });
 });
 
 exports.cancelPendingPaymentOrder = (orderId, actorId, reason) => prisma.$transaction(async (tx) => {

@@ -31,14 +31,14 @@ exports.listOrders = (accountId, roles) => {
   if (roles.includes("SELLER")) {
     return prisma.order.findMany({
       where: { seller: { ownerAccountId: accountId } },
-      include: { items: true, payments: true },
+      include: { items: true, payments: true, refunds: { orderBy: { createdAt: "desc" } } },
       orderBy: { createdAt: "desc" }
     });
   }
 
   return prisma.order.findMany({
     where: { buyerId: accountId },
-    include: { items: true, payments: true },
+    include: { items: true, payments: true, refunds: { orderBy: { createdAt: "desc" } } },
     orderBy: { createdAt: "desc" }
   });
 };
@@ -46,7 +46,13 @@ exports.listOrders = (accountId, roles) => {
 exports.getOrder = async (orderId) => {
   const order = await prisma.order.findUnique({
     where: { id: BigInt(orderId) },
-    include: { items: true, payments: true, histories: true, commissions: { include: { items: true } } }
+    include: {
+      items: true,
+      payments: true,
+      histories: true,
+      refunds: { orderBy: { createdAt: "desc" } },
+      commissions: { include: { items: true } }
+    }
   });
 
   return appendShippingSnapshot(order);

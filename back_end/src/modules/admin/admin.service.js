@@ -103,3 +103,11 @@ exports.reviewProduct = async (productId, adminId, payload) => {
 
 exports.reviewProductAffiliate = async (settingId, adminId, payload) =>
   adminRepository.reviewProductAffiliate({ settingId, adminId, ...payload });
+
+exports.reviewRefund = async (refundId, adminId, payload) => {
+  try {
+    return await adminRepository.reviewRefund({ refundId, adminId, ...payload });
+  } catch (error) {
+    throw new AppError(error.message, 400);
+  }
+};
