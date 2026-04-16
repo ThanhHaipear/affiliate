@@ -1,4 +1,4 @@
-﻿import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import RegisterSellerPage from "./RegisterSellerPage";
@@ -27,11 +27,11 @@ describe("RegisterSellerPage", () => {
       </MemoryRouter>,
     );
 
-    await user.click(screen.getByRole("button", { name: /Gui dang ky seller/i }));
+    await user.click(screen.getByRole("button", { name: /Gửi đăng ký seller/i }));
 
     expect(
       await screen.findByText(
-        (content) => /business/i.test(content) && /bat buoc|báº¯t buá»™c/i.test(content),
+        (content) => /doanh nghiệp|business/i.test(content) && /bắt buộc|bat buoc/i.test(content),
       ),
     ).toBeInTheDocument();
   });
@@ -48,18 +48,18 @@ describe("RegisterSellerPage", () => {
       </MemoryRouter>,
     );
 
-    await user.type(screen.getByLabelText(/Ho ten/i), "Seller One");
+    await user.type(screen.getByLabelText(/Họ tên/i), "Seller One");
     await user.type(screen.getByLabelText(/^Email/i), "seller@example.com");
-    await user.type(screen.getByLabelText(/So dien thoai/i), "0901234567");
-    await user.type(screen.getByLabelText(/Ten business/i), "Seller Business");
-    await user.type(screen.getByLabelText(/Ten shop/i), "Seller Shop");
-    await user.type(screen.getByLabelText(/^Ngan hang/i), "VCB");
-    await user.type(screen.getByLabelText(/Ten chu tai khoan/i), "Seller One");
-    await user.type(screen.getByLabelText(/So tai khoan/i), "123456789");
-    await user.type(screen.getByLabelText(/^Mat khau/i), "12345678");
-    await user.type(screen.getByLabelText(/Xac nhan mat khau/i), "12345678");
+    await user.type(screen.getByLabelText(/Số điện thoại/i), "0901234567");
+    await user.type(screen.getByLabelText(/Tên doanh nghiệp/i), "Seller Business");
+    await user.type(screen.getByLabelText(/Tên shop/i), "Seller Shop");
+    await user.type(screen.getByLabelText(/^Ngân hàng/i), "VCB");
+    await user.type(screen.getByLabelText(/Tên chủ tài khoản/i), "Seller One");
+    await user.type(screen.getByLabelText(/Số tài khoản/i), "123456789");
+    await user.type(screen.getByLabelText(/^Mật khẩu/i), "12345678");
+    await user.type(screen.getByLabelText(/Xác nhận mật khẩu/i), "12345678");
 
-    await user.click(screen.getByRole("button", { name: /Gui dang ky seller/i }));
+    await user.click(screen.getByRole("button", { name: /Gửi đăng ký seller/i }));
 
     await waitFor(() => expect(authApi.register).toHaveBeenCalledTimes(1));
     expect(authApi.register).toHaveBeenCalledWith(
@@ -75,7 +75,7 @@ describe("RegisterSellerPage", () => {
       }),
     );
     expect(onRegisterSuccess).toHaveBeenCalled();
-    expect(screen.getByText(/He thong da luu san thong tin shop va tai khoan thanh toan/i)).toBeInTheDocument();
+    expect(screen.getByText(/Hệ thống đã lưu sẵn thông tin shop và tài khoản thanh toán/i)).toBeInTheDocument();
   });
 
   it("shows backend error when registration fails", async () => {
@@ -91,21 +91,20 @@ describe("RegisterSellerPage", () => {
       </MemoryRouter>,
     );
 
-    await user.type(screen.getByLabelText(/Ho ten/i), "Seller Two");
+    await user.type(screen.getByLabelText(/Họ tên/i), "Seller Two");
     await user.type(screen.getByLabelText(/^Email/i), "seller2@example.com");
-    await user.type(screen.getByLabelText(/So dien thoai/i), "0909999999");
-    await user.type(screen.getByLabelText(/Ten business/i), "Seller Business");
-    await user.type(screen.getByLabelText(/Ten shop/i), "Seller Shop");
-    await user.type(screen.getByLabelText(/^Ngan hang/i), "VCB");
-    await user.type(screen.getByLabelText(/Ten chu tai khoan/i), "Seller Two");
-    await user.type(screen.getByLabelText(/So tai khoan/i), "123456789");
-    await user.type(screen.getByLabelText(/^Mat khau/i), "12345678");
-    await user.type(screen.getByLabelText(/Xac nhan mat khau/i), "12345678");
+    await user.type(screen.getByLabelText(/Số điện thoại/i), "0909999999");
+    await user.type(screen.getByLabelText(/Tên doanh nghiệp/i), "Seller Business");
+    await user.type(screen.getByLabelText(/Tên shop/i), "Seller Shop");
+    await user.type(screen.getByLabelText(/^Ngân hàng/i), "VCB");
+    await user.type(screen.getByLabelText(/Tên chủ tài khoản/i), "Seller Two");
+    await user.type(screen.getByLabelText(/Số tài khoản/i), "123456789");
+    await user.type(screen.getByLabelText(/^Mật khẩu/i), "12345678");
+    await user.type(screen.getByLabelText(/Xác nhận mật khẩu/i), "12345678");
 
-    await user.click(screen.getByRole("button", { name: /Gui dang ky seller/i }));
+    await user.click(screen.getByRole("button", { name: /Gửi đăng ký seller/i }));
 
     expect(await screen.findByText(/Account already exists with this email/i)).toBeInTheDocument();
     expect(toast.error).toHaveBeenCalledWith("Account already exists with this email");
   });
 });
-

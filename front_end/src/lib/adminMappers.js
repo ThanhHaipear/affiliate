@@ -380,6 +380,20 @@ function parseAdminProductRouteId(routeId = "") {
 function mapAdminAccountDto(account) {
   const roles = (account.accountRoles || []).map((item) => item.role?.code).filter(Boolean);
   const seller = account.sellers?.[0];
+  const hasCustomerCapability = Boolean(account.customerProfile);
+  const hasAffiliateCapability = Boolean(account.affiliate);
+  const affiliateActivityStatus = account.affiliate?.activityStatus || "--";
+  const customerLocked = hasCustomerCapability && !roles.includes("CUSTOMER");
+  const affiliateLocked = hasAffiliateCapability && affiliateActivityStatus === "LOCKED";
+  const manageableCapabilities = [hasCustomerCapability, hasAffiliateCapability].filter(Boolean).length;
+  const lockedCapabilities = [customerLocked, affiliateLocked].filter(Boolean).length;
+  const isFullyRoleLocked = manageableCapabilities > 0 && manageableCapabilities === lockedCapabilities;
+  const isAccountLocked = account.status === "LOCKED" && !isFullyRoleLocked;
+  const roleLabels = [
+    ...roles.filter((role) => !["CUSTOMER", "AFFILIATE"].includes(role)),
+    hasCustomerCapability ? (customerLocked ? "CUSTOMER (đã khóa)" : "CUSTOMER") : null,
+    hasAffiliateCapability ? (affiliateLocked ? "AFFILIATE (đã khóa)" : "AFFILIATE") : null,
+  ].filter(Boolean);
   const displayName =
     account.customerProfile?.fullName ||
     account.adminProfile?.fullName ||
@@ -395,10 +409,19 @@ function mapAdminAccountDto(account) {
     email: toText(account.email),
     phone: toText(account.phone),
     roles,
-    status: toText(account.status, "ACTIVE"),
+    roleLabels,
+    status: account.status === "LOCKED" || isFullyRoleLocked ? "LOCKED" : toText(account.status, "ACTIVE"),
+    accountStatus: toText(account.status, "ACTIVE"),
     createdAt: account.createdAt,
     lastLoginAt: account.lastLoginAt,
     lockReason: toText(account.lockReason, "--"),
+    hasCustomerCapability,
+    hasAffiliateCapability,
+    customerLocked,
+    affiliateLocked,
+    isFullyRoleLocked,
+    isAccountLocked,
+    affiliateActivityStatus,
     sellerApprovalStatus: seller?.approvalStatus || "--",
     affiliateKycStatus: account.affiliate?.kycStatus || "--",
     raw: account,

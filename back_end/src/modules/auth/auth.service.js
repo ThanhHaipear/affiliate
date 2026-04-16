@@ -8,6 +8,14 @@ const buildAuthPayload = (account) => {
   const accessToken = signAccessToken({ sub: account.id, roles });
   const refreshToken = signRefreshToken({ sub: account.id, roles });
   const profileFullName = account.customerProfile?.fullName || account.affiliate?.fullName || "";
+  const hasCustomerCapability = Boolean(account.customerProfile);
+  const hasAffiliateCapability = Boolean(account.affiliate);
+  const customerLocked = hasCustomerCapability && !roles.includes("CUSTOMER");
+  const affiliateLocked = account.affiliate?.activityStatus === "LOCKED";
+  const affiliateStatus =
+    affiliateLocked
+      ? "LOCKED"
+      : account.affiliate?.kycStatus || null;
 
   return {
     account: {
@@ -18,8 +26,16 @@ const buildAuthPayload = (account) => {
       roles,
       profile: {
         fullName: profileFullName,
-        affiliateStatus: account.affiliate?.kycStatus || null,
-        hasAffiliateApplication: Boolean(account.affiliate),
+        hasCustomerCapability,
+        hasAffiliateCapability,
+        customerLocked,
+        customerLockReason: customerLocked ? account.lockReason || null : null,
+        affiliateStatus,
+        affiliateKycStatus: account.affiliate?.kycStatus || null,
+        affiliateActivityStatus: account.affiliate?.activityStatus || null,
+        affiliateLocked,
+        affiliateLockReason: affiliateLocked ? account.affiliate?.lockReason || null : null,
+        hasAffiliateApplication: hasAffiliateCapability,
       },
     },
     accessToken,
@@ -66,6 +82,8 @@ exports.login = async ({ email, password }) => {
 
   const isMatched = await comparePassword(password, account.passwordHash);
   if (!isMatched) throw new AppError("Invalid credentials", 401);
+  if (account.status === "LOCKED") throw new AppError("Account is locked", 403);
+  if (!account.accountRoles.length) throw new AppError("Account is locked", 403);
   if (account.status !== "ACTIVE") throw new AppError("Account is not active", 403);
 
   await authRepository.updateLastLogin(account.id);
@@ -76,6 +94,9 @@ exports.refreshToken = async ({ refreshToken }) => {
   const payload = verifyRefreshToken(refreshToken);
   const account = await authRepository.findAccountById(payload.sub);
   if (!account) throw new AppError("Account not found", 404);
+  if (account.status === "LOCKED") throw new AppError("Account is locked", 401);
+  if (!account.accountRoles.length) throw new AppError("Account is locked", 401);
+  if (account.status !== "ACTIVE") throw new AppError("Account is not active", 401);
   return buildAuthPayload(account);
 };
 
@@ -113,6 +134,14 @@ exports.enrollAffiliate = async (accountId, payload) => {
   const roles = account.accountRoles.map((item) => item.role.code);
   if (roles.includes("AFFILIATE") && account.affiliate?.kycStatus === "APPROVED") {
     throw new AppError("Account is already enrolled as affiliate", 409);
+  }
+
+  if (account.affiliate?.activityStatus === "LOCKED") {
+    throw new AppError("Affiliate role is locked", 409);
+  }
+
+  if (account.affiliate?.kycStatus === "APPROVED") {
+    throw new AppError("Account already has an affiliate profile", 409);
   }
 
   if (account.affiliate?.kycStatus === "PENDING") {

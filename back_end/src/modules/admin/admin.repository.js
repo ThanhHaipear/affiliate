@@ -96,15 +96,186 @@ exports.listAccounts = ({ q, role, status }) =>
     orderBy: { createdAt: "desc" },
   });
 
-exports.lockAccount = ({ accountId, adminId, reason }) =>
+async function ensureRole(tx, code) {
+  const role = await tx.role.findUnique({ where: { code } });
+  if (!role) {
+    throw new Error(`Role ${code} not found`);
+  }
+
+  return role;
+}
+
+async function addRoleIfMissing(tx, accountId, roleCode) {
+  const role = await ensureRole(tx, roleCode);
+  const existing = await tx.accountRole.findFirst({
+    where: { accountId, roleId: role.id },
+  });
+
+  if (!existing) {
+    await tx.accountRole.create({
+      data: { accountId, roleId: role.id },
+    });
+  }
+}
+
+async function removeRoleIfPresent(tx, accountId, roleCode) {
+  const role = await ensureRole(tx, roleCode);
+  await tx.accountRole.deleteMany({
+    where: { accountId, roleId: role.id },
+  });
+}
+
+function getAccountIncludeConfig() {
+  return {
+    accountRoles: { include: { role: true } },
+    customerProfile: true,
+    adminProfile: true,
+    affiliate: true,
+    sellers: true,
+  };
+}
+
+async function syncAccountStatusByRoles(tx, accountId, adminId, reason = null) {
+  const refreshed = await tx.account.findUnique({
+    where: { id: accountId },
+    include: {
+      accountRoles: true,
+    },
+  });
+
+  if (!refreshed) {
+    throw new Error("Account not found");
+  }
+
+  if (!refreshed.accountRoles.length) {
+    await tx.account.update({
+      where: { id: accountId },
+      data: {
+        status: "LOCKED",
+        lockReason: reason || "Locked because all active roles were disabled by admin",
+        lockedAt: new Date(),
+        lockedBy: adminId,
+        updatedAt: new Date(),
+      },
+    });
+  } else if (refreshed.status === "LOCKED") {
+    await tx.account.update({
+      where: { id: accountId },
+      data: {
+        status: "ACTIVE",
+        lockReason: null,
+        lockedAt: null,
+        lockedBy: null,
+        updatedAt: new Date(),
+      },
+    });
+  }
+
+  return tx.account.findUnique({
+    where: { id: accountId },
+    include: getAccountIncludeConfig(),
+  });
+}
+
+exports.lockAccount = ({ accountId, adminId, reason, target = "ALL" }) =>
   prisma.$transaction(async (tx) => {
     const account = await tx.account.findUnique({
       where: { id: accountId },
-      include: {
-        affiliate: true,
-        sellers: true,
-      },
+      include: getAccountIncludeConfig(),
     });
+
+    if (!account) {
+      throw new Error("Account not found");
+    }
+
+    if (target === "CUSTOMER") {
+      if (!account.customerProfile) {
+        throw new Error("Account does not have customer capability");
+      }
+
+      const hasCustomerRole = account.accountRoles.some((item) => item.role.code === "CUSTOMER");
+      if (!hasCustomerRole) {
+        throw new Error("Customer role is already locked or unavailable");
+      }
+
+      await removeRoleIfPresent(tx, accountId, "CUSTOMER");
+      await tx.account.update({
+        where: { id: accountId },
+        data: {
+          lockReason: reason || "Customer role locked by admin",
+          updatedAt: new Date(),
+        },
+      });
+      await tx.activityLog.create({
+        data: {
+          accountId: adminId,
+          action: "ADMIN_LOCK_CUSTOMER_ROLE",
+          targetType: "ACCOUNT",
+          targetId: BigInt(accountId),
+          description: `Customer role locked for account ${accountId}`,
+          createdAt: new Date(),
+        },
+      });
+      await tx.notification.create({
+        data: {
+          accountId,
+          title: "Customer role locked",
+          content: reason || "Your customer role has been locked by admin.",
+          type: "CUSTOMER_ROLE_LOCKED",
+          targetType: "ACCOUNT",
+          targetId: BigInt(accountId),
+          createdAt: new Date(),
+        },
+      });
+
+      return syncAccountStatusByRoles(tx, accountId, adminId, reason);
+    }
+
+    if (target === "AFFILIATE") {
+      if (!account.affiliate) {
+        throw new Error("Account does not have affiliate capability");
+      }
+
+      const hasAffiliateRole = account.accountRoles.some((item) => item.role.code === "AFFILIATE");
+      if (!hasAffiliateRole) {
+        throw new Error("Affiliate role is already locked or unavailable");
+      }
+
+      await removeRoleIfPresent(tx, accountId, "AFFILIATE");
+      await tx.affiliate.update({
+        where: { accountId },
+        data: {
+          activityStatus: "LOCKED",
+          lockReason: reason || "Locked by admin",
+          lockedAt: new Date(),
+          lockedBy: adminId,
+          updatedAt: new Date(),
+        },
+      });
+      await tx.activityLog.create({
+        data: {
+          accountId: adminId,
+          action: "ADMIN_LOCK_AFFILIATE_ROLE",
+          targetType: "ACCOUNT",
+          targetId: BigInt(accountId),
+          description: `Affiliate role locked for account ${accountId}`,
+          createdAt: new Date(),
+        },
+      });
+      await tx.notification.create({
+        data: {
+          accountId,
+          title: "Affiliate role locked",
+          content: reason || "Your affiliate role has been locked by admin.",
+          type: "AFFILIATE_ROLE_LOCKED",
+          targetType: "ACCOUNT",
+          targetId: BigInt(accountId),
+          createdAt: new Date(),
+        },
+      });
+
+      return syncAccountStatusByRoles(tx, accountId, adminId, reason);
+    }
 
     const updated = await tx.account.update({
       where: { id: accountId },
@@ -115,13 +286,7 @@ exports.lockAccount = ({ accountId, adminId, reason }) =>
         lockedBy: adminId,
         updatedAt: new Date(),
       },
-      include: {
-        accountRoles: { include: { role: true } },
-        customerProfile: true,
-        adminProfile: true,
-        affiliate: true,
-        sellers: true,
-      },
+      include: getAccountIncludeConfig(),
     });
 
     if (account?.affiliate) {
@@ -174,15 +339,114 @@ exports.lockAccount = ({ accountId, adminId, reason }) =>
     return updated;
   });
 
-exports.unlockAccount = ({ accountId, adminId }) =>
+exports.unlockAccount = ({ accountId, adminId, target = "ALL" }) =>
   prisma.$transaction(async (tx) => {
     const account = await tx.account.findUnique({
       where: { id: accountId },
-      include: {
-        affiliate: true,
-        sellers: true,
-      },
+      include: getAccountIncludeConfig(),
     });
+
+    if (!account) {
+      throw new Error("Account not found");
+    }
+
+    if (target === "CUSTOMER") {
+      if (!account.customerProfile) {
+        throw new Error("Account does not have customer capability");
+      }
+
+      if (account.status === "LOCKED" && account.accountRoles.length > 0) {
+        throw new Error("Account is fully locked, unlock the whole account first");
+      }
+
+      const hasCustomerRole = account.accountRoles.some((item) => item.role.code === "CUSTOMER");
+      if (hasCustomerRole) {
+        throw new Error("Customer role is already active");
+      }
+
+      await addRoleIfMissing(tx, accountId, "CUSTOMER");
+      if (account.status !== "LOCKED") {
+        await tx.account.update({
+          where: { id: accountId },
+          data: {
+            lockReason: null,
+            updatedAt: new Date(),
+          },
+        });
+      }
+      await tx.activityLog.create({
+        data: {
+          accountId: adminId,
+          action: "ADMIN_UNLOCK_CUSTOMER_ROLE",
+          targetType: "ACCOUNT",
+          targetId: BigInt(accountId),
+          description: `Customer role unlocked for account ${accountId}`,
+          createdAt: new Date(),
+        },
+      });
+      await tx.notification.create({
+        data: {
+          accountId,
+          title: "Customer role unlocked",
+          content: "Your customer role has been unlocked by admin.",
+          type: "CUSTOMER_ROLE_UNLOCKED",
+          targetType: "ACCOUNT",
+          targetId: BigInt(accountId),
+          createdAt: new Date(),
+        },
+      });
+
+      return syncAccountStatusByRoles(tx, accountId, adminId);
+    }
+
+    if (target === "AFFILIATE") {
+      if (!account.affiliate) {
+        throw new Error("Account does not have affiliate capability");
+      }
+
+      if (account.status === "LOCKED" && account.accountRoles.length > 0) {
+        throw new Error("Account is fully locked, unlock the whole account first");
+      }
+
+      if (account.affiliate.activityStatus !== "LOCKED") {
+        throw new Error("Affiliate role is already active");
+      }
+
+      await addRoleIfMissing(tx, accountId, "AFFILIATE");
+      await tx.affiliate.update({
+        where: { accountId },
+        data: {
+          activityStatus: "ACTIVE",
+          lockReason: null,
+          lockedAt: null,
+          lockedBy: null,
+          updatedAt: new Date(),
+        },
+      });
+      await tx.activityLog.create({
+        data: {
+          accountId: adminId,
+          action: "ADMIN_UNLOCK_AFFILIATE_ROLE",
+          targetType: "ACCOUNT",
+          targetId: BigInt(accountId),
+          description: `Affiliate role unlocked for account ${accountId}`,
+          createdAt: new Date(),
+        },
+      });
+      await tx.notification.create({
+        data: {
+          accountId,
+          title: "Affiliate role unlocked",
+          content: "Your affiliate role has been unlocked by admin.",
+          type: "AFFILIATE_ROLE_UNLOCKED",
+          targetType: "ACCOUNT",
+          targetId: BigInt(accountId),
+          createdAt: new Date(),
+        },
+      });
+
+      return syncAccountStatusByRoles(tx, accountId, adminId);
+    }
 
     const updated = await tx.account.update({
       where: { id: accountId },
@@ -193,13 +457,7 @@ exports.unlockAccount = ({ accountId, adminId }) =>
         lockedBy: null,
         updatedAt: new Date(),
       },
-      include: {
-        accountRoles: { include: { role: true } },
-        customerProfile: true,
-        adminProfile: true,
-        affiliate: true,
-        sellers: true,
-      },
+      include: getAccountIncludeConfig(),
     });
 
     if (account?.affiliate) {

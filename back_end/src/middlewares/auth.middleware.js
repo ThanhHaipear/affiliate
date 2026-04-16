@@ -28,12 +28,25 @@ exports.authenticate = async (req, _res, next) => {
       return next(new AppError("Account not found", 401));
     }
 
+    if (account.status === "LOCKED") {
+      return next(new AppError("Account is locked", 401));
+    }
+
+    if (!account.accountRoles.length) {
+      return next(new AppError("Account is locked", 401));
+    }
+
+    if (account.status !== "ACTIVE") {
+      return next(new AppError("Account is not active", 401));
+    }
+
+    const roles = account.accountRoles.map((item) => item.role.code);
     req.user = {
       id: account.id,
       email: account.email,
       phone: account.phone,
       status: account.status,
-      roles: account.accountRoles.map((item) => item.role.code)
+      roles
     };
 
     return next();

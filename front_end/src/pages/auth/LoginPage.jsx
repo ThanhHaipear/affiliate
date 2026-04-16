@@ -31,7 +31,7 @@ function LoginPage() {
       };
 
       const session = await login(payload);
-      toast.success("Dang nhap thanh cong.");
+      toast.success("Đăng nhập thành công.");
       const role = session.roles?.[0];
 
       if (role) {
@@ -40,7 +40,24 @@ function LoginPage() {
         navigate("/dashboard");
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || "Dang nhap that bai.");
+      const message = error.response?.data?.message || "Đăng nhập thất bại.";
+      const status = error.response?.status;
+      const normalizedMessage = String(message).toLowerCase();
+
+      if (
+        status === 403 &&
+        (normalizedMessage.includes("locked") || normalizedMessage.includes("khóa"))
+      ) {
+        navigate("/unauthorized", {
+          replace: true,
+          state: {
+            reason: "locked",
+          },
+        });
+        return;
+      }
+
+      toast.error(message);
     }
   };
 
@@ -48,9 +65,9 @@ function LoginPage() {
     <div className="space-y-6">
       <div>
         <p className="text-xs uppercase tracking-[0.3em] text-emerald-700">Auth</p>
-        <h1 className="mt-2 text-3xl font-semibold text-slate-900">Dang nhap</h1>
+        <h1 className="mt-2 text-3xl font-semibold text-slate-900">Đăng nhập</h1>
         <p className="mt-3 text-sm leading-7 text-slate-600">
-          Ho tro dang nhap bang email de dam bao khoi phuc tai khoan nhat quan theo gmail.
+          Hỗ trợ đăng nhập bằng email để đảm bảo khôi phục tài khoản nhất quán theo Gmail.
         </p>
       </div>
       <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
@@ -61,22 +78,22 @@ function LoginPage() {
           {...register("email")}
         />
         <Input
-          label="Mat khau"
+          label="Mật khẩu"
           type="password"
           placeholder="******"
           error={errors.password?.message}
           {...register("password")}
         />
         <Button type="submit" className="w-full" loading={isSubmitting}>
-          Dang nhap
+          Đăng nhập
         </Button>
       </form>
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
         <Link to="/auth/forgot-password" className="font-medium text-sky-700 hover:text-sky-900">
-          Quen mat khau
+          Quên mật khẩu
         </Link>
         <Link to="/auth/register" className="font-medium text-sky-700 hover:text-sky-900">
-          Tao tai khoan
+          Tạo tài khoản
         </Link>
       </div>
     </div>

@@ -84,4 +84,27 @@ describe("guards", () => {
 
     expect(screen.getByText("Protected content")).toBeInTheDocument();
   });
+
+  it("redirects locked account to unauthorized", () => {
+    useAuthStore.setState({
+      accessToken: "access-1",
+      refreshToken: "refresh-1",
+      currentUser: { id: "user-1", roles: ["admin"], status: "LOCKED" },
+      roles: ["admin"],
+    });
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/unauthorized" element={<UnauthorizedPage />} />
+        <Route element={<AuthGuard />}>
+          <Route element={<RoleGuard allowedRoles={["admin"]} />}>
+            <Route path="/dashboard/admin" element={<ProtectedPage />} />
+          </Route>
+        </Route>
+      </Routes>,
+      { route: "/dashboard/admin" },
+    );
+
+    expect(screen.getByText("Unauthorized page")).toBeInTheDocument();
+  });
 });

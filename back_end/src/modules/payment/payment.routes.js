@@ -17,11 +17,11 @@ const router = express.Router();
 
 router.get("/vnpay-ipn", controller.handleVnpayIpn);
 router.post("/vnpay-return/confirm", validate(vnpayCallbackSchema), controller.confirmVnpayReturn);
-router.post("/:orderId/pay", authenticate, validate(payOrderSchema), controller.payOrder);
-router.post("/:orderId/vnpay-url", authenticate, validate(createVnpayPaymentSchema), controller.createVnpayPaymentUrl);
-router.post("/:orderId/cancel", authenticate, validate(cancelOrderSchema), controller.cancelOrder);
+router.post("/:orderId/pay", authenticate, authorize("CUSTOMER"), validate(payOrderSchema), controller.payOrder);
+router.post("/:orderId/vnpay-url", authenticate, authorize("CUSTOMER"), validate(createVnpayPaymentSchema), controller.createVnpayPaymentUrl);
+router.post("/:orderId/cancel", authenticate, authorize("CUSTOMER"), validate(cancelOrderSchema), controller.cancelOrder);
 router.post("/:orderId/seller-cancel", authenticate, authorize("SELLER"), validate(cancelOrderSchema), controller.cancelOrderBySeller);
 router.post("/:orderId/seller-confirm", authenticate, authorize("SELLER"), validate(confirmReceiptSchema), controller.confirmSellerReceivedMoney);
-router.post("/:orderId/refund", authenticate, validate(refundOrderSchema), controller.refundOrder);
+router.post("/:orderId/refund", authenticate, authorize("CUSTOMER"), validate(refundOrderSchema), controller.refundOrder);
 
 module.exports = router;

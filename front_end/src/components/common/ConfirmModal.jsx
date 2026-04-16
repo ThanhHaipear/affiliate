@@ -1,12 +1,12 @@
-import Button from "./Button";
+﻿import Button from "./Button";
 import Modal from "./Modal";
 
 function ConfirmModal({
   open,
-  title = "X�c nh?n thao t�c",
-  description = "B?n c� ch?c ch?n mu?n ti?p t?c?",
-  confirmLabel = "X�c nh?n",
-  cancelLabel = "H?y",
+  title = "Xác nhận thao tác",
+  description = "Bạn có chắc chắn muốn tiếp tục?",
+  confirmLabel = "Xác nhận",
+  cancelLabel = "Hủy",
   confirmVariant = "primary",
   loading = false,
   onClose,
@@ -31,7 +31,7 @@ function ConfirmModal({
       }
     >
       <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm leading-7 text-amber-100">
-        H?p tho?i n�y d�ng cho approve, reject, lock, unlock v� x�c nh?n d� nh?n ti?n.
+        Hộp thoại này dùng cho approve, reject, lock, unlock và xác nhận đã nhận tiền.
       </div>
       {children ? <div className="mt-4">{children}</div> : null}
     </Modal>

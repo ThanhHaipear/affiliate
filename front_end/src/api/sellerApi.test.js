@@ -12,12 +12,12 @@ vi.mock("./axiosClient", () => ({
 }));
 
 describe("sellerApi", () => {
-  it("gets seller orders from backend orders endpoint", async () => {
+  it("gets seller orders from seller endpoint", async () => {
     mockGet.mockResolvedValue({ data: { data: [{ id: "ord-1" }] } });
     const { getSellerOrders } = await import("./sellerApi");
     const result = await getSellerOrders({ page: 1 });
 
-    expect(mockGet).toHaveBeenCalledWith("/api/orders", { params: { page: 1 } });
+    expect(mockGet).toHaveBeenCalledWith("/api/seller/orders", { params: { page: 1 } });
     expect(result).toEqual([{ id: "ord-1" }]);
   });
 

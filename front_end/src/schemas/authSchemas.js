@@ -14,80 +14,80 @@ const normalizePaymentMethod = (value = "") => String(value).trim().toUpperCase(
 const isBankTransferMethod = (value = "") => normalizePaymentMethod(value) === "BANK_TRANSFER";
 
 const loginSchema = z.object({
-  email: z.string().email("Email khong hop le."),
-  password: z.string().min(6, "Mat khau toi thieu 6 ky tu."),
+  email: z.string().email("Email không hợp lệ."),
+  password: z.string().min(6, "Mật khẩu tối thiểu 6 ký tự."),
 });
 
 const registerCustomerBaseSchema = z.object({
-  fullName: z.string().min(2, "Ho ten toi thieu 2 ky tu."),
-  email: z.string().email("Email khong hop le."),
-  phone: z.string().min(10, "So dien thoai khong hop le."),
-  password: z.string().min(8, "Mat khau toi thieu 8 ky tu."),
-  confirmPassword: z.string().min(8, "Xac nhan mat khau toi thieu 8 ky tu."),
+  fullName: z.string().min(2, "Họ tên tối thiểu 2 ký tự."),
+  email: z.string().email("Email không hợp lệ."),
+  phone: z.string().min(10, "Số điện thoại không hợp lệ."),
+  password: z.string().min(8, "Mật khẩu tối thiểu 8 ký tự."),
+  confirmPassword: z.string().min(8, "Xác nhận mật khẩu tối thiểu 8 ký tự."),
 });
 
 const withPasswordConfirmation = (schema) =>
   schema.refine((data) => data.password === data.confirmPassword, {
-    message: "Mat khau xac nhan khong khop.",
+    message: "Mật khẩu xác nhận không khớp.",
     path: ["confirmPassword"],
   });
 
 const registerCustomerSchema = withPasswordConfirmation(registerCustomerBaseSchema);
 
 const registerPartnerBaseSchema = registerCustomerBaseSchema.extend({
-  businessName: z.string().min(2, "Ten business la bat buoc."),
-  paymentMethod: z.string().min(1, "Chon phuong thuc thanh toan."),
-  bankName: optionalText(2, "Ten ngan hang la bat buoc."),
-  bankAccountName: z.string().min(2, "Ten chu tai khoan la bat buoc."),
-  bankAccountNumber: optionalText(6, "So tai khoan khong hop le."),
+  businessName: z.string().min(2, "Tên doanh nghiệp là bắt buộc."),
+  paymentMethod: z.string().min(1, "Chọn phương thức thanh toán."),
+  bankName: optionalText(2, "Tên ngân hàng là bắt buộc."),
+  bankAccountName: z.string().min(2, "Tên chủ tài khoản là bắt buộc."),
+  bankAccountNumber: optionalText(6, "Số tài khoản không hợp lệ."),
 });
 
 const registerSellerSchema = withPasswordConfirmation(
   registerPartnerBaseSchema.extend({
-    shopName: z.string().min(2, "Ten shop la bat buoc."),
+    shopName: z.string().min(2, "Tên shop là bắt buộc."),
   }),
 );
 
 const registerAffiliateSchema = withPasswordConfirmation(
   registerPartnerBaseSchema.extend({
-    channelName: z.string().min(2, "Ten kenh la bat buoc."),
+    channelName: z.string().min(2, "Tên kênh là bắt buộc."),
   }).superRefine((data, ctx) => {
     if (isBankTransferMethod(data.paymentMethod)) {
       if (!data.bankName) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Ten ngan hang la bat buoc.", path: ["bankName"] });
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Tên ngân hàng là bắt buộc.", path: ["bankName"] });
       }
       if (!data.bankAccountNumber) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "So tai khoan khong hop le.", path: ["bankAccountNumber"] });
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Số tài khoản không hợp lệ.", path: ["bankAccountNumber"] });
       }
     }
   }),
 );
 
 const affiliateEnrollmentSchema = z.object({
-  fullName: z.string().min(2, "Ho ten toi thieu 2 ky tu."),
-  businessName: z.string().min(2, "Ten business la bat buoc."),
-  channelName: z.string().min(2, "Ten kenh la bat buoc."),
-  paymentMethod: z.string().min(1, "Chon phuong thuc thanh toan."),
-  bankName: optionalText(2, "Ten ngan hang la bat buoc."),
-  bankAccountName: z.string().min(2, "Ten chu tai khoan la bat buoc."),
-  bankAccountNumber: optionalText(6, "So tai khoan khong hop le."),
+  fullName: z.string().min(2, "Họ tên tối thiểu 2 ký tự."),
+  businessName: z.string().min(2, "Tên doanh nghiệp là bắt buộc."),
+  channelName: z.string().min(2, "Tên kênh là bắt buộc."),
+  paymentMethod: z.string().min(1, "Chọn phương thức thanh toán."),
+  bankName: optionalText(2, "Tên ngân hàng là bắt buộc."),
+  bankAccountName: z.string().min(2, "Tên chủ tài khoản là bắt buộc."),
+  bankAccountNumber: optionalText(6, "Số tài khoản không hợp lệ."),
 }).superRefine((data, ctx) => {
   if (isBankTransferMethod(data.paymentMethod)) {
     if (!data.bankName) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Ten ngan hang la bat buoc.", path: ["bankName"] });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Tên ngân hàng là bắt buộc.", path: ["bankName"] });
     }
     if (!data.bankAccountNumber) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "So tai khoan khong hop le.", path: ["bankAccountNumber"] });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Số tài khoản không hợp lệ.", path: ["bankAccountNumber"] });
     }
   }
 });
 
 const forgotPasswordSchema = z.object({
-  email: z.string().email("Email khong hop le."),
-  newPassword: z.string().min(8, "Mat khau moi toi thieu 8 ky tu."),
-  confirmPassword: z.string().min(8, "Xac nhan mat khau toi thieu 8 ky tu."),
+  email: z.string().email("Email không hợp lệ."),
+  newPassword: z.string().min(8, "Mật khẩu mới tối thiểu 8 ký tự."),
+  confirmPassword: z.string().min(8, "Xác nhận mật khẩu tối thiểu 8 ký tự."),
 }).refine((data) => data.newPassword === data.confirmPassword, {
-  message: "Mat khau xac nhan khong khop.",
+  message: "Mật khẩu xác nhận không khớp.",
   path: ["confirmPassword"],
 });
 

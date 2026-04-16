@@ -33,6 +33,7 @@ const ENDPOINTS = {
   seller: {
     profile: `${API_PREFIX}/seller/profile`,
     stats: `${API_PREFIX}/seller/stats`,
+    orders: `${API_PREFIX}/seller/orders`,
     products: `${API_PREFIX}/seller/products`,
     productDetail: (productId) => `${API_PREFIX}/seller/products/${productId}`,
     productAffiliateSetting: (productId) => `${API_PREFIX}/seller/products/${productId}/affiliate-setting`,

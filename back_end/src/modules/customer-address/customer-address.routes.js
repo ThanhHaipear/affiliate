@@ -2,12 +2,13 @@
 
 const controller = require("./customer-address.controller");
 const { authenticate } = require("../../middlewares/auth.middleware");
+const { authorize } = require("../../middlewares/role.middleware");
 const { validate } = require("../../middlewares/validate.middleware");
 const { createAddressSchema, updateAddressSchema, addressIdSchema } = require("./customer-address.schema");
 
 const router = express.Router();
 
-router.use(authenticate);
+router.use(authenticate, authorize("CUSTOMER"));
 router.get("/", controller.listAddresses);
 router.post("/", validate(createAddressSchema), controller.createAddress);
 router.put("/:addressId", validate(updateAddressSchema), controller.updateAddress);

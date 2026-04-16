@@ -18,7 +18,7 @@ exports.lockAccount = asyncHandler(async (req, res) => {
 });
 
 exports.unlockAccount = asyncHandler(async (req, res) => {
-  const data = await adminService.unlockAccount(req.params.accountId, req.user.id);
+  const data = await adminService.unlockAccount(req.params.accountId, req.user.id, req.validated?.body || req.body || {});
   successResponse(res, data, "Account unlocked");
 });
 

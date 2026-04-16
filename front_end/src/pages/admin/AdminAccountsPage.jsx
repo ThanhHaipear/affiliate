@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { getAdminUsers, lockUser, unlockUser } from "../../api/adminApi";
+﻿import { useEffect, useMemo, useState } from "react";
+import { getAdminUsers, lockUser, unlockUserByTarget } from "../../api/adminApi";
 import AdminStatCard from "../../components/admin/AdminStatCard";
 import Button from "../../components/common/Button";
 import ConfirmModal from "../../components/common/ConfirmModal";
@@ -23,6 +23,7 @@ function AdminAccountsPage() {
   const [role, setRole] = useState("ALL");
   const [status, setStatus] = useState("ALL");
   const [selectedAccount, setSelectedAccount] = useState(null);
+  const [selectedAction, setSelectedAction] = useState("");
   const [lockReason, setLockReason] = useState("");
 
   useEffect(() => {
@@ -42,15 +43,66 @@ function AdminAccountsPage() {
     }
   }
 
+  function getActionOptions(account) {
+    if (!account) {
+      return [];
+    }
+
+    if (account.isAccountLocked) {
+      return [{ value: "UNLOCK_ALL", label: "Mở khóa toàn bộ tài khoản" }];
+    }
+
+    const options = [];
+
+    if (!account.isFullyRoleLocked) {
+      options.push({ value: "LOCK_ALL", label: "Khóa toàn bộ tài khoản" });
+    }
+
+    if (account.hasCustomerCapability) {
+      if (account.customerLocked) {
+        options.push({ value: "UNLOCK_CUSTOMER", label: "Mở khóa vai trò customer" });
+      } else if (account.roles.includes("CUSTOMER")) {
+        options.push({ value: "LOCK_CUSTOMER", label: "Khóa vai trò customer" });
+      }
+    }
+
+    if (account.hasAffiliateCapability) {
+      if (account.affiliateLocked) {
+        options.push({ value: "UNLOCK_AFFILIATE", label: "Mở khóa vai trò affiliate" });
+      } else if (account.roles.includes("AFFILIATE")) {
+        options.push({ value: "LOCK_AFFILIATE", label: "Khóa vai trò affiliate" });
+      }
+    }
+
+    return options;
+  }
+
+  function openAccountActionModal(account) {
+    setSelectedAccount(account);
+    setSelectedAction(getActionOptions(account)[0]?.value || "");
+  }
+
   const filtered = useMemo(() => {
     return accounts.filter((account) => {
       const matchSearch =
         !search ||
-        [account.displayName, account.email, account.phone, account.roles.join(" ")]
+        [
+          account.displayName,
+          account.email,
+          account.phone,
+          account.roles.join(" "),
+          account.roleLabels.join(" "),
+          account.customerLocked ? "customer-locked" : "",
+          account.affiliateLocked ? "affiliate-locked" : "",
+        ]
           .join(" ")
           .toLowerCase()
           .includes(search.toLowerCase());
-      const matchRole = role === "ALL" || account.roles.includes(role);
+      const matchRole =
+        role === "ALL" ||
+        account.roles.includes(role) ||
+        (role === "CUSTOMER" && account.hasCustomerCapability) ||
+        (role === "AFFILIATE" && account.hasAffiliateCapability);
       const matchStatus = status === "ALL" || account.status === status;
       return matchSearch && matchRole && matchStatus;
     });
@@ -58,32 +110,46 @@ function AdminAccountsPage() {
 
   const summary = useMemo(() => {
     return filtered.reduce(
-      (result, account) => {
-        result.total += 1;
-        if (account.status === "LOCKED") result.locked += 1;
-        if (account.roles.includes("SELLER")) result.sellers += 1;
-        if (account.roles.includes("AFFILIATE")) result.affiliates += 1;
-        return result;
-      },
-      { total: 0, locked: 0, sellers: 0, affiliates: 0 },
+      (result, account) => ({
+        total: result.total + 1,
+        locked: result.locked + (account.status === "LOCKED" ? 1 : 0),
+        customerLocked: result.customerLocked + (account.customerLocked ? 1 : 0),
+        affiliateLocked: result.affiliateLocked + (account.affiliateLocked ? 1 : 0),
+      }), 
+      { total: 0, locked: 0, customerLocked: 0, affiliateLocked: 0 },
     );
   }, [filtered]);
 
   async function handleConfirmAction() {
-    if (!selectedAccount) {
+    if (!selectedAccount || !selectedAction) {
       return;
     }
 
     try {
       setSubmitting(true);
-      if (selectedAccount.status === "LOCKED") {
-        await unlockUser(selectedAccount.id);
-        toast.success("Đã mở khóa tài khoản.");
+
+      if (selectedAction === "UNLOCK_ALL") {
+        await unlockUserByTarget(selectedAccount.id, { target: "ALL" });
+        toast.success("Đã mở khóa toàn bộ tài khoản.");
+      } else if (selectedAction === "UNLOCK_CUSTOMER") {
+        await unlockUserByTarget(selectedAccount.id, { target: "CUSTOMER" });
+        toast.success("Đã mở khóa vai trò customer.");
+      } else if (selectedAction === "UNLOCK_AFFILIATE") {
+        await unlockUserByTarget(selectedAccount.id, { target: "AFFILIATE" });
+        toast.success("Đã mở khóa vai trò affiliate.");
+      } else if (selectedAction === "LOCK_CUSTOMER") {
+        await lockUser(selectedAccount.id, { target: "CUSTOMER", reason: lockReason });
+        toast.success("Đã khóa vai trò customer.");
+      } else if (selectedAction === "LOCK_AFFILIATE") {
+        await lockUser(selectedAccount.id, { target: "AFFILIATE", reason: lockReason });
+        toast.success("Đã khóa vai trò affiliate.");
       } else {
-        await lockUser(selectedAccount.id, { reason: lockReason });
-        toast.success("Đã khóa tài khoản.");
+        await lockUser(selectedAccount.id, { target: "ALL", reason: lockReason });
+        toast.success("Đã khóa toàn bộ tài khoản.");
       }
+
       setSelectedAccount(null);
+      setSelectedAction("");
       setLockReason("");
       await loadAccounts();
     } catch (submitError) {
@@ -106,14 +172,14 @@ function AdminAccountsPage() {
       <PageHeader
         eyebrow="Admin"
         title="Trung tâm quản lý tài khoản"
-        description="Danh sách tài khoản admin, seller, affiliate và customer đang đọc trực tiếp từ database. Bạn có thể khóa hoặc mở khóa ngay tại đây."
+        description="Bạn có thể khóa toàn bộ tài khoản hoặc khóa riêng từng vai trò customer và affiliate trên cùng một account."
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <AdminStatCard label="Tổng tài khoản" value={summary.total.toLocaleString("vi-VN")} meta="Theo bộ lọc hiện tại" tone="cyan" />
-        <AdminStatCard label="Dang bi khoa" value={summary.locked.toLocaleString("vi-VN")} meta="Can review ly do vi pham" tone="rose" />
-        <AdminStatCard label="Seller" value={summary.sellers.toLocaleString("vi-VN")} meta="Co vai tro seller" tone="amber" />
-        <AdminStatCard label="Affiliate" value={summary.affiliates.toLocaleString("vi-VN")} meta="Co vai tro affiliate" tone="emerald" />
+        <AdminStatCard label="Khóa toàn bộ" value={summary.locked.toLocaleString("vi-VN")} meta="Khóa cấp account" tone="rose" />
+        <AdminStatCard label="Customer bị khóa" value={summary.customerLocked.toLocaleString("vi-VN")} meta="Khóa riêng vai trò customer" tone="amber" />
+        <AdminStatCard label="Affiliate bị khóa" value={summary.affiliateLocked.toLocaleString("vi-VN")} meta="Khóa riêng vai trò affiliate" tone="emerald" />
       </div>
 
       <div className="grid gap-4 rounded-[2rem] border border-slate-300 bg-white p-6 shadow-sm lg:grid-cols-[1.5fr_0.7fr_0.7fr]">
@@ -164,7 +230,28 @@ function AdminAccountsPage() {
           {
             key: "roles",
             title: "Vai trò",
-            render: (row) => row.roles.join(", "),
+            render: (row) => row.roleLabels.join(", ") || "--",
+          },
+          {
+            key: "roleLocks",
+            title: "Khóa theo vai trò",
+            render: (row) => {
+              if (row.isFullyRoleLocked) {
+                return "Đã khóa toàn bộ vai trò";
+              }
+
+              const states = [];
+
+              if (row.customerLocked) {
+                states.push("Customer đã khóa");
+              }
+
+              if (row.affiliateLocked) {
+                states.push("Affiliate đã khóa");
+              }
+
+              return states.length ? states.join(" | ") : "Không";
+            },
           },
           {
             key: "status",
@@ -180,8 +267,8 @@ function AdminAccountsPage() {
             key: "actions",
             title: "Hành động",
             render: (row) => (
-              <Button size="sm" variant={row.status === "LOCKED" ? "primary" : "danger"} onClick={() => setSelectedAccount(row)}>
-                {row.status === "LOCKED" ? "Mở khóa" : "Khóa"}
+              <Button size="sm" variant={row.status === "LOCKED" ? "primary" : "danger"} onClick={() => openAccountActionModal(row)}>
+                Quản lý khóa
               </Button>
             ),
           },
@@ -193,18 +280,34 @@ function AdminAccountsPage() {
 
       <ConfirmModal
         open={Boolean(selectedAccount)}
-        title={selectedAccount?.status === "LOCKED" ? "Mở khóa tài khoản" : "Khóa tài khoản"}
+        title="Quản lý khóa tài khoản"
         description={selectedAccount ? `Xác nhận thao tác với ${selectedAccount.displayName}.` : ""}
-        confirmLabel={selectedAccount?.status === "LOCKED" ? "Mở khóa" : "Khóa tài khoản"}
-        confirmVariant={selectedAccount?.status === "LOCKED" ? "primary" : "danger"}
+        confirmLabel={selectedAction.startsWith("UNLOCK") ? "Mở khóa" : "Khóa"}
+        confirmVariant={selectedAction.startsWith("UNLOCK") ? "primary" : "danger"}
         loading={submitting}
         onClose={() => {
           setSelectedAccount(null);
+          setSelectedAction("");
           setLockReason("");
         }}
         onConfirm={handleConfirmAction}
       >
-        {selectedAccount?.status !== "LOCKED" ? (
+        <label className="block space-y-2">
+          <span className="text-sm font-medium text-slate-200">Phạm vi thao tác</span>
+          <select
+            value={selectedAction}
+            onChange={(event) => setSelectedAction(event.target.value)}
+            className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-emerald-500"
+          >
+            {getActionOptions(selectedAccount).map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {!selectedAction.startsWith("UNLOCK") ? (
           <label className="block space-y-2">
             <span className="text-sm font-medium text-slate-200">Lý do khóa</span>
             <textarea
@@ -217,7 +320,14 @@ function AdminAccountsPage() {
           </label>
         ) : (
           <div className="rounded-2xl border border-slate-700 bg-slate-950/60 p-4 text-sm leading-7 text-slate-300">
-            Lý do khóa hiện tại: {selectedAccount?.lockReason || "Không có ghi chú."}
+            {selectedAccount?.isAccountLocked
+              ? `Tài khoản đang bị khóa toàn bộ. Lý do hiện tại: ${selectedAccount?.lockReason || "Không có ghi chú."}`
+              : selectedAccount?.isFullyRoleLocked
+                ? "Tài khoản hiện đã bị khóa toàn bộ theo vai trò. Bạn có thể mở lại từng vai trò riêng lẻ."
+              : [
+                  selectedAccount?.customerLocked ? "Customer đang bị khóa." : null,
+                  selectedAccount?.affiliateLocked ? "Affiliate đang bị khóa." : null,
+                ].filter(Boolean).join(" ") || "Không có vai trò nào đang bị khóa."}
           </div>
         )}
       </ConfirmModal>

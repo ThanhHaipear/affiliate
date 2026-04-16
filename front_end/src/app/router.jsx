@@ -88,15 +88,15 @@ function AuthLayout() {
       <div className="mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[0.95fr_1.05fr]">
         <div className="rounded-[2rem] border border-sky-200 bg-[linear-gradient(180deg,#0f172a_0%,#16324f_100%)] p-8 text-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
           <p className="text-xs uppercase tracking-[0.32em] text-sky-200">Affiliate commerce</p>
-          <h1 className="mt-4 text-4xl font-semibold leading-tight">Dang ky tai khoan de mua hang va kich hoat them vai tro tiep thi khi can.</h1>
+          <h1 className="mt-4 text-4xl font-semibold leading-tight">Đăng ký tài khoản để mua hàng và kích hoạt thêm vai trò tiếp thị khi cần.</h1>
           <p className="mt-5 text-sm leading-7 text-slate-200">
-            Giao dien auth duoc tach rieng de nguoi dung nhap thong tin de doc, de quet va khong bi roi.
+            Giao diện auth được tách riêng để người dùng nhập thông tin dễ đọc, dễ quét và không bị rối.
           </p>
           <div className="mt-8 space-y-4">
             {[
-              "Customer mua hang, quan ly gio va theo doi don hang.",
-              "Affiliate duoc kich hoat them tren chinh tai khoan customer khi nguoi dung co nhu cau.",
-              "Seller dang ky o luong rieng va cho admin phe duyet truoc khi van hanh.",
+              "Customer mua hàng, quản lý giỏ và theo dõi đơn hàng.",
+              "Affiliate được kích hoạt thêm trên chính tài khoản customer khi người dùng có nhu cầu.",
+              "Seller đăng ký ở luồng riêng và chờ admin phê duyệt trước khi vận hành.",
             ].map((item) => (
               <div key={item} className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4 text-sm leading-7 text-slate-100">
                 {item}

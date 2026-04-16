@@ -228,7 +228,7 @@ function CheckoutPage() {
             >
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="md:col-span-2">
-                  <Input label="Email nhan thong bao" name="buyerEmail" value={form.buyerEmail} onChange={handleChange} />
+                  <Input label="Email nhận thông báo" name="buyerEmail" value={form.buyerEmail} onChange={handleChange} />
                 </div>
                 <Select
                   label="Phuong thuc giao hang"

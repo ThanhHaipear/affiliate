@@ -151,6 +151,24 @@ describe("app router", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows locked account message on unauthorized page", async () => {
+    await seedAuthSession({
+      accessToken: "token",
+      refreshToken: "refresh",
+      currentUser: { id: "1", roles: ["customer"], status: "LOCKED", profile: {} },
+      roles: ["customer"],
+      activeDashboardRole: "customer",
+    });
+
+    renderRoute("/dashboard/customer/profile");
+
+    expect(
+      await screen.findByRole("heading", {
+        name: /Tài khoản của bạn đã bị khóa/i,
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("renders not found route", async () => {
     renderRoute("/missing-page");
 

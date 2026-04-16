@@ -20,6 +20,11 @@ const axiosClient = axios.create({
 });
 
 let refreshTokenPromise = null;
+let roleLockSyncPromise = null;
+
+function isRoleDashboardPath(pathname = "") {
+  return pathname.startsWith("/dashboard/customer") || pathname.startsWith("/dashboard/affiliate");
+}
 
 async function requestTokenRefresh(refreshToken) {
   if (useMockAuth) {
@@ -59,6 +64,39 @@ axiosClient.interceptors.response.use(
     const originalRequest = error.config;
     const status = error.response?.status;
     const authStore = useAuthStore.getState();
+    const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+
+    if (
+      status === 403 &&
+      !originalRequest?._roleLockSync &&
+      authStore.refreshToken &&
+      isRoleDashboardPath(pathname)
+    ) {
+      originalRequest._roleLockSync = true;
+
+      try {
+        if (!roleLockSyncPromise) {
+          roleLockSyncPromise = requestTokenRefresh(authStore.refreshToken).finally(() => {
+            roleLockSyncPromise = null;
+          });
+        }
+
+        const session = await roleLockSyncPromise;
+
+        authStore.setTokens({
+          accessToken: session.accessToken,
+          refreshToken: session.refreshToken,
+        });
+
+        if (session.currentUser) {
+          authStore.setUser(session.currentUser);
+        }
+      } catch (_syncError) {
+        // Let the original 403 propagate; auth state will be handled by the refresh failure path elsewhere.
+      }
+
+      return Promise.reject(error);
+    }
 
     if (status !== 401 || originalRequest?._retry) {
       return Promise.reject(error);

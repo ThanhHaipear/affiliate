@@ -1,4 +1,4 @@
-﻿function toNumber(value) {
+function toNumber(value) {
   const normalized = Number(value ?? 0);
   return Number.isFinite(normalized) ? normalized : 0;
 }
@@ -242,7 +242,7 @@ function mapWalletDto(wallet = {}) {
 function mapNotificationDto(notification = {}) {
   return {
     id: notification.id,
-    title: notification.title || "Thong bao",
+    title: notification.title || "Thông báo",
     description: notification.content || "",
     type: notification.type || "GENERAL",
     unread: !Boolean(notification.isRead),

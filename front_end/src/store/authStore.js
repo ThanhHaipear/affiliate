@@ -5,12 +5,26 @@ const AUTH_STORAGE_KEY = "affiliate-platform-auth";
 
 const defaultUser = null;
 
-const resolveDashboardRole = (roles = [], preferredRole = null) => {
-  if (preferredRole && roles.includes(preferredRole)) {
+const getDashboardCapabilities = (currentUser = null, roles = []) => {
+  const normalizedRoles = roles || currentUser?.roles || [];
+  const profile = currentUser?.profile || {};
+
+  return {
+    admin: normalizedRoles.includes("admin"),
+    seller: normalizedRoles.includes("seller"),
+    customer: normalizedRoles.includes("customer") || Boolean(profile.hasCustomerCapability),
+    affiliate: normalizedRoles.includes("affiliate") || Boolean(profile.hasAffiliateCapability || profile.hasAffiliateApplication),
+  };
+};
+
+const resolveDashboardRole = (currentUser = null, roles = [], preferredRole = null) => {
+  const capabilities = getDashboardCapabilities(currentUser, roles);
+
+  if (preferredRole && capabilities[preferredRole]) {
     return preferredRole;
   }
 
-  return roles[0] || null;
+  return ["customer", "affiliate", "seller", "admin"].find((role) => capabilities[role]) || null;
 };
 
 const resolveAuthStorage = () => {
@@ -43,7 +57,7 @@ const useAuthStore = create(
           refreshToken: refreshToken || "",
           currentUser: currentUser || defaultUser,
           roles: nextRoles,
-          activeDashboardRole: resolveDashboardRole(nextRoles, get().activeDashboardRole),
+          activeDashboardRole: resolveDashboardRole(currentUser, nextRoles, get().activeDashboardRole),
         });
       },
       logout: () => {
@@ -67,12 +81,13 @@ const useAuthStore = create(
         set((state) => ({
           currentUser,
           roles: nextRoles,
-          activeDashboardRole: resolveDashboardRole(nextRoles, state.activeDashboardRole),
+          activeDashboardRole: resolveDashboardRole(currentUser, nextRoles, state.activeDashboardRole),
         }));
       },
       setActiveDashboardRole: (role) => {
-        const roles = get().roles || [];
-        if (!roles.includes(role)) {
+        const state = get();
+        const capabilities = getDashboardCapabilities(state.currentUser, state.roles);
+        if (!capabilities[role]) {
           return;
         }
 
@@ -108,4 +123,4 @@ const useAuthStore = create(
   ),
 );
 
-export { AUTH_STORAGE_KEY, useAuthStore };
+export { AUTH_STORAGE_KEY, getDashboardCapabilities, useAuthStore };

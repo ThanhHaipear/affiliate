@@ -1,15 +1,32 @@
 const prisma = require("../../config/prisma");
 
 const mapAccountToCurrentUser = (account) => ({
+  roles: (account.accountRoles || []).map((item) => item.role.code),
   id: account.id,
   email: account.email,
   phone: account.phone,
   status: account.status,
-  roles: (account.accountRoles || []).map((item) => item.role.code),
   profile: {
     fullName: account.customerProfile?.fullName || "",
     avatarUrl: account.customerProfile?.avatarUrl || "",
-    affiliateStatus: account.affiliate?.kycStatus || null,
+    hasCustomerCapability: Boolean(account.customerProfile),
+    hasAffiliateCapability: Boolean(account.affiliate),
+    customerLocked:
+      Boolean(account.customerProfile) &&
+      !(account.accountRoles || []).some((item) => item.role?.code === "CUSTOMER"),
+    customerLockReason:
+      Boolean(account.customerProfile) &&
+      !(account.accountRoles || []).some((item) => item.role?.code === "CUSTOMER")
+        ? account.lockReason || null
+        : null,
+    affiliateStatus:
+      account.affiliate?.activityStatus === "LOCKED"
+        ? "LOCKED"
+        : account.affiliate?.kycStatus || null,
+    affiliateKycStatus: account.affiliate?.kycStatus || null,
+    affiliateActivityStatus: account.affiliate?.activityStatus || null,
+    affiliateLocked: account.affiliate?.activityStatus === "LOCKED",
+    affiliateLockReason: account.affiliate?.activityStatus === "LOCKED" ? account.affiliate?.lockReason || null : null,
     hasAffiliateApplication: Boolean(account.affiliate),
   },
 });

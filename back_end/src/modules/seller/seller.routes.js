@@ -11,6 +11,7 @@ const router = express.Router();
 router.use(authenticate, authorize("SELLER"));
 router.get("/profile", controller.getProfile);
 router.get("/stats", controller.getStats);
+router.get("/orders", controller.listOrders);
 router.get("/products", controller.listProducts);
 router.get("/products/:productId", controller.getProduct);
 router.get("/affiliate-settings", controller.listAffiliateSettings);

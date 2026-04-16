@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import AdminStatCard from "../../components/admin/AdminStatCard";
 import Button from "../../components/common/Button";
@@ -134,7 +134,7 @@ function AdminNotificationsPage() {
       {!items.length ? (
         <EmptyState
           title="Chưa có thông báo admin"
-          description="Khi có phí nền tảng được ghi nhận hoặc bị đảo do refund, hệ thống sẽ hiện thông báo tại đây."
+          description="Khi có phí nền tảng được ghi nhận hoặc bị đảo do refund, hệ thống sẽ hiển thị thông báo tại đây."
         />
       ) : (
         <div className="space-y-4">

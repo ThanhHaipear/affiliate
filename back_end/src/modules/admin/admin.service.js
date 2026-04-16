@@ -17,15 +17,24 @@ exports.getAccounts = async (query) => adminRepository.listAccounts(query);
 
 exports.lockAccount = async (accountId, adminId, payload) => {
   try {
-    return await adminRepository.lockAccount({ accountId: Number(accountId), adminId, reason: payload?.reason });
+    return await adminRepository.lockAccount({
+      accountId: Number(accountId),
+      adminId,
+      reason: payload?.reason,
+      target: payload?.target || "ALL",
+    });
   } catch (error) {
     throw new AppError(error.message, 400);
   }
 };
 
-exports.unlockAccount = async (accountId, adminId) => {
+exports.unlockAccount = async (accountId, adminId, payload) => {
   try {
-    return await adminRepository.unlockAccount({ accountId: Number(accountId), adminId });
+    return await adminRepository.unlockAccount({
+      accountId: Number(accountId),
+      adminId,
+      target: payload?.target || "ALL",
+    });
   } catch (error) {
     throw new AppError(error.message, 400);
   }

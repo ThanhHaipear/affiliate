@@ -27,11 +27,11 @@ describe("RegisterAffiliatePage", () => {
       </MemoryRouter>,
     );
 
-    await user.click(screen.getByRole("button", { name: /Gui dang ky affiliate/i }));
+    await user.click(screen.getByRole("button", { name: /Gửi đăng ký affiliate/i }));
 
     expect(
       await screen.findByText(
-        (content) => /business/i.test(content) && /bat buoc|bắt buộc/i.test(content),
+        (content) => /doanh nghiệp|business/i.test(content) && /bắt buộc|bat buoc/i.test(content),
       ),
     ).toBeInTheDocument();
   });
@@ -48,18 +48,18 @@ describe("RegisterAffiliatePage", () => {
       </MemoryRouter>,
     );
 
-    await user.type(screen.getByLabelText(/Ho ten/i), "Affiliate One");
+    await user.type(screen.getByLabelText(/Họ tên/i), "Affiliate One");
     await user.type(screen.getByLabelText(/^Email/i), "affiliate@example.com");
-    await user.type(screen.getByLabelText(/So dien thoai/i), "0901234567");
-    await user.type(screen.getByLabelText(/Ten business/i), "Affiliate Business");
-    await user.type(screen.getByLabelText(/Ten kenh/i), "Affiliate Channel");
-    await user.type(screen.getByLabelText(/^Ngan hang/i), "VCB");
-    await user.type(screen.getByLabelText(/Ten chu tai khoan/i), "Affiliate One");
-    await user.type(screen.getByLabelText(/So tai khoan/i), "123456789");
-    await user.type(screen.getByLabelText(/^Mat khau/i), "12345678");
-    await user.type(screen.getByLabelText(/Xac nhan mat khau/i), "12345678");
+    await user.type(screen.getByLabelText(/Số điện thoại/i), "0901234567");
+    await user.type(screen.getByLabelText(/Tên doanh nghiệp/i), "Affiliate Business");
+    await user.type(screen.getByLabelText(/Tên kênh/i), "Affiliate Channel");
+    await user.type(screen.getByLabelText(/^Ngân hàng/i), "VCB");
+    await user.type(screen.getByLabelText(/Tên chủ tài khoản/i), "Affiliate One");
+    await user.type(screen.getByLabelText(/Số tài khoản/i), "123456789");
+    await user.type(screen.getByLabelText(/^Mật khẩu/i), "12345678");
+    await user.type(screen.getByLabelText(/Xác nhận mật khẩu/i), "12345678");
 
-    await user.click(screen.getByRole("button", { name: /Gui dang ky affiliate/i }));
+    await user.click(screen.getByRole("button", { name: /Gửi đăng ký affiliate/i }));
 
     await waitFor(() => expect(authApi.register).toHaveBeenCalledTimes(1));
     expect(authApi.register).toHaveBeenCalledWith(
@@ -75,7 +75,7 @@ describe("RegisterAffiliatePage", () => {
       }),
     );
     expect(onRegisterSuccess).toHaveBeenCalled();
-    expect(screen.getByText(/cho admin phe duyet/i)).toBeInTheDocument();
+    expect(screen.getByText(/chờ admin phê duyệt/i)).toBeInTheDocument();
   });
 
   it("shows backend error when registration fails", async () => {
@@ -91,18 +91,18 @@ describe("RegisterAffiliatePage", () => {
       </MemoryRouter>,
     );
 
-    await user.type(screen.getByLabelText(/Ho ten/i), "Affiliate Two");
+    await user.type(screen.getByLabelText(/Họ tên/i), "Affiliate Two");
     await user.type(screen.getByLabelText(/^Email/i), "taken@example.com");
-    await user.type(screen.getByLabelText(/So dien thoai/i), "0909999999");
-    await user.type(screen.getByLabelText(/Ten business/i), "Affiliate Business");
-    await user.type(screen.getByLabelText(/Ten kenh/i), "Affiliate Channel");
-    await user.type(screen.getByLabelText(/^Ngan hang/i), "VCB");
-    await user.type(screen.getByLabelText(/Ten chu tai khoan/i), "Affiliate Two");
-    await user.type(screen.getByLabelText(/So tai khoan/i), "123456789");
-    await user.type(screen.getByLabelText(/^Mat khau/i), "12345678");
-    await user.type(screen.getByLabelText(/Xac nhan mat khau/i), "12345678");
+    await user.type(screen.getByLabelText(/Số điện thoại/i), "0909999999");
+    await user.type(screen.getByLabelText(/Tên doanh nghiệp/i), "Affiliate Business");
+    await user.type(screen.getByLabelText(/Tên kênh/i), "Affiliate Channel");
+    await user.type(screen.getByLabelText(/^Ngân hàng/i), "VCB");
+    await user.type(screen.getByLabelText(/Tên chủ tài khoản/i), "Affiliate Two");
+    await user.type(screen.getByLabelText(/Số tài khoản/i), "123456789");
+    await user.type(screen.getByLabelText(/^Mật khẩu/i), "12345678");
+    await user.type(screen.getByLabelText(/Xác nhận mật khẩu/i), "12345678");
 
-    await user.click(screen.getByRole("button", { name: /Gui dang ky affiliate/i }));
+    await user.click(screen.getByRole("button", { name: /Gửi đăng ký affiliate/i }));
 
     expect(await screen.findByText(/Account already exists with this email/i)).toBeInTheDocument();
     expect(toast.error).toHaveBeenCalledWith("Account already exists with this email");

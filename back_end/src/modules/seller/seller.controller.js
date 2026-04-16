@@ -7,6 +7,11 @@ exports.getProfile = asyncHandler(async (req, res) => {
   successResponse(res, data, "Seller profile loaded");
 });
 
+exports.listOrders = asyncHandler(async (req, res) => {
+  const data = await sellerService.listOrders(req.user.id);
+  successResponse(res, data, "Seller orders loaded");
+});
+
 exports.listProducts = asyncHandler(async (req, res) => {
   const data = await sellerService.listProducts(req.user.id);
   successResponse(res, data, "Seller products loaded");

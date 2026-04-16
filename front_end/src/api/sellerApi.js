@@ -33,7 +33,7 @@ async function updateSellerProfile(payload) {
 }
 
 async function getSellerOrders(params) {
-  const response = await axiosClient.get(ENDPOINTS.orders.list, { params });
+  const response = await axiosClient.get(ENDPOINTS.seller.orders, { params });
   return unwrapResponseData(response);
 }
 

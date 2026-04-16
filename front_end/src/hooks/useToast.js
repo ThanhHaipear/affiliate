@@ -14,28 +14,28 @@ function useToast() {
     success: (description, options = {}) =>
       pushToast({
         type: "success",
-        title: options.title || "Thanh cong",
+        title: options.title || "Thành công",
         description,
         duration: options.duration,
       }),
     error: (description, options = {}) =>
       pushToast({
         type: "error",
-        title: options.title || "Co loi xay ra",
+        title: options.title || "Có lỗi xảy ra",
         description,
         duration: options.duration,
       }),
     info: (description, options = {}) =>
       pushToast({
         type: "info",
-        title: options.title || "Thong bao",
+        title: options.title || "Thông báo",
         description,
         duration: options.duration,
       }),
     warning: (description, options = {}) =>
       pushToast({
         type: "warning",
-        title: options.title || "Luu y",
+        title: options.title || "Lưu ý",
         description,
         duration: options.duration,
       }),

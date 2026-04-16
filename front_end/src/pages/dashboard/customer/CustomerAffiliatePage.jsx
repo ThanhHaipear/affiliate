@@ -41,6 +41,8 @@ function CustomerAffiliatePage() {
 
   const isAffiliate = roles.includes("affiliate");
   const affiliateStatus = currentUser?.profile?.affiliateStatus || null;
+  const affiliateActivityStatus = currentUser?.profile?.affiliateActivityStatus || null;
+  const isAffiliateLocked = affiliateStatus === "LOCKED" || affiliateActivityStatus === "LOCKED";
   const hasAffiliateApplication = Boolean(currentUser?.profile?.hasAffiliateApplication || affiliateStatus);
   const isPendingApplication = affiliateStatus === "PENDING" || (hasAffiliateApplication && !affiliateStatus);
   const defaultAffiliateName = currentUser?.profile?.fullName || currentUser?.email || "Affiliate";
@@ -141,6 +143,26 @@ function CustomerAffiliatePage() {
           <Link to="/dashboard/affiliate">
             <Button>Mở khu affiliate</Button>
           </Link>
+          <Link to="/dashboard/customer/profile">
+            <Button variant="secondary">Quay lại customer</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAffiliateLocked) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          eyebrow="Customer + Affiliate"
+          title="Vai trò affiliate đang bị khóa"
+          description="Tài khoản này đã có hồ sơ affiliate nhưng hiện đang bị khóa. Bạn không thể đăng ký lại hoặc truy cập khu affiliate cho đến khi quản trị viên mở khóa."
+        />
+        <div className="rounded-[2rem] border border-rose-200 bg-rose-50 p-6 text-sm leading-7 text-rose-700">
+          Trạng thái hiện tại: affiliate đã bị khóa. Vui lòng liên hệ quản trị viên nếu bạn cần kiểm tra lý do khóa hoặc thời điểm mở lại.
+        </div>
+        <div className="flex flex-wrap gap-3">
           <Link to="/dashboard/customer/profile">
             <Button variant="secondary">Quay lại customer</Button>
           </Link>

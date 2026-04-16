@@ -50,7 +50,9 @@ const roleMenus = {
 };
 
 function RoleSidebar() {
-  const { primaryRole, isAffiliate, isCustomer } = useRole();
+  const { primaryRole, currentUser, isAffiliate, isCustomer } = useRole();
+  const hasCustomerCapability = Boolean(currentUser?.profile?.hasCustomerCapability);
+  const hasAffiliateCapability = Boolean(currentUser?.profile?.hasAffiliateCapability);
   let menuItems = roleMenus[primaryRole] || [];
 
   if (primaryRole === "customer") {
@@ -59,13 +61,13 @@ function RoleSidebar() {
         return item;
       }
 
-      return isAffiliate
+      return hasAffiliateCapability
         ? { label: "Khu affiliate", to: "/dashboard/affiliate" }
         : item;
     });
   }
 
-  if (primaryRole === "affiliate" && !isCustomer) {
+  if (primaryRole === "affiliate" && !hasCustomerCapability) {
     menuItems = menuItems.filter((item) => item.to !== "/dashboard/customer/profile");
   }
 

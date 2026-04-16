@@ -31,6 +31,7 @@ function AuthGuard({
 }) {
   const location = useLocation();
   const accessToken = useAuthStore((state) => state.accessToken);
+  const currentUser = useAuthStore((state) => state.currentUser);
 
   if (!isAuthenticated(accessToken)) {
     return React.createElement(Navigate, {
@@ -38,6 +39,16 @@ function AuthGuard({
       replace: true,
       state: {
         [redirectStateKey]: location,
+      },
+    });
+  }
+
+  if (currentUser?.status === "LOCKED") {
+    return React.createElement(Navigate, {
+      to: "/unauthorized",
+      replace: true,
+      state: {
+        reason: "locked",
       },
     });
   }
@@ -53,14 +64,36 @@ function RoleGuard({
   const roles = useAuthStore((state) => state.roles);
   const currentUser = useAuthStore((state) => state.currentUser);
   const affiliateStatus = currentUser?.profile?.affiliateStatus || null;
+  const affiliateLocked = Boolean(currentUser?.profile?.affiliateLocked || currentUser?.profile?.affiliateActivityStatus === "LOCKED");
+  const customerLocked = Boolean(currentUser?.profile?.customerLocked);
+  const hasCustomerCapability = Boolean(currentUser?.profile?.hasCustomerCapability);
+  const hasAffiliateCapability = Boolean(currentUser?.profile?.hasAffiliateCapability || currentUser?.profile?.hasAffiliateApplication);
   const hasAffiliateRole = roles.includes("affiliate");
   const canAccessAffiliate = hasAffiliateRole || affiliateStatus === "APPROVED";
+  const canAccessLockedCustomer = allowedRoles.includes("customer") && hasCustomerCapability && customerLocked;
+  const canAccessLockedAffiliate = allowedRoles.includes("affiliate") && hasAffiliateCapability && affiliateLocked;
 
-  if (!hasRequiredRole(roles, allowedRoles)) {
-    return React.createElement(Navigate, { to: redirectTo, replace: true });
+  if (currentUser?.status === "LOCKED") {
+    return React.createElement(Navigate, {
+      to: redirectTo,
+      replace: true,
+      state: {
+        reason: "locked",
+      },
+    });
   }
 
-  if (allowedRoles.includes("affiliate") && !canAccessAffiliate) {
+  if (!hasRequiredRole(roles, allowedRoles) && !canAccessLockedCustomer && !canAccessLockedAffiliate) {
+    return React.createElement(Navigate, {
+      to: redirectTo,
+      replace: true,
+      state: {
+        reason: "forbidden",
+      },
+    });
+  }
+
+  if (allowedRoles.includes("affiliate") && !canAccessAffiliate && !canAccessLockedAffiliate) {
     return React.createElement(Navigate, { to: "/dashboard/customer/affiliate", replace: true });
   }
 

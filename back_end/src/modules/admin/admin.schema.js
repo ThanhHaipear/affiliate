@@ -10,6 +10,7 @@ exports.reviewSchema = z.object({
 exports.lockAccountSchema = z.object({
   body: z.object({
     reason: z.string().trim().max(500).optional(),
+    target: z.enum(["ALL", "CUSTOMER", "AFFILIATE"]).optional(),
   }),
   params: z.object({
     accountId: z.coerce.number().int().positive(),
@@ -17,6 +18,9 @@ exports.lockAccountSchema = z.object({
 });
 
 exports.accountActionParamsSchema = z.object({
+  body: z.object({
+    target: z.enum(["ALL", "CUSTOMER", "AFFILIATE"]).optional(),
+  }).optional(),
   params: z.object({
     accountId: z.coerce.number().int().positive(),
   }),

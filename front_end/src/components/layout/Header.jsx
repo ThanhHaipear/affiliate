@@ -13,7 +13,8 @@ const roleLabels = {
 function Header() {
   const navigate = useNavigate();
   const { currentUser, logout, roles, activeDashboardRole, setActiveDashboardRole } = useAuth();
-  const canSwitchCustomerAffiliate = roles.includes("customer") && roles.includes("affiliate");
+  const canSwitchCustomerAffiliate =
+    Boolean(currentUser?.profile?.hasCustomerCapability) && Boolean(currentUser?.profile?.hasAffiliateCapability);
 
   const handleLogout = async () => {
     await logout();
@@ -65,7 +66,7 @@ function Header() {
               {currentUser?.profile?.fullName || currentUser?.email || "Khách"}
             </p>
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-              {(roles || []).map((role) => roleLabels[role] || role).join(", ") || "Chưa có vai trò"}
+              {(roles || []).map((role) => roleLabels[role] || role).join(", ") || "Chưa có vai trò hoạt động"}
             </p>
           </div>
         </div>

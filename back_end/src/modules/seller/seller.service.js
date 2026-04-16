@@ -8,6 +8,10 @@ const getSellerOrThrow = async (accountId) => {
 };
 
 exports.getProfile = (accountId) => getSellerOrThrow(accountId);
+exports.listOrders = async (accountId) => {
+  const seller = await getSellerOrThrow(accountId);
+  return sellerRepository.listOrders(seller.id);
+};
 exports.listProducts = async (accountId) => {
   const seller = await getSellerOrThrow(accountId);
   return sellerRepository.listProducts(seller.id);

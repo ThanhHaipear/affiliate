@@ -40,10 +40,10 @@ function RegisterSellerPage({ onRegisterSuccess = () => {} }) {
     try {
       setSubmitError("");
       await registerAccount(payload);
-      toast.success("Ho so seller da duoc gui, cho admin phe duyet.");
+      toast.success("Hồ sơ seller đã được gửi, chờ admin phê duyệt.");
       onRegisterSuccess(payload);
     } catch (error) {
-      const message = error.response?.data?.message || "Dang ky seller that bai. Vui long kiem tra lai thong tin.";
+      const message = error.response?.data?.message || "Đăng ký seller thất bại. Vui lòng kiểm tra lại thông tin.";
       setSubmitError(message);
       toast.error(message);
     }
@@ -53,13 +53,13 @@ function RegisterSellerPage({ onRegisterSuccess = () => {} }) {
     <div className="space-y-6">
       <div>
         <p className="text-xs uppercase tracking-[0.3em] text-amber-700">Seller</p>
-        <h1 className="mt-2 text-3xl font-semibold text-slate-900">Dang ky seller</h1>
+        <h1 className="mt-2 text-3xl font-semibold text-slate-900">Đăng ký seller</h1>
         <p className="mt-3 text-sm leading-7 text-slate-600">
-          Tao ho so shop, khai bao thanh toan va gui len admin de phe duyet truoc khi ban hang.
+          Tạo hồ sơ shop, khai báo thanh toán và gửi lên admin để phê duyệt trước khi bán hàng.
         </p>
       </div>
       <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-slate-700">
-        Seller can duoc admin phe duyet truoc khi dang san pham va tham gia chuong trinh affiliate.
+        Seller cần được admin phê duyệt trước khi đăng sản phẩm và tham gia chương trình affiliate.
       </div>
       {submitError ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
@@ -68,45 +68,45 @@ function RegisterSellerPage({ onRegisterSuccess = () => {} }) {
       ) : null}
       <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
         <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
-          <p className="text-sm font-semibold text-slate-900">Thong tin dai dien</p>
+          <p className="text-sm font-semibold text-slate-900">Thông tin đại diện</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <Input label="Ho ten" error={errors.fullName?.message} {...register("fullName")} />
-            <Input label="So dien thoai" error={errors.phone?.message} {...register("phone")} />
+            <Input label="Họ tên" error={errors.fullName?.message} {...register("fullName")} />
+            <Input label="Số điện thoại" error={errors.phone?.message} {...register("phone")} />
             <Input label="Email" error={errors.email?.message} {...register("email")} />
-            <Input label="Ten business" error={errors.businessName?.message} {...register("businessName")} />
+            <Input label="Tên doanh nghiệp" error={errors.businessName?.message} {...register("businessName")} />
             <div className="sm:col-span-2">
-              <Input label="Ten shop" error={errors.shopName?.message} {...register("shopName")} />
+              <Input label="Tên shop" error={errors.shopName?.message} {...register("shopName")} />
             </div>
           </div>
         </div>
         <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
-          <p className="text-sm font-semibold text-slate-900">Thong tin thanh toan</p>
+          <p className="text-sm font-semibold text-slate-900">Thông tin thanh toán</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <Select
-              label="Phuong thuc thanh toan"
+              label="Phương thức thanh toán"
               error={errors.paymentMethod?.message}
-              options={[{ label: "Chuyen khoan ngan hang", value: "BANK_TRANSFER" }]}
+              options={[{ label: "Chuyển khoản ngân hàng", value: "BANK_TRANSFER" }]}
               {...register("paymentMethod")}
             />
-            <Input label="Ngan hang" error={errors.bankName?.message} {...register("bankName")} />
-            <Input label="Ten chu tai khoan" error={errors.bankAccountName?.message} {...register("bankAccountName")} />
-            <Input label="So tai khoan" error={errors.bankAccountNumber?.message} {...register("bankAccountNumber")} />
+            <Input label="Ngân hàng" error={errors.bankName?.message} {...register("bankName")} />
+            <Input label="Tên chủ tài khoản" error={errors.bankAccountName?.message} {...register("bankAccountName")} />
+            <Input label="Số tài khoản" error={errors.bankAccountNumber?.message} {...register("bankAccountNumber")} />
           </div>
         </div>
         <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
-          <p className="text-sm font-semibold text-slate-900">Bao mat tai khoan</p>
+          <p className="text-sm font-semibold text-slate-900">Bảo mật tài khoản</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <Input label="Mat khau" type="password" error={errors.password?.message} {...register("password")} />
-            <Input label="Xac nhan mat khau" type="password" error={errors.confirmPassword?.message} {...register("confirmPassword")} />
+            <Input label="Mật khẩu" type="password" error={errors.password?.message} {...register("password")} />
+            <Input label="Xác nhận mật khẩu" type="password" error={errors.confirmPassword?.message} {...register("confirmPassword")} />
           </div>
         </div>
         <Button type="submit" className="w-full" loading={isSubmitting}>
-          Gui dang ky seller
+          Gửi đăng ký seller
         </Button>
       </form>
       {isSubmitSuccessful && !submitError ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          Ho so seller da duoc gui. He thong da luu san thong tin shop va tai khoan thanh toan de admin phe duyet.
+          Hồ sơ seller đã được gửi. Hệ thống đã lưu sẵn thông tin shop và tài khoản thanh toán để admin phê duyệt.
         </div>
       ) : null}
     </div>

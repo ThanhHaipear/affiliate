@@ -5,7 +5,7 @@ const TOAST_LIMIT = 5;
 function createToast(toast) {
   return {
     id: toast.id || `toast-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    title: toast.title || "Thong bao",
+    title: toast.title || "Thông báo",
     description: toast.description || "",
     type: toast.type || "info",
     duration: toast.duration ?? 3000,

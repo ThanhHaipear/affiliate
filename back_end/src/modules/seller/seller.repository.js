@@ -7,6 +7,16 @@ exports.findSellerByOwner = (accountId) => prisma.seller.findFirst({
   include: { paymentAccounts: true, kyc: { include: { documents: true } } }
 });
 
+exports.listOrders = (sellerId) => prisma.order.findMany({
+  where: { sellerId },
+  include: {
+    items: true,
+    payments: true,
+    refunds: { orderBy: { createdAt: "desc" } },
+  },
+  orderBy: { createdAt: "desc" },
+});
+
 exports.listProducts = (sellerId) => prisma.product.findMany({
   where: { sellerId },
   include: {

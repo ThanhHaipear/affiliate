@@ -18,7 +18,12 @@ async function lockUser(userId, payload) {
 }
 
 async function unlockUser(userId) {
-  const response = await axiosClient.patch(ENDPOINTS.admin.accountUnlock(userId));
+  const response = await axiosClient.patch(ENDPOINTS.admin.accountUnlock(userId), {});
+  return unwrapResponseData(response);
+}
+
+async function unlockUserByTarget(userId, payload) {
+  const response = await axiosClient.patch(ENDPOINTS.admin.accountUnlock(userId), payload || {});
   return unwrapResponseData(response);
 }
 
@@ -165,6 +170,7 @@ export {
   reviewRefundRequest,
   reviewWithdrawal,
   unlockUser,
+  unlockUserByTarget,
   updatePlatformFee,
   updateWithdrawalConfig,
 };
