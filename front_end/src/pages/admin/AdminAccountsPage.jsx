@@ -36,7 +36,7 @@ function AdminAccountsPage() {
       const response = await getAdminUsers();
       setAccounts((response || []).map(mapAdminAccountDto));
     } catch (loadError) {
-      setError(loadError.response?.data?.message || "Khong tai duoc danh sach tai khoan.");
+      setError(loadError.response?.data?.message || "Không tải được danh sách tài khoản.");
     } finally {
       setLoading(false);
     }
@@ -78,50 +78,50 @@ function AdminAccountsPage() {
       setSubmitting(true);
       if (selectedAccount.status === "LOCKED") {
         await unlockUser(selectedAccount.id);
-        toast.success("Da mo khoa tai khoan.");
+        toast.success("Đã mở khóa tài khoản.");
       } else {
         await lockUser(selectedAccount.id, { reason: lockReason });
-        toast.success("Da khoa tai khoan.");
+        toast.success("Đã khóa tài khoản.");
       }
       setSelectedAccount(null);
       setLockReason("");
       await loadAccounts();
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong cap nhat duoc tai khoan.");
+      toast.error(submitError.response?.data?.message || "Không cập nhật được tài khoản.");
     } finally {
       setSubmitting(false);
     }
   }
 
   if (loading) {
-    return <LoadingSpinner label="Dang tai danh sach tai khoan..." />;
+    return <LoadingSpinner label="Đang tải danh sách tài khoản..." />;
   }
 
   if (error) {
-    return <EmptyState title="Khong tai duoc admin accounts" description={error} />;
+    return <EmptyState title="Không tải được tài khoản admin" description={error} />;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Admin"
-        title="Accounts control center"
-        description="Danh sach tai khoan admin, seller, affiliate va customer dang doc truc tiep tu database. Ban co the lock hoac unlock ngay tai day."
+        title="Trung tâm quản lý tài khoản"
+        description="Danh sách tài khoản admin, seller, affiliate và customer đang đọc trực tiếp từ database. Bạn có thể khóa hoặc mở khóa ngay tại đây."
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <AdminStatCard label="Tong tai khoan" value={summary.total.toLocaleString("vi-VN")} meta="Theo bo loc hien tai" tone="cyan" />
+        <AdminStatCard label="Tổng tài khoản" value={summary.total.toLocaleString("vi-VN")} meta="Theo bộ lọc hiện tại" tone="cyan" />
         <AdminStatCard label="Dang bi khoa" value={summary.locked.toLocaleString("vi-VN")} meta="Can review ly do vi pham" tone="rose" />
         <AdminStatCard label="Seller" value={summary.sellers.toLocaleString("vi-VN")} meta="Co vai tro seller" tone="amber" />
         <AdminStatCard label="Affiliate" value={summary.affiliates.toLocaleString("vi-VN")} meta="Co vai tro affiliate" tone="emerald" />
       </div>
 
       <div className="grid gap-4 rounded-[2rem] border border-slate-300 bg-white p-6 shadow-sm lg:grid-cols-[1.5fr_0.7fr_0.7fr]">
-        <Input label="Tim kiem" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Email, phone, ten, shop..." />
+        <Input label="Tìm kiếm" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Email, số điện thoại, tên, shop..." />
         <label className="block space-y-2">
-          <span className="text-sm font-medium text-slate-800">Vai tro</span>
+          <span className="text-sm font-medium text-slate-800">Vai trò</span>
           <select className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900" value={role} onChange={(event) => setRole(event.target.value)}>
-            <option value="ALL">Tat ca</option>
+            <option value="ALL">Tất cả</option>
             <option value="ADMIN">Admin</option>
             <option value="SELLER">Seller</option>
             <option value="AFFILIATE">Affiliate</option>
@@ -129,9 +129,9 @@ function AdminAccountsPage() {
           </select>
         </label>
         <label className="block space-y-2">
-          <span className="text-sm font-medium text-slate-800">Trang thai</span>
+          <span className="text-sm font-medium text-slate-800">Trạng thái</span>
           <select className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900" value={status} onChange={(event) => setStatus(event.target.value)}>
-            <option value="ALL">Tat ca</option>
+            <option value="ALL">Tất cả</option>
             <option value="ACTIVE">ACTIVE</option>
             <option value="LOCKED">LOCKED</option>
             <option value="PENDING">PENDING</option>
@@ -143,7 +143,7 @@ function AdminAccountsPage() {
         columns={[
           {
             key: "displayName",
-            title: "Tai khoan",
+            title: "Tài khoản",
             render: (row) => (
               <div>
                 <p className="font-medium text-slate-900">{row.displayName}</p>
@@ -153,7 +153,7 @@ function AdminAccountsPage() {
           },
           {
             key: "contact",
-            title: "Lien he",
+            title: "Liên hệ",
             render: (row) => (
               <div className="space-y-1">
                 <p>{row.email}</p>
@@ -163,39 +163,39 @@ function AdminAccountsPage() {
           },
           {
             key: "roles",
-            title: "Vai tro",
+            title: "Vai trò",
             render: (row) => row.roles.join(", "),
           },
           {
             key: "status",
-            title: "Trang thai",
+            title: "Trạng thái",
             render: (row) => <StatusBadge status={row.status} />,
           },
           {
             key: "lastLoginAt",
-            title: "Lan dang nhap",
+            title: "Lần đăng nhập",
             render: (row) => formatDateTime(row.lastLoginAt),
           },
           {
             key: "actions",
-            title: "Hanh dong",
+            title: "Hành động",
             render: (row) => (
               <Button size="sm" variant={row.status === "LOCKED" ? "primary" : "danger"} onClick={() => setSelectedAccount(row)}>
-                {row.status === "LOCKED" ? "Unlock" : "Lock"}
+                {row.status === "LOCKED" ? "Mở khóa" : "Khóa"}
               </Button>
             ),
           },
         ]}
         rows={filtered}
-        emptyTitle="Khong co tai khoan phu hop"
-        emptyDescription="Thu doi bo loc hoac tim kiem theo email, phone, vai tro."
+        emptyTitle="Không có tài khoản phù hợp"
+        emptyDescription="Thử đổi bộ lọc hoặc tìm kiếm theo email, số điện thoại, vai trò."
       />
 
       <ConfirmModal
         open={Boolean(selectedAccount)}
-        title={selectedAccount?.status === "LOCKED" ? "Mo khoa tai khoan" : "Khoa tai khoan"}
-        description={selectedAccount ? `Xac nhan thao tac voi ${selectedAccount.displayName}.` : ""}
-        confirmLabel={selectedAccount?.status === "LOCKED" ? "Mo khoa" : "Khoa tai khoan"}
+        title={selectedAccount?.status === "LOCKED" ? "Mở khóa tài khoản" : "Khóa tài khoản"}
+        description={selectedAccount ? `Xác nhận thao tác với ${selectedAccount.displayName}.` : ""}
+        confirmLabel={selectedAccount?.status === "LOCKED" ? "Mở khóa" : "Khóa tài khoản"}
         confirmVariant={selectedAccount?.status === "LOCKED" ? "primary" : "danger"}
         loading={submitting}
         onClose={() => {
@@ -206,18 +206,18 @@ function AdminAccountsPage() {
       >
         {selectedAccount?.status !== "LOCKED" ? (
           <label className="block space-y-2">
-            <span className="text-sm font-medium text-slate-200">Ly do khoa</span>
+            <span className="text-sm font-medium text-slate-200">Lý do khóa</span>
             <textarea
               value={lockReason}
               onChange={(event) => setLockReason(event.target.value)}
               rows={4}
-              placeholder="Nhap ly do vi pham, gian lan, spam..."
+              placeholder="Nhập lý do vi phạm, gian lận, spam..."
               className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-500"
             />
           </label>
         ) : (
           <div className="rounded-2xl border border-slate-700 bg-slate-950/60 p-4 text-sm leading-7 text-slate-300">
-            Ly do khoa hien tai: {selectedAccount?.lockReason || "Khong co ghi chu."}
+            Lý do khóa hiện tại: {selectedAccount?.lockReason || "Không có ghi chú."}
           </div>
         )}
       </ConfirmModal>

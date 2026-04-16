@@ -35,7 +35,7 @@ function AdminSellerDetailPage() {
       const match = mapAdminOverview(response).pendingSellers.find((item) => item.id === String(id));
       setSeller(match || null);
     } catch (loadError) {
-      setError(loadError.response?.data?.message || "Khong tai duoc chi tiet seller.");
+      setError(loadError.response?.data?.message || "Không tải được chi tiết seller.");
     } finally {
       setLoading(false);
     }
@@ -46,16 +46,16 @@ function AdminSellerDetailPage() {
       setSubmitting(true);
       if (action === "approve") {
         await approveSeller(seller.id);
-        toast.success("Da duyet seller.");
+        toast.success("Đã duyệt seller.");
       } else {
         await rejectSeller(seller.id, { rejectReason });
-        toast.success("Da tu choi seller.");
+        toast.success("Đã từ chối seller.");
       }
       setAction(null);
       setRejectReason("");
       await loadSeller();
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong cap nhat duoc seller.");
+      toast.error(submitError.response?.data?.message || "Không cập nhật được seller.");
     } finally {
       setSubmitting(false);
     }
@@ -68,9 +68,9 @@ function AdminSellerDetailPage() {
   if (!seller) {
     return (
       <EmptyState
-        title="Seller not found"
-        description={error || "Seller nay khong con nam trong danh sach cho duyet hoac backend khong tra ve ban ghi."}
-        actionLabel="Back to pending sellers"
+        title="Không tìm thấy seller"
+        description={error || "Seller này không còn nằm trong danh sách chờ duyệt hoặc backend không trả về bản ghi."}
+        actionLabel="Quay lại danh sách seller chờ duyệt"
         onAction={() => window.history.back()}
       />
     );
@@ -79,39 +79,39 @@ function AdminSellerDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Seller detail"
+        eyebrow="Chi tiết seller"
         title={seller.shopName}
         description={seller.description}
         action={
           <div className="flex gap-3">
             <Button variant="danger" onClick={() => setAction("reject")}>
-              Reject seller
+              Từ chối seller
             </Button>
-            <Button onClick={() => setAction("approve")}>Approve seller</Button>
+            <Button onClick={() => setAction("approve")}>Duyệt seller</Button>
           </div>
         }
       />
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <DetailPanel eyebrow="Profile" title="Business snapshot">
+        <DetailPanel eyebrow="Hồ sơ" title="Ảnh chụp doanh nghiệp">
           <div className="grid gap-3 sm:grid-cols-2">
-            <InfoItem label="Owner" value={seller.ownerName} />
+            <InfoItem label="Chủ sở hữu" value={seller.ownerName} />
             <InfoItem label="Email" value={seller.email} />
-            <InfoItem label="Phone" value={seller.phone} />
-            <InfoItem label="Submitted" value={formatDateTime(seller.submittedAt)} />
-            <InfoItem label="Category" value={seller.category} />
-            <InfoItem label="Payment" value={seller.paymentMethod} />
+            <InfoItem label="Số điện thoại" value={seller.phone} />
+            <InfoItem label="Ngày gửi" value={formatDateTime(seller.submittedAt)} />
+            <InfoItem label="Ngành hàng" value={seller.category} />
+            <InfoItem label="Thanh toán" value={seller.paymentMethod} />
           </div>
         </DetailPanel>
 
-        <DetailPanel eyebrow="Compliance" title="Review status">
+        <DetailPanel eyebrow="Tuân thủ" title="Trạng thái review">
           <div className="flex flex-wrap gap-3">
             <StatusBadge status={seller.kycStatus} />
             <span className="rounded-full border border-white/10 px-3 py-1 text-xs font-medium text-slate-300">
-              Risk {seller.riskLevel}
+              Rủi ro {seller.riskLevel}
             </span>
           </div>
           <div className="rounded-[1.5rem] bg-white/[0.04] p-4">
-            <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Documents</p>
+            <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Tài liệu</p>
             <ul className="mt-3 space-y-2 text-sm text-slate-300">
               {seller.documents.map((item) => (
                 <li key={item}>- {item}</li>
@@ -121,11 +121,11 @@ function AdminSellerDetailPage() {
         </DetailPanel>
       </div>
       <DetailPanel
-        eyebrow="Activity"
-        title="Observed behavior"
+        eyebrow="Hoạt động"
+        title="Hành vi quan sát được"
         footer={
           <Link to="/admin/sellers/pending">
-            <Button variant="secondary">Back to pending sellers</Button>
+            <Button variant="secondary">Quay lại danh sách seller chờ duyệt</Button>
           </Link>
         }
       >
@@ -139,8 +139,8 @@ function AdminSellerDetailPage() {
       </DetailPanel>
       <ConfirmModal
         open={Boolean(action)}
-        title={action === "approve" ? "Approve seller" : "Reject seller"}
-        description={`Confirm ${action || "review"} decision for ${seller.shopName}.`}
+        title={action === "approve" ? "Duyệt seller" : "Từ chối seller"}
+        description={`Xác nhận thao tác ${action === "approve" ? "duyệt" : "từ chối"} cho ${seller.shopName}.`}
         confirmVariant={action === "approve" ? "primary" : "danger"}
         onClose={() => {
           setAction(null);
@@ -151,10 +151,10 @@ function AdminSellerDetailPage() {
       >
         {action === "reject" ? (
           <Input
-            label="Reject reason"
+            label="Lý do từ chối"
             value={rejectReason}
             onChange={(event) => setRejectReason(event.target.value)}
-            placeholder="Explain what is missing or invalid"
+            placeholder="Nêu rõ phần còn thiếu hoặc không hợp lệ"
           />
         ) : null}
       </ConfirmModal>

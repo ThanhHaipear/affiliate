@@ -59,7 +59,7 @@ function SellerWithdrawalsPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Seller"
-        title="Rút tiền seller"
+        title="Ví và rút tiền seller"
         description="Hiển thị rõ số dư ví, tài khoản nhận tiền mặc định, giới hạn min/max và lịch sử rút tiền trên cùng một màn hình."
         action={(
           <Link

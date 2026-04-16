@@ -27,7 +27,7 @@ function AdminFraudDetectionPage() {
       const response = await getFraudAlerts();
       setAlerts((response || []).map(mapFraudAlertDto));
     } catch (loadError) {
-      setError(loadError.response?.data?.message || "Khong tai duoc fraud alerts.");
+      setError(loadError.response?.data?.message || "Không tải được fraud alerts.");
     } finally {
       setLoading(false);
     }
@@ -55,42 +55,42 @@ function AdminFraudDetectionPage() {
   }, [filtered]);
 
   if (loading) {
-    return <LoadingSpinner label="Dang tai fraud alerts..." />;
+    return <LoadingSpinner label="Đang tải fraud alerts..." />;
   }
 
   if (error) {
-    return <EmptyState title="Khong tai duoc fraud alerts" description={error} />;
+    return <EmptyState title="Không tải được fraud alerts" description={error} />;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Fraud detection"
-        title="Fraud detection and anomaly review"
-        description="Trang nay dang doc du lieu that tu bang fraud_alerts. Cac canh bao duoc tao khi he thong phat hien hanh vi bat thuong nhu click burst hoac risk pattern."
+        title="Phát hiện gian lận và review bất thường"
+        description="Trang này đang đọc dữ liệu thật từ bảng fraud_alerts. Các cảnh báo được tạo khi hệ thống phát hiện hành vi bất thường như click burst hoặc risk pattern."
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <AdminStatCard label="Tong alert" value={summary.total.toLocaleString("vi-VN")} meta="Theo bo loc hien tai" tone="cyan" />
-        <AdminStatCard label="Open" value={summary.open.toLocaleString("vi-VN")} meta="Can admin review" tone="rose" />
-        <AdminStatCard label="High severity" value={summary.high.toLocaleString("vi-VN")} meta="Can uu tien xu ly" tone="amber" />
-        <AdminStatCard label="Medium severity" value={summary.medium.toLocaleString("vi-VN")} meta="Can tiep tuc theo doi" tone="emerald" />
+        <AdminStatCard label="Tổng cảnh báo" value={summary.total.toLocaleString("vi-VN")} meta="Theo bộ lọc hiện tại" tone="cyan" />
+        <AdminStatCard label="Đang mở" value={summary.open.toLocaleString("vi-VN")} meta="Cần admin review" tone="rose" />
+        <AdminStatCard label="Mức độ cao" value={summary.high.toLocaleString("vi-VN")} meta="Cần ưu tiên xử lý" tone="amber" />
+        <AdminStatCard label="Mức độ trung bình" value={summary.medium.toLocaleString("vi-VN")} meta="Cần tiếp tục theo dõi" tone="emerald" />
       </div>
 
       <div className="grid gap-4 rounded-[2rem] border border-slate-300 bg-white p-6 shadow-sm md:grid-cols-2">
         <label className="block space-y-2">
-          <span className="text-sm font-medium text-slate-800">Process status</span>
+          <span className="text-sm font-medium text-slate-800">Trạng thái xử lý</span>
           <select className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900" value={status} onChange={(event) => setStatus(event.target.value)}>
-            <option value="ALL">Tat ca</option>
+            <option value="ALL">Tất cả</option>
             <option value="OPEN">OPEN</option>
             <option value="PROCESSING">PROCESSING</option>
             <option value="RESOLVED">RESOLVED</option>
           </select>
         </label>
         <label className="block space-y-2">
-          <span className="text-sm font-medium text-slate-800">Severity</span>
+          <span className="text-sm font-medium text-slate-800">Mức độ</span>
           <select className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900" value={severity} onChange={(event) => setSeverity(event.target.value)}>
-            <option value="ALL">Tat ca</option>
+            <option value="ALL">Tất cả</option>
             <option value="HIGH">HIGH</option>
             <option value="MEDIUM">MEDIUM</option>
             <option value="LOW">LOW</option>
@@ -102,7 +102,7 @@ function AdminFraudDetectionPage() {
         columns={[
           {
             key: "alertType",
-            title: "Alert",
+            title: "Cảnh báo",
             render: (row) => (
               <div>
                 <p className="font-medium text-slate-900">{row.alertType}</p>
@@ -110,12 +110,12 @@ function AdminFraudDetectionPage() {
               </div>
             ),
           },
-          { key: "severity", title: "Severity", render: (row) => <StatusBadge status={row.severity} /> },
-          { key: "processStatus", title: "Trang thai", render: (row) => <StatusBadge status={row.processStatus} /> },
-          { key: "description", title: "Mo ta" },
+          { key: "severity", title: "Mức độ", render: (row) => <StatusBadge status={row.severity} /> },
+          { key: "processStatus", title: "Trạng thái", render: (row) => <StatusBadge status={row.processStatus} /> },
+          { key: "description", title: "Mô tả" },
           {
             key: "processedBy",
-            title: "Xu ly",
+            title: "Xử lý",
             render: (row) => (
               <div>
                 <p>{row.processedBy}</p>
@@ -123,11 +123,11 @@ function AdminFraudDetectionPage() {
               </div>
             ),
           },
-          { key: "createdAt", title: "Tao luc", render: (row) => formatDateTime(row.createdAt) },
+          { key: "createdAt", title: "Tạo lúc", render: (row) => formatDateTime(row.createdAt) },
         ]}
         rows={filtered}
-        emptyTitle="Khong co fraud alert"
-        emptyDescription="Hien tai chua co canh bao gian lan nao theo bo loc da chon."
+        emptyTitle="Không có fraud alert"
+        emptyDescription="Hiện tại chưa có cảnh báo gian lận nào theo bộ lọc đã chọn."
       />
     </div>
   );

@@ -8,9 +8,6 @@ const sellerShopSchema = z.object({
   businessField: z.string().min(2, "Linh vuc kinh doanh la bat buoc."),
   shopDescription: z.string().min(10, "Mo ta shop toi thieu 10 ky tu."),
   taxCode: z.string().min(4, "Thong tin phap ly chua hop le."),
-  bankName: z.string().min(2, "Ten ngan hang la bat buoc."),
-  accountName: z.string().min(2, "Ten chu tai khoan la bat buoc."),
-  accountNumber: z.string().min(6, "So tai khoan khong hop le."),
 });
 
 const sellerChangePasswordSchema = z

@@ -62,6 +62,20 @@ function CustomerProfilePage() {
   useEffect(() => {
     let active = true;
 
+    const mergeUserIntoSession = (nextUser) => {
+      const baseUser = useAuthStore.getState().currentUser || {};
+
+      setUser({
+        ...baseUser,
+        ...nextUser,
+        roles: nextUser?.roles?.length ? nextUser.roles : baseUser.roles || [],
+        profile: {
+          ...(baseUser.profile || {}),
+          ...(nextUser?.profile || {}),
+        },
+      });
+    };
+
     async function loadProfilePage() {
       setLoading(true);
       setError("");
@@ -82,7 +96,7 @@ function CustomerProfilePage() {
       }
 
       if (profileResult.status === "fulfilled") {
-        setUser(profileResult.value);
+        mergeUserIntoSession(profileResult.value);
       } else {
         setError(profileResult.reason?.response?.data?.message || "Không tải được hồ sơ khách hàng.");
       }
@@ -118,7 +132,15 @@ function CustomerProfilePage() {
   const onSubmit = async (values) => {
     try {
       const updatedUser = await updateCurrentUserProfile(values);
-      setUser(updatedUser);
+      setUser({
+        ...(useAuthStore.getState().currentUser || {}),
+        ...updatedUser,
+        roles: updatedUser?.roles?.length ? updatedUser.roles : useAuthStore.getState().currentUser?.roles || [],
+        profile: {
+          ...(useAuthStore.getState().currentUser?.profile || {}),
+          ...(updatedUser?.profile || {}),
+        },
+      });
       toast.success("Đã cập nhật hồ sơ customer.");
     } catch (submitError) {
       toast.error(submitError.response?.data?.message || "Không cập nhật được hồ sơ customer.");

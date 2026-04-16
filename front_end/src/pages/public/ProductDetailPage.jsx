@@ -31,6 +31,7 @@ function ProductDetailPage() {
   const [selectedImage, setSelectedImage] = useState("");
   const [wishlisted, setWishlisted] = useState(false);
   const [trackedAffiliateSource, setTrackedAffiliateSource] = useState(null);
+  const [quantity, setQuantity] = useState("1");
 
   useEffect(() => {
     let active = true;
@@ -48,6 +49,7 @@ function ProductDetailPage() {
         setProduct(mapped);
         setSelectedImage(mapped.gallery?.[0] || mapped.image);
         setWishlisted(isWishlisted(mapped.id));
+        setQuantity("1");
       } catch (loadError) {
         if (active) {
           setError(loadError.response?.data?.message || "Không tải được chi tiết sản phẩm.");
@@ -136,6 +138,31 @@ function ProductDetailPage() {
 
   const gallery = useMemo(() => product?.gallery?.length ? product.gallery : product ? [product.image] : [], [product]);
   const isOutOfStock = !product?.variant_id || Number(product?.stock || 0) <= 0;
+  const maxQuantity = Math.max(1, Number(product?.stock || 0));
+  const normalizedQuantity = Math.min(
+    maxQuantity,
+    Math.max(1, Number.parseInt(quantity, 10) || 1),
+  );
+
+  function handleQuantityChange(nextValue) {
+    const rawValue = String(nextValue ?? "");
+
+    if (rawValue === "") {
+      setQuantity("");
+      return;
+    }
+
+    if (!/^\d+$/.test(rawValue)) {
+      return;
+    }
+
+    const nextQuantity = Math.min(maxQuantity, Math.max(1, Number.parseInt(rawValue, 10)));
+    setQuantity(String(nextQuantity));
+  }
+
+  function handleQuantityBlur() {
+    setQuantity(String(normalizedQuantity));
+  }
 
   async function handleAddToCart(redirectToCheckout = false) {
     if (!product?.variant_id) {
@@ -153,7 +180,7 @@ function ProductDetailPage() {
       const cartItem = await updateCartItem({
         productId: Number(product.id),
         variantId: Number(product.variant_id),
-        quantity: 1,
+        quantity: normalizedQuantity,
         attributionToken: trackedAffiliateSource?.token || undefined,
       });
       toast.success("Đã thêm sản phẩm vào giỏ hàng.");
@@ -269,6 +296,40 @@ function ProductDetailPage() {
           {isOutOfStock ? (
             <div className="rounded-[1.5rem] bg-rose-50 p-4 text-sm leading-7 text-rose-700">
               Sản phẩm này hiện đã hết hàng nên không thể thêm vào giỏ hàng hoặc mua ngay.
+            </div>
+          ) : null}
+          {!isOutOfStock ? (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-slate-900">So luong</p>
+              <div className="inline-flex items-center overflow-hidden rounded-full border border-slate-200 bg-slate-50">
+                <button
+                  type="button"
+                  className="px-4 py-3 text-sm font-semibold text-slate-700"
+                  onClick={() => handleQuantityChange(normalizedQuantity - 1)}
+                  disabled={submitting || normalizedQuantity <= 1}
+                >
+                  -
+                </button>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  min="1"
+                  max={maxQuantity}
+                  value={quantity}
+                  onChange={(event) => handleQuantityChange(event.target.value)}
+                  onBlur={handleQuantityBlur}
+                  className="w-20 border-x border-slate-200 bg-white px-2 py-3 text-center text-sm text-slate-900 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+                <button
+                  type="button"
+                  className="px-4 py-3 text-sm font-semibold text-slate-700"
+                  onClick={() => handleQuantityChange(normalizedQuantity + 1)}
+                  disabled={submitting || normalizedQuantity >= maxQuantity}
+                >
+                  +
+                </button>
+              </div>
             </div>
           ) : null}
           <div className="grid gap-3 sm:grid-cols-2">

@@ -11,7 +11,7 @@ import Select from "../../../components/common/Select";
 import { useToast } from "../../../hooks/useToast";
 import { buildCheckoutPayload } from "../../../lib/apiPayloads";
 import { aggregateDisplayCartItems, mapCartDto, mapOrderDto } from "../../../lib/apiMappers";
-import { shippingMethods } from "../../../mock/customerData";
+import { SHIPPING_METHOD_OPTIONS } from "../../../lib/checkout";
 import { useAuthStore } from "../../../store/authStore";
 
 function CheckoutPage() {
@@ -235,7 +235,7 @@ function CheckoutPage() {
                   name="shippingMethod"
                   value={form.shippingMethod}
                   onChange={handleChange}
-                  options={shippingMethods}
+                  options={SHIPPING_METHOD_OPTIONS}
                 />
                 <Select
                   label="Phuong thuc thanh toan"

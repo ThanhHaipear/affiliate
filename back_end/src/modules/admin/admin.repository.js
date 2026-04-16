@@ -519,6 +519,23 @@ exports.reviewAffiliate = ({ affiliateId, adminId, status, rejectReason }) =>
       data: { kycStatus: status, updatedAt: new Date() },
     });
 
+    const affiliateRole = await tx.role.findUnique({ where: { code: "AFFILIATE" } });
+    const existingAffiliateRole = await tx.accountRole.findFirst({
+      where: {
+        accountId: affiliateId,
+        roleId: affiliateRole.id,
+      },
+    });
+
+    if (status === "APPROVED" && !existingAffiliateRole) {
+      await tx.accountRole.create({
+        data: {
+          accountId: affiliateId,
+          roleId: affiliateRole.id,
+        },
+      });
+    }
+
     await tx.activityLog.create({
       data: {
         accountId: adminId,
@@ -576,6 +593,20 @@ exports.reviewProduct = ({ productId, adminId, status, rejectReason }) =>
       },
       include: {
         seller: { select: { ownerAccountId: true, approvalStatus: true } },
+      },
+    });
+
+    await tx.productAffiliateSetting.updateMany({
+      where: {
+        productId: Number(productId),
+        approvalStatus: "PENDING",
+      },
+      data: {
+        approvalStatus: status,
+        reviewedBy: adminId,
+        reviewedAt: new Date(),
+        rejectReason: status === "REJECTED" ? rejectReason : null,
+        updatedAt: new Date(),
       },
     });
 

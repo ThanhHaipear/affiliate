@@ -9,7 +9,7 @@ import MoneyText from "../../components/common/MoneyText";
 import PageHeader from "../../components/common/PageHeader";
 import StatusBadge from "../../components/common/StatusBadge";
 import { useToast } from "../../hooks/useToast";
-import { formatDateTime } from "../../lib/format";
+import { formatCompactCurrency, formatCurrency as formatFullCurrency, formatDateTime } from "../../lib/format";
 import { mapWithdrawalDto } from "../../lib/apiMappers";
 
 const formatCurrency = (value) => new Intl.NumberFormat("vi-VN", {
@@ -19,23 +19,23 @@ const formatCurrency = (value) => new Intl.NumberFormat("vi-VN", {
 }).format(Number(value || 0));
 
 const baseColumns = [
-  { key: "id", title: "Yeu cau" },
+  { key: "id", title: "Yêu cầu" },
   {
     key: "owner_type",
-    title: "Loai vi",
+    title: "Loại ví",
     render: (row) => row.raw?.ownerType || "--",
   },
-  { key: "amount", title: "So tien", render: (row) => <MoneyText value={row.amount} /> },
+  { key: "amount", title: "Số tiền", render: (row) => <MoneyText value={row.amount} /> },
   {
     key: "receiver",
-    title: "Tai khoan nhan",
+    title: "Tài khoản nhận",
     render: (row) => {
       const paymentAccount = row.raw?.affiliatePaymentAccount || row.raw?.sellerPaymentAccount;
       return paymentAccount?.accountNumber || paymentAccount?.bankName || "--";
     },
   },
-  { key: "requested_at", title: "Ngay gui", render: (row) => formatDateTime(row.requested_at) },
-  { key: "status", title: "Trang thai", render: (row) => <StatusBadge status={row.status} /> },
+  { key: "requested_at", title: "Ngày gửi", render: (row) => formatDateTime(row.requested_at) },
+  { key: "status", title: "Trạng thái", render: (row) => <StatusBadge status={row.status} /> },
 ];
 
 function AdminPendingWithdrawalsPage() {
@@ -77,7 +77,7 @@ function AdminPendingWithdrawalsPage() {
         }
       } catch (loadError) {
         if (active) {
-          setError(loadError.response?.data?.message || "Khong tai duoc du lieu withdrawal admin.");
+          setError(loadError.response?.data?.message || "Không tải được dữ liệu withdrawal admin.");
         }
       } finally {
         if (active) {
@@ -95,7 +95,7 @@ function AdminPendingWithdrawalsPage() {
 
   async function handleReview(withdrawalId, status) {
     const rejectReason = status === "REJECTED"
-      ? window.prompt("Nhap ly do tu choi yeu cau rut tien", "")
+      ? window.prompt("Nhập lý do từ chối yêu cầu rút tiền", "")
       : "";
 
     if (status === "REJECTED" && rejectReason === null) {
@@ -123,9 +123,9 @@ function AdminPendingWithdrawalsPage() {
         }));
       }
 
-      toast.success(status === "APPROVED" ? "Da duyet yeu cau va cap nhat vao danh sach da duyet." : "Da tu choi yeu cau rut tien.");
+      toast.success(status === "APPROVED" ? "Đã duyệt yêu cầu và cập nhật vào danh sách đã duyệt." : "Đã từ chối yêu cầu rút tiền.");
     } catch (reviewError) {
-      toast.error(reviewError.response?.data?.message || "Khong cap nhat duoc yeu cau rut tien.");
+      toast.error(reviewError.response?.data?.message || "Không cập nhật được yêu cầu rút tiền.");
     } finally {
       setActionId(null);
     }
@@ -152,7 +152,7 @@ function AdminPendingWithdrawalsPage() {
     {
       key: "note",
       title: "Ghi chu",
-      render: (row) => row.raw?.note || row.raw?.payoutBatchId ? `Batch #${row.raw?.payoutBatchId || "--"}` : "Da duyet",
+      render: (row) => row.raw?.note || row.raw?.payoutBatchId ? `Batch #${row.raw?.payoutBatchId || "--"}` : "Đã duyệt",
     },
   ];
 
@@ -160,14 +160,14 @@ function AdminPendingWithdrawalsPage() {
     ...baseColumns,
     {
       key: "actions",
-      title: "Thao tac",
+          title: "Thao tác",
       render: (row) => (
         <div className="flex flex-wrap gap-2">
           <Button size="sm" loading={actionId === row.id} disabled={Boolean(actionId)} onClick={() => handleReview(row.id, "APPROVED")}>
-            Duyet
+            Duyệt
           </Button>
           <Button size="sm" variant="danger" disabled={Boolean(actionId)} onClick={() => handleReview(row.id, "REJECTED")}>
-            Tu choi
+            Từ chối
           </Button>
         </div>
       ),
@@ -178,8 +178,8 @@ function AdminPendingWithdrawalsPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Admin"
-        title="Yeu cau duyet rut tien"
-        description="Admin duyet yeu cau withdrawal cua seller va affiliate. Ben duoi hien ca hang doi cho duyet va danh sach da duyet thuc te."
+        title="Yêu cầu duyệt rút tiền"
+        description="Admin duyệt yêu cầu withdrawal của seller và affiliate. Bên dưới hiển thị cả hàng đợi chờ duyệt và danh sách đã duyệt thực tế."
         action={
           <Link
             to="/admin/commissions"
@@ -191,41 +191,41 @@ function AdminPendingWithdrawalsPage() {
       />
 
       <div className="grid gap-4 md:grid-cols-4">
-        <AdminStatCard label="Pending requests" value={pendingWithdrawals.length.toLocaleString("vi-VN")} meta="Yeu cau dang cho admin review" tone="amber" />
-        <AdminStatCard label="Affiliate requests" value={pendingSummary.affiliateCount.toLocaleString("vi-VN")} meta="Rut tien tu vi affiliate" tone="cyan" />
-        <AdminStatCard label="Total pending amount" value={formatCurrency(pendingSummary.totalAmount)} meta={`${pendingSummary.sellerCount.toLocaleString("vi-VN")} yeu cau tu seller`} tone="emerald" />
-        <AdminStatCard label="Tong tien da duyet thuc te" value={formatCurrency(approvedSummary.approvedAmount)} meta={`${approvedSummary.approvedCount.toLocaleString("vi-VN")} yeu cau da duyet | Affiliate ${approvedSummary.affiliateApprovedCount.toLocaleString("vi-VN")} | Seller ${approvedSummary.sellerApprovedCount.toLocaleString("vi-VN")}`} tone="rose" />
+        <AdminStatCard label="Yêu cầu chờ duyệt" value={pendingWithdrawals.length.toLocaleString("vi-VN")} meta="Yêu cầu đang chờ admin review" tone="amber" />
+        <AdminStatCard label="Yêu cầu affiliate" value={pendingSummary.affiliateCount.toLocaleString("vi-VN")} meta="Rút tiền từ ví affiliate" tone="cyan" />
+        <AdminStatCard label="Tổng tiền chờ duyệt" value={formatCompactCurrency(pendingSummary.totalAmount)} tooltip={formatFullCurrency(pendingSummary.totalAmount)} meta={`${pendingSummary.sellerCount.toLocaleString("vi-VN")} yêu cầu từ seller`} tone="emerald" />
+        <AdminStatCard label="Tổng tiền đã duyệt thực tế" value={formatCompactCurrency(approvedSummary.approvedAmount)} tooltip={formatFullCurrency(approvedSummary.approvedAmount)} meta={`${approvedSummary.approvedCount.toLocaleString("vi-VN")} yêu cầu đã duyệt | Affiliate ${approvedSummary.affiliateApprovedCount.toLocaleString("vi-VN")} | Seller ${approvedSummary.sellerApprovedCount.toLocaleString("vi-VN")}`} tone="rose" />
       </div>
 
-      {loading ? <EmptyState title="Dang tai yeu cau rut tien" description="He thong dang lay du lieu withdrawal cua admin tu backend." /> : null}
-      {!loading && error ? <EmptyState title="Khong tai duoc yeu cau rut tien" description={error} /> : null}
+      {loading ? <EmptyState title="Đang tải yêu cầu rút tiền" description="Hệ thống đang lấy dữ liệu withdrawal của admin từ backend." /> : null}
+      {!loading && error ? <EmptyState title="Không tải được yêu cầu rút tiền" description={error} /> : null}
       {!loading && !error ? (
         <>
           <section className="space-y-4">
             <div className="rounded-[2rem] border border-slate-200 bg-white/95 p-6 shadow-sm">
-              <p className="text-xs uppercase tracking-[0.3em] text-sky-700">Pending</p>
-              <h2 className="mt-2 text-2xl font-semibold text-slate-900">Danh sach cho duyet</h2>
-              <p className="mt-3 text-sm leading-7 text-slate-600">Admin co the duyet hoac tu choi ngay tren bang nay.</p>
+              <p className="text-xs uppercase tracking-[0.3em] text-sky-700">Chờ duyệt</p>
+              <h2 className="mt-2 text-2xl font-semibold text-slate-900">Danh sách chờ duyệt</h2>
+              <p className="mt-3 text-sm leading-7 text-slate-600">Admin có thể duyệt hoặc từ chối ngay trên bảng này.</p>
             </div>
             <DataTable
               columns={pendingColumns}
               rows={pendingWithdrawals}
-              emptyTitle="Khong co yeu cau dang cho duyet"
-              emptyDescription="Hang doi pending hien dang trong, nhung ben duoi van hien cac yeu cau da duyet."
+              emptyTitle="Không có yêu cầu đang chờ duyệt"
+              emptyDescription="Hàng đợi pending hiện đang trống, nhưng bên dưới vẫn hiển thị các yêu cầu đã duyệt."
             />
           </section>
 
           <section className="space-y-4">
             <div className="rounded-[2rem] border border-slate-200 bg-white/95 p-6 shadow-sm">
-              <p className="text-xs uppercase tracking-[0.3em] text-emerald-700">Approved</p>
-              <h2 className="mt-2 text-2xl font-semibold text-slate-900">Danh sach da duyet</h2>
-              <p className="mt-3 text-sm leading-7 text-slate-600">Hien toan bo yeu cau rut tien da duoc admin duyet thuc te, gom ca request dang cho payout va request da payout.</p>
+              <p className="text-xs uppercase tracking-[0.3em] text-emerald-700">Đã duyệt</p>
+              <h2 className="mt-2 text-2xl font-semibold text-slate-900">Danh sách đã duyệt</h2>
+              <p className="mt-3 text-sm leading-7 text-slate-600">Hiện toàn bộ yêu cầu rút tiền đã được admin duyệt thực tế, gồm cả request đang chờ payout và request đã payout.</p>
             </div>
             <DataTable
               columns={approvedColumns}
               rows={approvedWithdrawals}
-              emptyTitle="Chua co yeu cau da duyet"
-              emptyDescription="Khi admin duyet request rut tien, danh sach nay se hien ngay tai day."
+              emptyTitle="Chưa có yêu cầu đã duyệt"
+              emptyDescription="Khi admin duyệt request rút tiền, danh sách này sẽ hiện ngay tại đây."
             />
           </section>
         </>

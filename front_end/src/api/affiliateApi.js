@@ -1,18 +1,19 @@
-﻿import { axiosClient } from "./axiosClient";
+import { axiosClient } from "./axiosClient";
+import { ENDPOINTS } from "./endpoints";
 import { unwrapResponseData } from "./response";
 
 async function getAffiliateOverview() {
-  const response = await axiosClient.get("/api/affiliate/stats");
+  const response = await axiosClient.get(ENDPOINTS.affiliate.stats);
   return unwrapResponseData(response);
 }
 
 async function getAffiliateProfile() {
-  const response = await axiosClient.get("/api/affiliate/profile");
+  const response = await axiosClient.get(ENDPOINTS.affiliate.profile);
   return unwrapResponseData(response);
 }
 
 async function updateAffiliateProfile(payload) {
-  const response = await axiosClient.put("/api/affiliate/profile", payload);
+  const response = await axiosClient.put(ENDPOINTS.affiliate.profile, payload);
   return unwrapResponseData(response);
 }
 
@@ -21,7 +22,7 @@ async function uploadAffiliateAvatar(file) {
   formData.append("file", file);
   formData.append("scope", "avatar");
 
-  const response = await axiosClient.post("/api/uploads/images", formData, {
+  const response = await axiosClient.post(ENDPOINTS.uploads.images, formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
@@ -32,37 +33,37 @@ async function uploadAffiliateAvatar(file) {
 }
 
 async function addAffiliateChannel(payload) {
-  const response = await axiosClient.post("/api/affiliate/channels", payload);
+  const response = await axiosClient.post(ENDPOINTS.affiliate.channels, payload);
   return unwrapResponseData(response);
 }
 
 async function addAffiliatePaymentAccount(payload) {
-  const response = await axiosClient.post("/api/affiliate/payment-accounts", payload);
+  const response = await axiosClient.post(ENDPOINTS.affiliate.paymentAccounts, payload);
   return unwrapResponseData(response);
 }
 
 async function getAffiliateMarketplaceProducts(params) {
-  const response = await axiosClient.get("/api/products", { params });
+  const response = await axiosClient.get(ENDPOINTS.products.list, { params });
   return unwrapResponseData(response);
 }
 
 async function createAffiliateLink(payload) {
-  const response = await axiosClient.post("/api/tracking/links", payload);
+  const response = await axiosClient.post(ENDPOINTS.tracking.links, payload);
   return unwrapResponseData(response);
 }
 
 async function revokeAffiliateLink(linkId) {
-  const response = await axiosClient.patch(`/api/tracking/links/${linkId}/revoke`);
+  const response = await axiosClient.patch(ENDPOINTS.tracking.linkRevoke(linkId));
   return unwrapResponseData(response);
 }
 
 async function getAffiliateLinks(params) {
-  const response = await axiosClient.get("/api/tracking/links", { params });
+  const response = await axiosClient.get(ENDPOINTS.tracking.links, { params });
   return unwrapResponseData(response);
 }
 
 async function getAffiliateCommissions(params) {
-  const response = await axiosClient.get("/api/commissions/me", { params });
+  const response = await axiosClient.get(ENDPOINTS.commissions.me, { params });
   return unwrapResponseData(response);
 }
 

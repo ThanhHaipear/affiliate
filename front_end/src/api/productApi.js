@@ -1,23 +1,24 @@
 import { axiosClient } from "./axiosClient";
+import { ENDPOINTS } from "./endpoints";
 import { unwrapResponseData } from "./response";
 
 async function getProducts(params) {
-  const response = await axiosClient.get("/api/products", { params });
+  const response = await axiosClient.get(ENDPOINTS.products.list, { params });
   return unwrapResponseData(response);
 }
 
 async function getProductDetail(productIdOrSlug) {
-  const response = await axiosClient.get(`/api/products/${productIdOrSlug}`);
+  const response = await axiosClient.get(ENDPOINTS.products.detail(productIdOrSlug));
   return unwrapResponseData(response);
 }
 
 async function getSellerProducts(params) {
-  const response = await axiosClient.get("/api/seller/products", { params });
+  const response = await axiosClient.get(ENDPOINTS.seller.products, { params });
   return unwrapResponseData(response);
 }
 
 async function getSellerProductDetail(productId) {
-  const response = await axiosClient.get(`/api/seller/products/${productId}`);
+  const response = await axiosClient.get(ENDPOINTS.seller.productDetail(productId));
   return unwrapResponseData(response);
 }
 
@@ -29,7 +30,7 @@ async function uploadSellerProductImages(files, scope = "product") {
   });
   formData.append("scope", scope);
 
-  const response = await axiosClient.post("/api/uploads/images", formData, {
+  const response = await axiosClient.post(ENDPOINTS.uploads.images, formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
@@ -39,22 +40,22 @@ async function uploadSellerProductImages(files, scope = "product") {
 }
 
 async function createSellerProduct(payload) {
-  const response = await axiosClient.post("/api/products", payload);
+  const response = await axiosClient.post(ENDPOINTS.products.list, payload);
   return unwrapResponseData(response);
 }
 
 async function updateSellerProduct(productId, payload) {
-  const response = await axiosClient.put(`/api/products/${productId}`, payload);
+  const response = await axiosClient.put(ENDPOINTS.products.detail(productId), payload);
   return unwrapResponseData(response);
 }
 
 async function getSellerAffiliateSettings() {
-  const response = await axiosClient.get("/api/seller/affiliate-settings");
+  const response = await axiosClient.get(ENDPOINTS.seller.affiliateSettings);
   return unwrapResponseData(response);
 }
 
 async function updateSellerAffiliateSetting(productId, payload) {
-  const response = await axiosClient.put(`/api/seller/products/${productId}/affiliate-setting`, payload);
+  const response = await axiosClient.put(ENDPOINTS.seller.productAffiliateSetting(productId), payload);
   return unwrapResponseData(response);
 }
 

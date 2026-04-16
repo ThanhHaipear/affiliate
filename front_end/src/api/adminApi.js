@@ -1,35 +1,36 @@
-﻿import { axiosClient } from "./axiosClient";
+import { axiosClient } from "./axiosClient";
+import { ENDPOINTS } from "./endpoints";
 import { unwrapResponseData } from "./response";
 
 async function getAdminOverview() {
-  const response = await axiosClient.get("/api/admin/dashboard");
+  const response = await axiosClient.get(ENDPOINTS.admin.dashboard);
   return unwrapResponseData(response);
 }
 
 async function getAdminUsers(params) {
-  const response = await axiosClient.get("/api/admin/accounts", { params });
+  const response = await axiosClient.get(ENDPOINTS.admin.accounts, { params });
   return unwrapResponseData(response);
 }
 
 async function lockUser(userId, payload) {
-  const response = await axiosClient.patch(`/api/admin/accounts/${userId}/lock`, payload || {});
+  const response = await axiosClient.patch(ENDPOINTS.admin.accountLock(userId), payload || {});
   return unwrapResponseData(response);
 }
 
 async function unlockUser(userId) {
-  const response = await axiosClient.patch(`/api/admin/accounts/${userId}/unlock`);
+  const response = await axiosClient.patch(ENDPOINTS.admin.accountUnlock(userId));
   return unwrapResponseData(response);
 }
 
 async function approveSeller(sellerId) {
-  const response = await axiosClient.patch(`/api/admin/sellers/${sellerId}/review`, {
+  const response = await axiosClient.patch(ENDPOINTS.admin.sellerReview(sellerId), {
     status: "APPROVED",
   });
   return unwrapResponseData(response);
 }
 
 async function rejectSeller(sellerId, payload) {
-  const response = await axiosClient.patch(`/api/admin/sellers/${sellerId}/review`, {
+  const response = await axiosClient.patch(ENDPOINTS.admin.sellerReview(sellerId), {
     status: "REJECTED",
     rejectReason: payload?.rejectReason || "",
   });
@@ -37,14 +38,14 @@ async function rejectSeller(sellerId, payload) {
 }
 
 async function approveAffiliate(affiliateId) {
-  const response = await axiosClient.patch(`/api/admin/affiliates/${affiliateId}/review`, {
+  const response = await axiosClient.patch(ENDPOINTS.admin.affiliateReview(affiliateId), {
     status: "APPROVED",
   });
   return unwrapResponseData(response);
 }
 
 async function rejectAffiliate(affiliateId, payload) {
-  const response = await axiosClient.patch(`/api/admin/affiliates/${affiliateId}/review`, {
+  const response = await axiosClient.patch(ENDPOINTS.admin.affiliateReview(affiliateId), {
     status: "REJECTED",
     rejectReason: payload?.rejectReason || "",
   });
@@ -52,14 +53,14 @@ async function rejectAffiliate(affiliateId, payload) {
 }
 
 async function approveProduct(productId) {
-  const response = await axiosClient.patch(`/api/admin/products/${productId}/review`, {
+  const response = await axiosClient.patch(ENDPOINTS.admin.productReview(productId), {
     status: "APPROVED",
   });
   return unwrapResponseData(response);
 }
 
 async function rejectProduct(productId, payload) {
-  const response = await axiosClient.patch(`/api/admin/products/${productId}/review`, {
+  const response = await axiosClient.patch(ENDPOINTS.admin.productReview(productId), {
     status: "REJECTED",
     rejectReason: payload?.rejectReason || "",
   });
@@ -67,14 +68,14 @@ async function rejectProduct(productId, payload) {
 }
 
 async function approveAffiliateSetting(settingId) {
-  const response = await axiosClient.patch(`/api/admin/product-affiliate-settings/${settingId}/review`, {
+  const response = await axiosClient.patch(ENDPOINTS.admin.productAffiliateReview(settingId), {
     status: "APPROVED",
   });
   return unwrapResponseData(response);
 }
 
 async function rejectAffiliateSetting(settingId, payload) {
-  const response = await axiosClient.patch(`/api/admin/product-affiliate-settings/${settingId}/review`, {
+  const response = await axiosClient.patch(ENDPOINTS.admin.productAffiliateReview(settingId), {
     status: "REJECTED",
     rejectReason: payload?.rejectReason || "",
   });
@@ -82,62 +83,62 @@ async function rejectAffiliateSetting(settingId, payload) {
 }
 
 async function getAdminOrders(params) {
-  const response = await axiosClient.get("/api/admin/orders", { params });
+  const response = await axiosClient.get(ENDPOINTS.admin.orders, { params });
   return unwrapResponseData(response);
 }
 
 async function getAdminFinancialStats(params) {
-  const response = await axiosClient.get("/api/admin/financial-stats", { params });
+  const response = await axiosClient.get(ENDPOINTS.admin.financialStats, { params });
   return unwrapResponseData(response);
 }
 
 async function updatePlatformFee(payload) {
-  const response = await axiosClient.put("/api/admin/settings/platform-fee", payload);
+  const response = await axiosClient.put(ENDPOINTS.admin.platformFee, payload);
   return unwrapResponseData(response);
 }
 
 async function updateWithdrawalConfig(payload) {
-  const response = await axiosClient.put("/api/admin/settings/withdrawal-config", payload);
+  const response = await axiosClient.put(ENDPOINTS.admin.withdrawalConfig, payload);
   return unwrapResponseData(response);
 }
 
 async function getAdminSettings() {
-  const response = await axiosClient.get("/api/admin/settings");
+  const response = await axiosClient.get(ENDPOINTS.admin.settings);
   return unwrapResponseData(response);
 }
 
 async function getPayoutBatches(params) {
-  const response = await axiosClient.get("/api/payout-batches", { params });
+  const response = await axiosClient.get(ENDPOINTS.payoutBatches.list, { params });
   return unwrapResponseData(response);
 }
 
 async function getPendingWithdrawals(params) {
-  const response = await axiosClient.get("/api/withdrawals/pending/list", { params });
+  const response = await axiosClient.get(ENDPOINTS.withdrawals.pendingList, { params });
   return unwrapResponseData(response);
 }
 
 async function getAdminWithdrawals(params) {
-  const response = await axiosClient.get("/api/withdrawals/admin/list", { params });
+  const response = await axiosClient.get(ENDPOINTS.withdrawals.adminList, { params });
   return unwrapResponseData(response);
 }
 
 async function getAdminWithdrawalSummary() {
-  const response = await axiosClient.get("/api/withdrawals/admin/summary");
+  const response = await axiosClient.get(ENDPOINTS.withdrawals.adminSummary);
   return unwrapResponseData(response);
 }
 
 async function reviewWithdrawal(withdrawalId, payload) {
-  const response = await axiosClient.patch(`/api/withdrawals/${withdrawalId}/review`, payload);
+  const response = await axiosClient.patch(ENDPOINTS.withdrawals.review(withdrawalId), payload);
   return unwrapResponseData(response);
 }
 
 async function reviewRefundRequest(refundId, payload) {
-  const response = await axiosClient.patch(`/api/admin/refunds/${refundId}/review`, payload);
+  const response = await axiosClient.patch(ENDPOINTS.admin.refundsReview(refundId), payload);
   return unwrapResponseData(response);
 }
 
 async function getFraudAlerts(params) {
-  const response = await axiosClient.get("/api/admin/fraud-alerts", { params });
+  const response = await axiosClient.get(ENDPOINTS.admin.fraudAlerts, { params });
   return unwrapResponseData(response);
 }
 

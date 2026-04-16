@@ -1,29 +1,30 @@
-﻿const prisma = require("../../config/prisma");
+const prisma = require("../../config/prisma");
 const { generateOrderCode } = require("../../utils/code");
 
-const getCurrentPlatformFee = (tx) => tx.platformFeeConfig.findFirst({
-  where: {
-    effectiveFrom: { lte: new Date() },
-    OR: [{ effectiveTo: null }, { effectiveTo: { gte: new Date() } }]
-  },
-  orderBy: { effectiveFrom: "desc" }
-});
+const getCurrentPlatformFee = (tx) =>
+  tx.platformFeeConfig.findFirst({
+    where: {
+      effectiveFrom: { lte: new Date() },
+      OR: [{ effectiveTo: null }, { effectiveTo: { gte: new Date() } }],
+    },
+    orderBy: { effectiveFrom: "desc" },
+  });
 
-async function createInventoryReservation(tx, { variantId, quantity, referenceId, note }) {
+async function createInventoryReservation(tx, { variantId, quantity, referenceId, note, referenceType = "ORDER" }) {
   const inventory = await tx.inventory.findUnique({ where: { variantId } });
   if (!inventory) {
     throw new Error("Inventory not found for this variant");
   }
 
-  const availableStock = inventory.quantity - inventory.reservedQuantity;
+  const availableStock = Number(inventory.quantity) - Number(inventory.reservedQuantity);
   if (availableStock < quantity) {
-    throw new Error("Insufficient stock for requested quantity");
+    throw new Error(`Only ${Math.max(0, availableStock)} items are available in stock`);
   }
 
-  const nextReserved = inventory.reservedQuantity + quantity;
+  const nextReserved = Number(inventory.reservedQuantity) + quantity;
   await tx.inventory.update({
     where: { variantId },
-    data: { reservedQuantity: nextReserved, updatedAt: new Date() }
+    data: { reservedQuantity: nextReserved, updatedAt: new Date() },
   });
 
   await tx.inventoryTransaction.create({
@@ -33,40 +34,12 @@ async function createInventoryReservation(tx, { variantId, quantity, referenceId
       quantity,
       stockAfter: inventory.quantity,
       reservedAfter: nextReserved,
-      referenceType: "CART",
+      referenceType,
       referenceId,
-      idempotencyKey: `CART_RESERVE_${referenceId}_${variantId}_${Date.now()}`,
+      idempotencyKey: `${referenceType}_RESERVE_${referenceId}_${variantId}_${Date.now()}`,
       note,
-      createdAt: new Date()
-    }
-  });
-}
-
-async function releaseInventoryReservation(tx, { variantId, quantity, referenceId, note }) {
-  const inventory = await tx.inventory.findUnique({ where: { variantId } });
-  if (!inventory) {
-    throw new Error("Inventory not found for this variant");
-  }
-
-  const nextReserved = Math.max(0, inventory.reservedQuantity - quantity);
-  await tx.inventory.update({
-    where: { variantId },
-    data: { reservedQuantity: nextReserved, updatedAt: new Date() }
-  });
-
-  await tx.inventoryTransaction.create({
-    data: {
-      variantId,
-      type: "RESERVE_RELEASE",
-      quantity,
-      stockAfter: inventory.quantity,
-      reservedAfter: nextReserved,
-      referenceType: "CART",
-      referenceId,
-      idempotencyKey: `CART_RELEASE_${referenceId}_${variantId}_${Date.now()}`,
-      note,
-      createdAt: new Date()
-    }
+      createdAt: new Date(),
+    },
   });
 }
 
@@ -119,344 +92,335 @@ exports.getCart = async (accountId) => {
           affiliateLink: true,
           attributionSession: true,
           affiliate: true,
-        }
-      }
-    }
+        },
+      },
+    },
   });
 
   if (!cart) {
     cart = await prisma.cart.create({
       data: { accountId, createdAt: new Date(), updatedAt: new Date() },
-      include: { items: { orderBy: { createdAt: "desc" } } }
+      include: { items: { orderBy: { createdAt: "desc" } } },
     });
   }
 
   return cart;
 };
 
-exports.addItem = async (accountId, payload) => prisma.$transaction(async (tx) => {
-  let cart = await tx.cart.findFirst({ where: { accountId } });
-  if (!cart) {
-    cart = await tx.cart.create({ data: { accountId, createdAt: new Date(), updatedAt: new Date() } });
-  }
+exports.addItem = async (accountId, payload) =>
+  prisma.$transaction(async (tx) => {
+    let cart = await tx.cart.findFirst({ where: { accountId } });
+    if (!cart) {
+      cart = await tx.cart.create({ data: { accountId, createdAt: new Date(), updatedAt: new Date() } });
+    }
 
-  const attribution = payload.attributionToken
-    ? await tx.attributionSession.findUnique({ where: { token: payload.attributionToken } })
-    : null;
+    const attribution = payload.attributionToken
+      ? await tx.attributionSession.findUnique({ where: { token: payload.attributionToken } })
+      : null;
 
-  const variant = await tx.productVariant.findUnique({
-    where: { id: payload.variantId },
-    include: { inventory: true }
-  });
-
-  if (!variant || !variant.inventory) {
-    throw new Error("Product variant is unavailable");
-  }
-
-  const existing = await tx.cartItem.findFirst({
-    where: buildCartItemIdentityWhere(cart.id, payload.variantId, attribution),
-  });
-  const reserveQuantity = payload.quantity;
-
-  if (reserveQuantity <= 0) {
-    throw new Error("Quantity must be greater than 0");
-  }
-
-  if (existing) {
-    await createInventoryReservation(tx, {
-      variantId: payload.variantId,
-      quantity: reserveQuantity,
-      referenceId: existing.id,
-      note: "Reserve stock when increasing cart item quantity"
+    const variant = await tx.productVariant.findUnique({
+      where: { id: payload.variantId },
+      include: { inventory: true },
     });
+
+    if (!variant || !variant.inventory) {
+      throw new Error("Product variant is unavailable");
+    }
+
+    const existing = await tx.cartItem.findFirst({
+      where: buildCartItemIdentityWhere(cart.id, payload.variantId, attribution),
+    });
+
+    if (payload.quantity <= 0) {
+      throw new Error("Quantity must be greater than 0");
+    }
+
+    const nextQuantity = (existing?.quantity || 0) + payload.quantity;
+    if (Number(variant.inventory.quantity) < nextQuantity) {
+      throw new Error(`Only ${Number(variant.inventory.quantity)} items are available in stock`);
+    }
+
+    if (existing) {
+      return tx.cartItem.update({
+        where: { id: existing.id },
+        data: {
+          quantity: nextQuantity,
+          updatedAt: new Date(),
+        },
+      });
+    }
+
+    return tx.cartItem.create({
+      data: {
+        cartId: cart.id,
+        productId: payload.productId,
+        variantId: payload.variantId,
+        quantity: payload.quantity,
+        affiliateId: attribution?.affiliateId,
+        attributionSessionId: attribution?.id,
+        affiliateLinkId: attribution?.affiliateLinkId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+  });
+
+exports.updateItemQuantity = async (accountId, itemId, quantity) =>
+  prisma.$transaction(async (tx) => {
+    const cart = await tx.cart.findFirst({ where: { accountId } });
+    if (!cart) throw new Error("Cart not found");
+
+    const item = await tx.cartItem.findFirst({
+      where: { id: BigInt(itemId), cartId: cart.id },
+      include: { variant: { include: { inventory: true } } },
+    });
+
+    if (!item) throw new Error("Cart item not found");
+    if (quantity < 1) throw new Error("Quantity must be greater than 0");
+
+    const totalStock = Number(item.variant.inventory?.quantity || 0);
+    if (totalStock < quantity) {
+      throw new Error(`Only ${totalStock} items are available in stock`);
+    }
 
     return tx.cartItem.update({
-      where: { id: existing.id },
-      data: {
-        quantity: existing.quantity + reserveQuantity,
-        updatedAt: new Date(),
+      where: { id: item.id },
+      data: { quantity, updatedAt: new Date() },
+    });
+  });
+
+exports.removeItem = async (accountId, itemId) =>
+  prisma.$transaction(async (tx) => {
+    const cart = await tx.cart.findFirst({ where: { accountId } });
+    if (!cart) throw new Error("Cart not found");
+
+    const item = await tx.cartItem.findFirst({
+      where: { id: BigInt(itemId), cartId: cart.id },
+    });
+    if (!item) throw new Error("Cart item not found");
+
+    await tx.cartItem.delete({ where: { id: item.id } });
+
+    return { id: itemId, removed: true };
+  });
+
+exports.checkout = async (accountId, payload) =>
+  prisma.$transaction(async (tx) => {
+    const cart = await tx.cart.findFirst({
+      where: { accountId },
+      include: {
+        items: {
+          include: {
+            product: { include: { affiliateSetting: true } },
+            variant: { include: { inventory: true } },
+          },
+        },
+      },
+    });
+
+    if (!cart || cart.items.length === 0) throw new Error("Cart is empty");
+
+    const selectedIds = normalizeSelectedItemIds(payload.selectedItemIds);
+    const checkoutItems = selectedIds.length
+      ? cart.items.filter((item) => selectedIds.includes(item.id))
+      : cart.items;
+
+    if (!checkoutItems.length) {
+      throw new Error("No cart items selected for checkout");
+    }
+
+    const sellerIds = [...new Set(checkoutItems.map((item) => item.product.sellerId))];
+    if (sellerIds.length !== 1) throw new Error("Checkout currently supports one seller per order");
+
+    const shippingAddress = await getShippingAddress(tx, accountId, payload.addressId);
+    const feeConfig = await getCurrentPlatformFee(tx);
+    if (!feeConfig) throw new Error("Missing active platform fee config");
+
+    const platformFeeType = feeConfig.feeType;
+    const platformFeeValue = Number(feeConfig.feeValue);
+
+    let subtotal = 0;
+    const snapshots = [];
+
+    for (const item of checkoutItems) {
+      const inventory = item.variant.inventory;
+      const availableStock = Number(inventory?.quantity || 0) - Number(inventory?.reservedQuantity || 0);
+
+      if (!inventory || availableStock < item.quantity) {
+        throw new Error(`Only ${Math.max(0, availableStock)} items are available for variant ${item.variantId}`);
       }
-    });
-  }
 
-  const createdItem = await tx.cartItem.create({
-    data: {
-      cartId: cart.id,
-      productId: payload.productId,
-      variantId: payload.variantId,
-      quantity: payload.quantity,
-      affiliateId: attribution?.affiliateId,
-      attributionSessionId: attribution?.id,
-      affiliateLinkId: attribution?.affiliateLinkId,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }
-  });
+      const lineTotal = Number(item.variant.price) * item.quantity;
+      const commissionType = item.product.affiliateSetting?.commissionType || null;
+      const commissionValue = item.product.affiliateSetting ? Number(item.product.affiliateSetting.commissionValue) : 0;
+      const commissionAmount = item.affiliateId
+        ? commissionType === "PERCENT"
+          ? Math.floor((lineTotal * commissionValue) / 100)
+          : commissionValue
+        : 0;
+      const platformFeeAmount =
+        platformFeeType === "PERCENT" ? Math.floor((lineTotal * platformFeeValue) / 100) : platformFeeValue;
+      const sellerNetAmount = lineTotal - commissionAmount - platformFeeAmount;
 
-  await createInventoryReservation(tx, {
-    variantId: payload.variantId,
-    quantity: reserveQuantity,
-    referenceId: createdItem.id,
-    note: "Reserve stock when adding item to cart"
-  });
-
-  return createdItem;
-});
-
-exports.updateItemQuantity = async (accountId, itemId, quantity) => prisma.$transaction(async (tx) => {
-  const cart = await tx.cart.findFirst({ where: { accountId } });
-  if (!cart) throw new Error("Cart not found");
-
-  const item = await tx.cartItem.findFirst({
-    where: { id: BigInt(itemId), cartId: cart.id },
-    include: { variant: { include: { inventory: true } } },
-  });
-
-  if (!item) throw new Error("Cart item not found");
-  if (quantity < 1) throw new Error("Quantity must be greater than 0");
-
-  const delta = quantity - item.quantity;
-  if (delta > 0) {
-    await createInventoryReservation(tx, {
-      variantId: item.variantId,
-      quantity: delta,
-      referenceId: item.id,
-      note: "Reserve more stock when cart quantity increases"
-    });
-  } else if (delta < 0) {
-    await releaseInventoryReservation(tx, {
-      variantId: item.variantId,
-      quantity: Math.abs(delta),
-      referenceId: item.id,
-      note: "Release reserved stock when cart quantity decreases"
-    });
-  }
-
-  return tx.cartItem.update({
-    where: { id: item.id },
-    data: { quantity, updatedAt: new Date() },
-  });
-});
-
-exports.removeItem = async (accountId, itemId) => prisma.$transaction(async (tx) => {
-  const cart = await tx.cart.findFirst({ where: { accountId } });
-  if (!cart) throw new Error("Cart not found");
-
-  const item = await tx.cartItem.findFirst({
-    where: { id: BigInt(itemId), cartId: cart.id },
-  });
-  if (!item) throw new Error("Cart item not found");
-
-  await releaseInventoryReservation(tx, {
-    variantId: item.variantId,
-    quantity: item.quantity,
-    referenceId: item.id,
-    note: "Release reserved stock when removing item from cart"
-  });
-
-  await tx.cartItem.delete({ where: { id: item.id } });
-
-  return { id: itemId, removed: true };
-});
-
-exports.checkout = async (accountId, payload) => prisma.$transaction(async (tx) => {
-  const cart = await tx.cart.findFirst({
-    where: { accountId },
-    include: {
-      items: {
-        include: {
-          product: { include: { affiliateSetting: true } },
-          variant: { include: { inventory: true } }
-        }
-      }
-    }
-  });
-
-  if (!cart || cart.items.length === 0) throw new Error("Cart is empty");
-
-  const selectedIds = normalizeSelectedItemIds(payload.selectedItemIds);
-  const checkoutItems = selectedIds.length
-    ? cart.items.filter((item) => selectedIds.includes(item.id))
-    : cart.items;
-
-  if (!checkoutItems.length) {
-    throw new Error("No cart items selected for checkout");
-  }
-
-  const sellerIds = [...new Set(checkoutItems.map((item) => item.product.sellerId))];
-  if (sellerIds.length !== 1) throw new Error("Checkout currently supports one seller per order");
-
-  const shippingAddress = await getShippingAddress(tx, accountId, payload.addressId);
-  const feeConfig = await getCurrentPlatformFee(tx);
-  if (!feeConfig) throw new Error("Missing active platform fee config");
-
-  const platformFeeType = feeConfig.feeType;
-  const platformFeeValue = Number(feeConfig.feeValue);
-
-  let subtotal = 0;
-  const snapshots = [];
-
-  for (const item of checkoutItems) {
-    const inventory = item.variant.inventory;
-    if (!inventory || inventory.reservedQuantity < item.quantity) {
-      throw new Error(`Reserved stock is invalid for variant ${item.variantId}`);
-    }
-
-    const lineTotal = Number(item.variant.price) * item.quantity;
-    const commissionType = item.product.affiliateSetting?.commissionType || null;
-    const commissionValue = item.product.affiliateSetting ? Number(item.product.affiliateSetting.commissionValue) : 0;
-    const commissionAmount = item.affiliateId
-      ? commissionType === "PERCENT"
-        ? Math.floor((lineTotal * commissionValue) / 100)
-        : commissionValue
-      : 0;
-    const platformFeeAmount = platformFeeType === "PERCENT"
-      ? Math.floor((lineTotal * platformFeeValue) / 100)
-      : platformFeeValue;
-    const sellerNetAmount = lineTotal - commissionAmount - platformFeeAmount;
-
-    subtotal += lineTotal;
-    snapshots.push({ item, inventory, lineTotal, commissionType, commissionValue, commissionAmount, platformFeeAmount, sellerNetAmount });
-  }
-
-  const totalAmount = subtotal + payload.shippingFee - payload.discountAmount;
-  const order = await tx.order.create({
-    data: {
-      orderCode: generateOrderCode(),
-      buyerId: accountId,
-      buyerName: payload.buyerName || shippingAddress.recipientName,
-      buyerEmail: payload.buyerEmail,
-      buyerPhone: payload.buyerPhone || shippingAddress.phone,
-      sellerId: sellerIds[0],
-      status: "PENDING_PAYMENT",
-      subtotal: BigInt(subtotal),
-      shippingFee: BigInt(payload.shippingFee),
-      discountAmount: BigInt(payload.discountAmount),
-      totalAmount: BigInt(totalAmount),
-      sellerConfirmedReceivedMoney: false,
-      platformFeeType,
-      platformFeeValue: BigInt(platformFeeValue),
-      platformFeeAmount: BigInt(snapshots.reduce((sum, entry) => sum + entry.platformFeeAmount, 0)),
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }
-  });
-
-  await tx.$executeRaw`
-    UPDATE orders
-    SET
-      shipping_address_id = ${BigInt(payload.addressId)},
-      shipping_recipient_name = ${shippingAddress.recipientName},
-      shipping_phone = ${shippingAddress.phone},
-      shipping_province = ${shippingAddress.province},
-      shipping_district = ${shippingAddress.district},
-      shipping_ward = ${shippingAddress.ward},
-      shipping_detail = ${shippingAddress.detail},
-      shipping_method = ${payload.shippingMethod}
-    WHERE id = ${order.id}
-  `;
-
-  const commissionSnapshotsByAffiliate = new Map();
-
-  for (const snapshot of snapshots) {
-    const orderItem = await tx.orderItem.create({
-      data: {
-        orderId: order.id,
-        productId: snapshot.item.productId,
-        variantId: snapshot.item.variantId,
-        productNameSnapshot: snapshot.item.product.name,
-        variantNameSnapshot: snapshot.item.variant.variantName,
-        skuSnapshot: snapshot.item.variant.sku,
-        quantity: snapshot.item.quantity,
-        price: snapshot.item.variant.price,
-        lineTotal: BigInt(snapshot.lineTotal),
-        affiliateId: snapshot.item.affiliateId,
-        attributionSessionId: snapshot.item.attributionSessionId,
-        affiliateLinkId: snapshot.item.affiliateLinkId,
-        commissionTypeSnapshot: snapshot.commissionType,
-        commissionValueSnapshot: snapshot.commissionType ? BigInt(snapshot.commissionValue) : null,
-        commissionAmount: BigInt(snapshot.commissionAmount),
-        platformFeeTypeSnapshot: platformFeeType,
-        platformFeeValueSnapshot: BigInt(platformFeeValue),
-        platformFeeAmount: BigInt(snapshot.platformFeeAmount),
-        sellerNetAmount: BigInt(snapshot.sellerNetAmount),
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }
-    });
-
-    if (snapshot.item.affiliateId && snapshot.commissionAmount > 0) {
-      const current = commissionSnapshotsByAffiliate.get(snapshot.item.affiliateId) || {
-        total: 0,
-        items: [],
-      };
-
-      current.total += snapshot.commissionAmount;
-      current.items.push({
-        orderItemId: orderItem.id,
-        productId: snapshot.item.productId,
-        amount: snapshot.commissionAmount,
+      subtotal += lineTotal;
+      snapshots.push({
+        item,
+        inventory,
+        lineTotal,
+        commissionType,
+        commissionValue,
+        commissionAmount,
+        platformFeeAmount,
+        sellerNetAmount,
       });
-
-      commissionSnapshotsByAffiliate.set(snapshot.item.affiliateId, current);
     }
-  }
 
-  for (const [affiliateId, aggregate] of commissionSnapshotsByAffiliate.entries()) {
-    const commission = await tx.affiliateCommission.create({
+    const totalAmount = subtotal + payload.shippingFee - payload.discountAmount;
+    const order = await tx.order.create({
       data: {
-        orderId: order.id,
-        affiliateId,
+        orderCode: generateOrderCode(),
+        buyerId: accountId,
+        buyerName: payload.buyerName || shippingAddress.recipientName,
+        buyerEmail: payload.buyerEmail,
+        buyerPhone: payload.buyerPhone || shippingAddress.phone,
         sellerId: sellerIds[0],
-        totalCommission: BigInt(aggregate.total),
-        status: "PENDING",
-        fraudCheckStatus: "PENDING",
-        note: "Pending commission recorded at checkout",
+        status: "PENDING_PAYMENT",
+        subtotal: BigInt(subtotal),
+        shippingFee: BigInt(payload.shippingFee),
+        discountAmount: BigInt(payload.discountAmount),
+        totalAmount: BigInt(totalAmount),
+        sellerConfirmedReceivedMoney: false,
+        platformFeeType,
+        platformFeeValue: BigInt(platformFeeValue),
+        platformFeeAmount: BigInt(snapshots.reduce((sum, entry) => sum + entry.platformFeeAmount, 0)),
         createdAt: new Date(),
-      }
+        updatedAt: new Date(),
+      },
     });
 
-    if (aggregate.items.length) {
-      await tx.affiliateCommissionItem.createMany({
-        data: aggregate.items.map((item) => ({
-          commissionId: commission.id,
-          orderItemId: item.orderItemId,
-          productId: item.productId,
-          amount: BigInt(item.amount),
-        })),
+    await tx.$executeRaw`
+      UPDATE orders
+      SET
+        shipping_address_id = ${BigInt(payload.addressId)},
+        shipping_recipient_name = ${shippingAddress.recipientName},
+        shipping_phone = ${shippingAddress.phone},
+        shipping_province = ${shippingAddress.province},
+        shipping_district = ${shippingAddress.district},
+        shipping_ward = ${shippingAddress.ward},
+        shipping_detail = ${shippingAddress.detail},
+        shipping_method = ${payload.shippingMethod}
+      WHERE id = ${order.id}
+    `;
+
+    const commissionSnapshotsByAffiliate = new Map();
+
+    for (const snapshot of snapshots) {
+      await createInventoryReservation(tx, {
+        variantId: snapshot.item.variantId,
+        quantity: snapshot.item.quantity,
+        referenceId: order.id,
+        referenceType: "ORDER",
+        note: "Reserve stock when customer checkout creates order",
       });
-    }
-  }
 
-  await tx.payment.create({
-    data: {
-      orderId: order.id,
-      method: payload.paymentMethod,
-      status: "PENDING",
-      amount: BigInt(totalAmount),
-      createdAt: new Date()
+      const orderItem = await tx.orderItem.create({
+        data: {
+          orderId: order.id,
+          productId: snapshot.item.productId,
+          variantId: snapshot.item.variantId,
+          productNameSnapshot: snapshot.item.product.name,
+          variantNameSnapshot: snapshot.item.variant.variantName,
+          skuSnapshot: snapshot.item.variant.sku,
+          quantity: snapshot.item.quantity,
+          price: snapshot.item.variant.price,
+          lineTotal: BigInt(snapshot.lineTotal),
+          affiliateId: snapshot.item.affiliateId,
+          attributionSessionId: snapshot.item.attributionSessionId,
+          affiliateLinkId: snapshot.item.affiliateLinkId,
+          commissionTypeSnapshot: snapshot.commissionType,
+          commissionValueSnapshot: snapshot.commissionType ? BigInt(snapshot.commissionValue) : null,
+          commissionAmount: BigInt(snapshot.commissionAmount),
+          platformFeeTypeSnapshot: platformFeeType,
+          platformFeeValueSnapshot: BigInt(platformFeeValue),
+          platformFeeAmount: BigInt(snapshot.platformFeeAmount),
+          sellerNetAmount: BigInt(snapshot.sellerNetAmount),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+
+      if (snapshot.item.affiliateId && snapshot.commissionAmount > 0) {
+        const current = commissionSnapshotsByAffiliate.get(snapshot.item.affiliateId) || {
+          total: 0,
+          items: [],
+        };
+
+        current.total += snapshot.commissionAmount;
+        current.items.push({
+          orderItemId: orderItem.id,
+          productId: snapshot.item.productId,
+          amount: snapshot.commissionAmount,
+        });
+
+        commissionSnapshotsByAffiliate.set(snapshot.item.affiliateId, current);
+      }
     }
+
+    for (const [affiliateId, aggregate] of commissionSnapshotsByAffiliate.entries()) {
+      const commission = await tx.affiliateCommission.create({
+        data: {
+          orderId: order.id,
+          affiliateId,
+          sellerId: sellerIds[0],
+          totalCommission: BigInt(aggregate.total),
+          status: "PENDING",
+          fraudCheckStatus: "PENDING",
+          note: "Pending commission recorded at checkout",
+          createdAt: new Date(),
+        },
+      });
+
+      if (aggregate.items.length) {
+        await tx.affiliateCommissionItem.createMany({
+          data: aggregate.items.map((item) => ({
+            commissionId: commission.id,
+            orderItemId: item.orderItemId,
+            productId: item.productId,
+            amount: BigInt(item.amount),
+          })),
+        });
+      }
+    }
+
+    await tx.payment.create({
+      data: {
+        orderId: order.id,
+        method: payload.paymentMethod,
+        status: "PENDING",
+        amount: BigInt(totalAmount),
+        createdAt: new Date(),
+      },
+    });
+
+    await tx.orderStatusHistory.create({
+      data: {
+        orderId: order.id,
+        oldStatus: null,
+        newStatus: "PENDING_PAYMENT",
+        note: "Order created",
+        changedAt: new Date(),
+      },
+    });
+
+    await tx.cartItem.deleteMany({
+      where: {
+        cartId: cart.id,
+        ...(selectedIds.length ? { id: { in: selectedIds } } : {}),
+      },
+    });
+
+    return tx.order.findUnique({ where: { id: order.id }, include: { items: true, payments: true } });
   });
-
-  await tx.orderStatusHistory.create({
-    data: {
-      orderId: order.id,
-      oldStatus: null,
-      newStatus: "PENDING_PAYMENT",
-      note: "Order created",
-      changedAt: new Date()
-    }
-  });
-
-  await tx.cartItem.deleteMany({
-    where: {
-      cartId: cart.id,
-      ...(selectedIds.length ? { id: { in: selectedIds } } : {}),
-    }
-  });
-
-  return tx.order.findUnique({ where: { id: order.id }, include: { items: true, payments: true } });
-});
 
 exports.__private = {
   buildCartItemIdentityWhere,

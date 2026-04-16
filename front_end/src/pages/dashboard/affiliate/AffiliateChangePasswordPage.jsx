@@ -44,7 +44,7 @@ function AffiliateChangePasswordPage() {
       />
       <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
         <div className="rounded-[2rem] border border-slate-900 bg-slate-950 p-6 text-white shadow-sm">
-          <p className="text-xs uppercase tracking-[0.28em] text-cyan-200">Security</p>
+          <p className="text-xs uppercase tracking-[0.28em] text-cyan-200">Bảo mật</p>
           <h3 className="mt-3 text-2xl font-semibold">Tài khoản affiliate liên quan trực tiếp đến commission và withdrawal.</h3>
           <div className="mt-5 space-y-3 text-sm leading-7 text-slate-300">
             <p>Không dùng chung mật khẩu này với email, kênh social hoặc công cụ tracking bên ngoài.</p>

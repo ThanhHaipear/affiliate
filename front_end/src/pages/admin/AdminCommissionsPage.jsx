@@ -5,7 +5,7 @@ import DataTable from "../../components/common/DataTable";
 import EmptyState from "../../components/common/EmptyState";
 import PageHeader from "../../components/common/PageHeader";
 import StatusBadge from "../../components/common/StatusBadge";
-import { formatCurrency, formatDateTime } from "../../lib/format";
+import { formatCompactCurrency, formatCurrency, formatDateTime } from "../../lib/format";
 
 function AdminCommissionsPage() {
   const [batches, setBatches] = useState([]);
@@ -25,7 +25,7 @@ function AdminCommissionsPage() {
         }
       } catch (loadError) {
         if (active) {
-          setError(loadError.response?.data?.message || "Khong tai duoc payout batches.");
+          setError(loadError.response?.data?.message || "Không tải được payout batches.");
         }
       } finally {
         if (active) {
@@ -59,43 +59,44 @@ function AdminCommissionsPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Admin"
-        title="Commission control"
-        description="Backend chua co admin commissions endpoint rieng, nen trang nay dang dung du lieu that tu payout batches de theo doi cac dot chi tra."
+        title="Quản lý hoa hồng"
+        description="Backend chưa có admin commissions endpoint riêng, nên trang này đang dùng dữ liệu thật từ payout batches để theo dõi các đợt chi trả."
       />
       <div className="grid gap-4 md:grid-cols-3">
         <AdminStatCard
-          label="Payout batches"
+          label="Đợt chi trả"
           value={batches.length.toLocaleString("vi-VN")}
-          meta="Du lieu that tu backend"
+          meta="Dữ liệu thật từ backend"
           tone="cyan"
         />
         <AdminStatCard
-          label="Total requests"
+          label="Tổng yêu cầu"
           value={summary.totalRequests.toLocaleString("vi-VN")}
-          meta="Tong so withdrawal trong cac batch"
+          meta="Tổng số withdrawal trong các batch"
           tone="amber"
         />
         <AdminStatCard
-          label="Total paid amount"
-          value={formatCurrency(summary.totalAmount)}
+          label="Tổng tiền đã chi"
+          value={formatCompactCurrency(summary.totalAmount)}
+          tooltip={formatCurrency(summary.totalAmount)}
           meta={`${summary.completed} batch da hoan tat`}
           tone="emerald"
         />
       </div>
-      {!loading && error ? <EmptyState title="Khong tai duoc payout batches" description={error} /> : null}
+      {!loading && error ? <EmptyState title="Không tải được payout batches" description={error} /> : null}
       {!loading && !error ? (
         <DataTable
           columns={[
-            { key: "id", title: "Batch" },
+            { key: "id", title: "Mã batch" },
             { key: "type", title: "Loai" },
             { key: "totalRequests", title: "So yeu cau" },
-            { key: "totalAmount", title: "Tong tien", render: (row) => formatCurrency(row.totalAmount) },
-            { key: "status", title: "Trang thai", render: (row) => <StatusBadge status={row.status} /> },
-            { key: "payoutDate", title: "Ngay chi tra", render: (row) => formatDateTime(row.payoutDate) },
+            { key: "totalAmount", title: "Tổng tiền", render: (row) => formatCurrency(row.totalAmount) },
+            { key: "status", title: "Trạng thái", render: (row) => <StatusBadge status={row.status} /> },
+            { key: "payoutDate", title: "Ngày chi trả", render: (row) => formatDateTime(row.payoutDate) },
           ]}
           rows={batches}
-          emptyTitle="Chua co payout batch"
-          emptyDescription="Backend da noi API that, nhung hien tai chua co batch chi tra nao."
+          emptyTitle="Chưa có payout batch"
+          emptyDescription="Backend đã nối API thật, nhưng hiện tại chưa có batch chi trả nào."
         />
       ) : null}
     </div>

@@ -5,6 +5,7 @@ import {
   RouterProvider,
   createBrowserRouter,
   createMemoryRouter,
+  useLocation,
   useParams,
 } from "react-router-dom";
 import { AuthGuard, GuestGuard, RoleGuard } from "../lib/guards";
@@ -44,7 +45,6 @@ import SellerProductDetailPage from "../pages/dashboard/seller/SellerProductDeta
 import SellerEditProductPage from "../pages/dashboard/seller/SellerEditProductPage";
 import SellerOrdersPage from "../pages/dashboard/seller/SellerOrdersPage";
 import SellerOrderDetailPage from "../pages/dashboard/seller/SellerOrderDetailPage";
-import SellerWalletPage from "../pages/dashboard/seller/SellerWalletPage";
 import SellerWithdrawalsPage from "../pages/dashboard/seller/SellerWithdrawalsPage";
 import SellerRevenuePage from "../pages/dashboard/seller/SellerRevenuePage";
 import SellerChangePasswordPage from "../pages/dashboard/seller/SellerChangePasswordPage";
@@ -55,7 +55,6 @@ import AffiliateMarketplacePage from "../pages/dashboard/affiliate/AffiliateMark
 import AffiliateProductDetailPage from "../pages/dashboard/affiliate/AffiliateProductDetailPage";
 import AffiliateLinksPage from "../pages/dashboard/affiliate/AffiliateLinksPage";
 import AffiliateCommissionsPage from "../pages/dashboard/affiliate/AffiliateCommissionsPage";
-import AffiliateWalletPage from "../pages/dashboard/affiliate/AffiliateWalletPage";
 import AffiliateWithdrawalsPage from "../pages/dashboard/affiliate/AffiliateWithdrawalsPage";
 import AffiliateNotificationsPage from "../pages/dashboard/affiliate/AffiliateNotificationsPage";
 import AffiliateChangePasswordPage from "../pages/dashboard/affiliate/AffiliateChangePasswordPage";
@@ -74,7 +73,6 @@ import AdminPendingWithdrawalsPage from "../pages/admin/AdminPendingWithdrawalsP
 import AdminFraudDetectionPage from "../pages/admin/AdminFraudDetectionPage";
 import AdminSettingsPage from "../pages/admin/AdminSettingsPage";
 import AdminNotificationsPage from "../pages/admin/AdminNotificationsPage";
-import AdminPlatformFeesPage from "../pages/dashboard/admin/AdminPlatformFeesPage";
 
 function AppShell() {
   return (
@@ -164,6 +162,11 @@ function SellerOrderAliasRedirect() {
   return <Navigate to={`/dashboard/seller/orders/${orderId}`} replace />;
 }
 
+function AdminPlatformFeesRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/admin/settings${location.search || ""}`} replace />;
+}
+
 const routes = [
   {
     path: "/",
@@ -251,7 +254,7 @@ const routes = [
               { path: "orders/:orderId", element: <SellerOrderDetailPage /> },
               { path: "revenue", element: <SellerRevenuePage /> },
               { path: "payments", element: <Navigate to="/dashboard/seller/withdrawals" replace /> },
-              { path: "wallet", element: <SellerWalletPage /> },
+              { path: "wallet", element: <Navigate to="/dashboard/seller/withdrawals" replace /> },
               { path: "withdrawals", element: <SellerWithdrawalsPage /> },
               { path: "change-password", element: <SellerChangePasswordPage /> },
               { path: "notifications", element: <SellerNotificationsPage /> },
@@ -271,7 +274,7 @@ const routes = [
               { path: "products/:productId", element: <AffiliateProductDetailPage /> },
               { path: "links", element: <AffiliateLinksPage /> },
               { path: "commissions", element: <AffiliateCommissionsPage /> },
-              { path: "wallet", element: <AffiliateWalletPage /> },
+              { path: "wallet", element: <Navigate to="/dashboard/affiliate/withdrawals" replace /> },
               { path: "withdrawals", element: <AffiliateWithdrawalsPage /> },
               { path: "withdraw-history", element: <Navigate to="/dashboard/affiliate/withdrawals" replace /> },
               { path: "payment-accounts", element: <Navigate to="/dashboard/affiliate/profile" replace /> },
@@ -318,7 +321,7 @@ const routes = [
           { path: "products/:id", element: <AdminProductDetailPage /> },
           { path: "orders", element: <AdminOrdersPage /> },
           { path: "notifications", element: <AdminNotificationsPage /> },
-          { path: "platform-fees", element: <AdminPlatformFeesPage /> },
+          { path: "platform-fees", element: <AdminPlatformFeesRedirect /> },
           { path: "commissions", element: <AdminCommissionsPage /> },
           { path: "withdrawals/pending", element: <AdminPendingWithdrawalsPage /> },
           { path: "fraud-detection", element: <AdminFraudDetectionPage /> },
@@ -361,7 +364,7 @@ const routes = [
       { path: "seller/orders/:orderId", element: <SellerOrderAliasRedirect /> },
       { path: "seller/revenue", element: <Navigate to="/dashboard/seller/revenue" replace /> },
       { path: "seller/withdraw", element: <Navigate to="/dashboard/seller/withdrawals" replace /> },
-      { path: "seller/wallet", element: <Navigate to="/dashboard/seller/wallet" replace /> },
+      { path: "seller/wallet", element: <Navigate to="/dashboard/seller/withdrawals" replace /> },
       { path: "seller/payments", element: <Navigate to="/dashboard/seller/withdrawals" replace /> },
       { path: "seller/profile", element: <Navigate to="/dashboard/seller/shop" replace /> },
       { path: "seller/change-password", element: <Navigate to="/dashboard/seller/change-password" replace /> },

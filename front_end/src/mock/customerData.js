@@ -71,9 +71,4 @@ const customerWishlist = [
   },
 ];
 
-const shippingMethods = [
-  { label: "Giao hang nhanh", value: "EXPRESS" },
-  { label: "Tiet kiem", value: "STANDARD" },
-];
-
-export { customerAddresses, customerNotifications, customerWishlist, shippingMethods };
+export { customerAddresses, customerNotifications, customerWishlist };

@@ -117,6 +117,7 @@ function mapCartItemDto(item = {}) {
     ...(item.product || {}),
     variants: item.product?.variants || (item.variant ? [item.variant] : []),
   });
+  const currentAvailableStock = getAvailableInventory(item.variant || {});
 
   return {
     id: item.id,
@@ -128,6 +129,8 @@ function mapCartItemDto(item = {}) {
     affiliateLinkId: item.affiliateLinkId ?? item.affiliateLink?.id ?? null,
     attributionSessionId: item.attributionSessionId ?? item.attributionSession?.id ?? null,
     isAffiliateAttributed: Boolean(item.affiliateId || item.affiliateLinkId || item.attributionSessionId),
+    currentAvailableStock,
+    hasStockConflict: toNumber(item.quantity) > currentAvailableStock,
     product: mappedProduct,
     raw: item,
   };
@@ -162,6 +165,8 @@ function aggregateDisplayCartItems(items = []) {
       affiliateLinkId: item.affiliateLinkId,
       attributionSessionId: item.attributionSessionId,
       isAffiliateAttributed: item.isAffiliateAttributed,
+      currentAvailableStock: item.currentAvailableStock,
+      hasStockConflict: item.hasStockConflict,
       unitPrice: item.product.salePrice || item.product.price,
       lineTotal: (item.product.salePrice || item.product.price) * item.quantity,
       createdAt: item.raw?.createdAt || null,
@@ -182,6 +187,8 @@ function aggregateDisplayCartItems(items = []) {
         quantity: item.quantity,
         lineTotal: allocation.lineTotal,
         hasAffiliateAttributed: item.isAffiliateAttributed,
+        currentAvailableStock: item.currentAvailableStock,
+        hasStockConflict: item.hasStockConflict,
         itemIds: [String(item.id)],
         allocations: [allocation],
         latestActivityAt: allocation.updatedAt || allocation.createdAt || null,
@@ -192,6 +199,8 @@ function aggregateDisplayCartItems(items = []) {
     existing.quantity += item.quantity;
     existing.lineTotal += allocation.lineTotal;
     existing.hasAffiliateAttributed = existing.hasAffiliateAttributed || item.isAffiliateAttributed;
+    existing.currentAvailableStock = Math.min(existing.currentAvailableStock, item.currentAvailableStock);
+    existing.hasStockConflict = existing.hasStockConflict || item.hasStockConflict;
     existing.itemIds.push(String(item.id));
     existing.allocations.push(allocation);
     const candidateActivityAt = allocation.updatedAt || allocation.createdAt || null;

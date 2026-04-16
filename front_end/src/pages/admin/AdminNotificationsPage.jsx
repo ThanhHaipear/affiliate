@@ -34,7 +34,7 @@ function resolveAdminNotificationLink(item) {
   }
 
   if (item.type === "PLATFORM_FEE_CREDIT" || item.type === "PLATFORM_FEE_REVERSAL") {
-    return `/admin/platform-fees?orderId=${targetId}`;
+    return `/admin/settings?orderId=${targetId}`;
   }
 
   return `/admin/orders?orderId=${targetId}`;
@@ -59,7 +59,7 @@ function AdminNotificationsPage() {
         }
       } catch (loadError) {
         if (active) {
-          setError(loadError.response?.data?.message || "Khong tai duoc thong bao admin.");
+          setError(loadError.response?.data?.message || "Không tải được thông báo admin.");
         }
       } finally {
         if (active) {
@@ -93,7 +93,7 @@ function AdminNotificationsPage() {
       await markNotificationAsRead(id);
       setItems((current) => current.map((item) => (item.id === id ? { ...item, unread: false } : item)));
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong cap nhat duoc thong bao.");
+      toast.error(submitError.response?.data?.message || "Không cập nhật được thông báo.");
     }
   }
 
@@ -101,40 +101,40 @@ function AdminNotificationsPage() {
     try {
       await markAllNotificationsAsRead({ audience: "admin" });
       setItems((current) => current.map((item) => ({ ...item, unread: false })));
-      toast.success("Da danh dau da doc toan bo thong bao admin.");
+      toast.success("Đã đánh dấu đã đọc toàn bộ thông báo admin.");
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong cap nhat duoc thong bao.");
+      toast.error(submitError.response?.data?.message || "Không cập nhật được thông báo.");
     }
   }
 
   if (loading) {
-    return <EmptyState title="Dang tai thong bao admin" description="He thong dang doc notification cua admin tu backend." />;
+    return <EmptyState title="Đang tải thông báo admin" description="Hệ thống đang đọc notification của admin từ backend." />;
   }
 
   if (error) {
-    return <EmptyState title="Khong tai duoc thong bao admin" description={error} />;
+    return <EmptyState title="Không tải được thông báo admin" description={error} />;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Admin"
-        title="Admin notifications"
-        description="Theo doi cac bien dong tai chinh cua nen tang, dac biet la phi nen tang da ghi nhan hoac bi dao but toan sau refund."
-        action={<Button variant="secondary" onClick={handleReadAll}>Danh dau da doc tat ca</Button>}
+        title="Thông báo admin"
+        description="Theo dõi các biến động tài chính của nền tảng, đặc biệt là phí nền tảng đã ghi nhận hoặc bị đảo bút toán sau refund."
+        action={<Button variant="secondary" onClick={handleReadAll}>Đánh dấu đã đọc tất cả</Button>}
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <AdminStatCard label="Tong thong bao" value={summary.total.toLocaleString("vi-VN")} meta="Theo audience admin" tone="cyan" />
-        <AdminStatCard label="Chua doc" value={summary.unread.toLocaleString("vi-VN")} meta="Can admin xu ly hoac doi chieu" tone="amber" />
-        <AdminStatCard label="Phi da ghi nhan" value={summary.credited.toLocaleString("vi-VN")} meta="Platform fee credit events" tone="emerald" />
-        <AdminStatCard label="Phi bi dao" value={summary.reversed.toLocaleString("vi-VN")} meta="Refund reversal events" tone="rose" />
+        <AdminStatCard label="Tổng thông báo" value={summary.total.toLocaleString("vi-VN")} meta="Theo audience admin" tone="cyan" />
+        <AdminStatCard label="Chưa đọc" value={summary.unread.toLocaleString("vi-VN")} meta="Cần admin xử lý hoặc đối chiếu" tone="amber" />
+        <AdminStatCard label="Phí đã ghi nhận" value={summary.credited.toLocaleString("vi-VN")} meta="Sự kiện cộng phí nền tảng" tone="emerald" />
+        <AdminStatCard label="Phí bị đảo" value={summary.reversed.toLocaleString("vi-VN")} meta="Sự kiện đảo phí sau refund" tone="rose" />
       </div>
 
       {!items.length ? (
         <EmptyState
-          title="Chua co thong bao admin"
-          description="Khi co phi nen tang duoc ghi nhan hoac bi dao do refund, he thong se hien thong bao tai day."
+          title="Chưa có thông báo admin"
+          description="Khi có phí nền tảng được ghi nhận hoặc bị đảo do refund, hệ thống sẽ hiện thông báo tại đây."
         />
       ) : (
         <div className="space-y-4">
@@ -156,7 +156,7 @@ function AdminNotificationsPage() {
                         to={resolveAdminNotificationLink(item)}
                         className="inline-flex rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-100 transition hover:border-cyan-200/50 hover:bg-cyan-300/15"
                       >
-                        Mo ban ghi lien quan
+                        Mở bản ghi liên quan
                       </Link>
                     </div>
                   ) : null}
@@ -165,7 +165,7 @@ function AdminNotificationsPage() {
                   <p className="text-xs uppercase tracking-[0.22em] text-slate-400">{formatDateTime(item.created_at)}</p>
                   {item.unread ? (
                     <Button variant="secondary" size="sm" onClick={() => handleRead(item.id)}>
-                      Da doc
+                      Đã đọc
                     </Button>
                   ) : null}
                 </div>

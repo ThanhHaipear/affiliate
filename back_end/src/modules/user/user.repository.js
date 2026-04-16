@@ -9,6 +9,8 @@ const mapAccountToCurrentUser = (account) => ({
   profile: {
     fullName: account.customerProfile?.fullName || "",
     avatarUrl: account.customerProfile?.avatarUrl || "",
+    affiliateStatus: account.affiliate?.kycStatus || null,
+    hasAffiliateApplication: Boolean(account.affiliate),
   },
 });
 
@@ -20,6 +22,7 @@ async function findCustomerAccountRecord(client, accountId) {
         include: { role: true },
       },
       customerProfile: true,
+      affiliate: true,
     },
   });
 }

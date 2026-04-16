@@ -9,7 +9,11 @@ import PageHeader from "../../../components/common/PageHeader";
 import StatCard from "../../../components/common/StatCard";
 import StatusBadge from "../../../components/common/StatusBadge";
 import { mapProductDto, mapWalletDto } from "../../../lib/apiMappers";
-import { formatCurrency, formatDateTime } from "../../../lib/format";
+import { formatCompactCurrency, formatCurrency, formatDateTime } from "../../../lib/format";
+
+function CompactOverviewValue({ value }) {
+  return <span title={formatCurrency(value)}>{formatCompactCurrency(value)}</span>;
+}
 
 function SellerOverviewPage() {
   const skipRemote = import.meta.env.MODE === "test";
@@ -107,22 +111,22 @@ function SellerOverviewPage() {
         action={<div className="flex flex-wrap gap-3"><Link to="/dashboard/seller/products/create"><Button>{"Th\u00eam s\u1ea3n ph\u1ea9m"}</Button></Link><Link to="/dashboard/seller/orders"><Button variant="secondary">{"Xem \u0111\u01a1n h\u00e0ng"}</Button></Link></div>}
       />
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label={"S\u1ea3n ph\u1ea9m \u0111\u00e3 ph\u00e1t sinh \u0111\u01a1n"} value={summary.soldProducts} hint={"Suy ra t\u1eeb d\u1eef li\u1ec7u \u0111\u01a1n h\u00e0ng th\u1eadt"} tone="cyan" />
-        <StatCard label={"S\u1ea3n ph\u1ea9m tr\u00ean h\u1ec7 th\u1ed1ng"} value={summary.listedProducts} hint={"L\u1ea5y tr\u1ef1c ti\u1ebfp t\u1eeb seller products API"} tone="amber" />
-        <StatCard label={"T\u1ed5ng \u0111\u01a1n h\u00e0ng"} value={summary.totalOrders} tone="emerald" />
-        <StatCard label={"\u0110\u01a1n t\u1eeb affiliate"} value={summary.affiliateOrders} tone="rose" />
-        <StatCard label="Doanh thu" value={formatCurrency(summary.revenue)} tone="emerald" />
-        <StatCard label={"Hoa h\u1ed3ng ph\u1ea3i tr\u1ea3"} value={formatCurrency(summary.payoutCommission)} tone="amber" />
-        <StatCard label={"Ch\u1edd x\u00e1c nh\u1eadn ti\u1ec1n"} value={summary.pendingMoneyConfirm} tone="rose" />
-        <StatCard label={"T\u1ef7 l\u1ec7 th\u00e0nh c\u00f4ng"} value={`${summary.successRate}%`} tone="cyan" />
+        <StatCard label={"S\u1ea3n ph\u1ea9m \u0111\u00e3 ph\u00e1t sinh \u0111\u01a1n"} value={summary.soldProducts} hint={"Suy ra t\u1eeb d\u1eef li\u1ec7u \u0111\u01a1n h\u00e0ng th\u1eadt"} tone="cyan" strong />
+        <StatCard label={"S\u1ea3n ph\u1ea9m tr\u00ean h\u1ec7 th\u1ed1ng"} value={summary.listedProducts} hint={"L\u1ea5y tr\u1ef1c ti\u1ebfp t\u1eeb seller products API"} tone="amber" strong />
+        <StatCard label={"T\u1ed5ng \u0111\u01a1n h\u00e0ng"} value={summary.totalOrders} tone="emerald" strong />
+        <StatCard label={"\u0110\u01a1n t\u1eeb affiliate"} value={summary.affiliateOrders} tone="rose" strong />
+        <StatCard label="Doanh thu" value={<CompactOverviewValue value={summary.revenue} />} tone="emerald" strong />
+        <StatCard label={"Hoa h\u1ed3ng ph\u1ea3i tr\u1ea3"} value={<CompactOverviewValue value={summary.payoutCommission} />} tone="amber" strong />
+        <StatCard label={"Ch\u1edd x\u00e1c nh\u1eadn ti\u1ec1n"} value={summary.pendingMoneyConfirm} tone="rose" strong />
+        <StatCard label={"T\u1ef7 l\u1ec7 th\u00e0nh c\u00f4ng"} value={`${summary.successRate}%`} tone="cyan" strong />
       </div>
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <Panel title={"Thao t\u00e1c nhanh"} description={"Nh\u1eefng thao t\u00e1c seller d\u00f9ng th\u01b0\u1eddng xuy\u00ean trong khu v\u1eadn h\u00e0nh."}>
           <div className="grid gap-3 sm:grid-cols-2">
             <QuickLink to="/dashboard/seller/products/create" title={"Thêm sản phẩm"} description={"Tạo sản phẩm mới và cấu hình commission ngay trong form."} />
             <QuickLink to="/dashboard/seller/revenue" title={"Xem doanh thu"} description={"Theo dõi gross, commission, net và top sản phẩm."} />
-            <QuickLink to="/dashboard/seller/withdrawals" title={"Rút tiền"} description={"Tạo yêu cầu rút tiền với số dư ví và giới hạn min/max hiện tại."} />
-            <QuickLink to="/dashboard/seller/wallet" title={"Ví seller"} description={"Theo dõi số dư khả dụng, tiền đang xử lý và tổng đã payout."} />
+            <QuickLink to="/dashboard/seller/withdrawals" title={"Ví và rút tiền"} description={"Theo dõi số dư, lịch sử payout và tạo yêu cầu rút tiền trên cùng một màn hình."} />
+            <QuickLink to="/dashboard/seller/shop" title={"Cấu hình shop"} description={"Cập nhật thông tin shop, pháp lý và tài khoản nhận tiền mặc định."} />
           </div>
         </Panel>
         <Panel title={"Nh\u1eafc vi\u1ec7c v\u1eadn h\u00e0nh"} description={"Seller c\u1ea7n x\u1eed l\u00fd \u0111\u1ec3 hoa h\u1ed3ng \u0111\u01b0\u1ee3c ghi nh\u1eadn \u0111\u00fang logic."}>

@@ -43,7 +43,7 @@ function AffiliateOverviewPage() {
         setCommissions((commissionsResponse || []).map(mapCommissionDto));
       } catch (loadError) {
         if (active) {
-          setError(loadError.response?.data?.message || "Không tải được dashboard affiliate.");
+          setError(loadError.response?.data?.message || "Không tải được bảng điều khiển affiliate.");
         }
       } finally {
         if (active) {
@@ -89,16 +89,18 @@ function AffiliateOverviewPage() {
         <StatCard label="Số dư khả dụng" value={formatCurrency(availableBalance)} tone="emerald" strong />
       </div>
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-        <MetricTile label="Link đã tạo" value={overview?.linkCount || 0} hint="Tổng tracking link đang có trên hệ thống" />
-        <MetricTile label="Commission đã duyệt" value={approvedCount} hint="Đã được seller xác nhận nhận tiền" />
-        <MetricTile label="Commission chờ mở khóa" value={pendingCount} hint="Đang chờ đủ điều kiện ghi nhận thực nhận" />
+        <MetricTile label="Link đã tạo" value={overview?.linkCount || 0} hint="Tổng tracking link đang có trên hệ thống." />
+        <MetricTile label="Commission đã duyệt" value={approvedCount} hint="Đã được seller xác nhận nhận tiền." />
+        <MetricTile label="Commission chờ mở khóa" value={pendingCount} hint="Đang chờ đủ điều kiện ghi nhận thực nhận." />
       </div>
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h3 className="text-xl font-semibold text-slate-900">Top commission</h3>
-              <p className="mt-2 text-sm leading-7 text-slate-600">Các đơn có giá trị hoa hồng cao nhất, đọc trực tiếp từ bảng commission thực tế.</p>
+              <p className="mt-2 text-sm leading-7 text-slate-600">
+                Các đơn có giá trị hoa hồng cao nhất, đọc trực tiếp từ bảng commission thực tế.
+              </p>
             </div>
             <StatusBadge status={pendingCount ? "PENDING" : "APPROVED"} />
           </div>

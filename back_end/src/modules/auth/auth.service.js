@@ -7,6 +7,7 @@ const buildAuthPayload = (account) => {
   const roles = account.accountRoles.map((item) => item.role.code);
   const accessToken = signAccessToken({ sub: account.id, roles });
   const refreshToken = signRefreshToken({ sub: account.id, roles });
+  const profileFullName = account.customerProfile?.fullName || account.affiliate?.fullName || "";
 
   return {
     account: {
@@ -15,6 +16,11 @@ const buildAuthPayload = (account) => {
       phone: account.phone,
       status: account.status,
       roles,
+      profile: {
+        fullName: profileFullName,
+        affiliateStatus: account.affiliate?.kycStatus || null,
+        hasAffiliateApplication: Boolean(account.affiliate),
+      },
     },
     accessToken,
     refreshToken,
@@ -22,6 +28,10 @@ const buildAuthPayload = (account) => {
 };
 
 exports.register = async (payload) => {
+  if (payload.role === "AFFILIATE") {
+    throw new AppError("Affiliate registration must go through customer enrollment and admin approval", 400);
+  }
+
   const existing = await authRepository.findExistingAccount({ email: payload.email });
   if (existing) {
     throw new AppError("Account already exists with this email", 409);
@@ -101,8 +111,12 @@ exports.enrollAffiliate = async (accountId, payload) => {
   if (!account) throw new AppError("Account not found", 404);
 
   const roles = account.accountRoles.map((item) => item.role.code);
-  if (roles.includes("AFFILIATE")) {
+  if (roles.includes("AFFILIATE") && account.affiliate?.kycStatus === "APPROVED") {
     throw new AppError("Account is already enrolled as affiliate", 409);
+  }
+
+  if (account.affiliate?.kycStatus === "PENDING") {
+    throw new AppError("Affiliate application is pending admin approval", 409);
   }
 
   const updatedAccount = await authRepository.createAffiliateRole(accountId, payload);

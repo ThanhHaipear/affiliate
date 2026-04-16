@@ -37,6 +37,29 @@ function formatCurrency(value = 0) {
   return currencyFormatter.format(Number(value) || 0);
 }
 
+function formatCompactCurrency(value = 0) {
+  const amount = Number(value) || 0;
+  const absoluteAmount = Math.abs(amount);
+
+  const units = [
+    { threshold: 1e15, label: "triệu tỷ" },
+    { threshold: 1e12, label: "nghìn tỷ" },
+    { threshold: 1e9, label: "tỷ" },
+    { threshold: 1e6, label: "triệu" },
+    { threshold: 1e3, label: "nghìn" },
+  ];
+
+  for (const unit of units) {
+    if (absoluteAmount >= unit.threshold) {
+      const scaled = amount / unit.threshold;
+      const rounded = scaled >= 100 ? scaled.toFixed(0) : scaled.toFixed(1);
+      return `${rounded.replace(/\.0$/, "")} ${unit.label} đ`;
+    }
+  }
+
+  return formatCurrency(amount);
+}
+
 function formatDateTime(value) {
   if (!value) {
     return "--";
@@ -59,4 +82,4 @@ function formatStatusLabel(status = "") {
   return normalized.replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-export { formatCurrency, formatDateTime, formatStatusLabel };
+export { formatCompactCurrency, formatCurrency, formatDateTime, formatStatusLabel };

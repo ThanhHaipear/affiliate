@@ -5,7 +5,7 @@ import Select from "../common/Select";
 function FilterBar({
   searchValue,
   onSearchChange,
-  searchPlaceholder = "Search",
+  searchPlaceholder = "Tìm kiếm",
   filters = [],
   primaryAction,
 }) {

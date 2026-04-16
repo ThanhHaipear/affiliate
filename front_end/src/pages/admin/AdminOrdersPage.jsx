@@ -12,7 +12,7 @@ import PageHeader from "../../components/common/PageHeader";
 import StatusBadge from "../../components/common/StatusBadge";
 import { useToast } from "../../hooks/useToast";
 import { mapAdminOrderDto } from "../../lib/adminMappers";
-import { formatCurrency, formatDateTime } from "../../lib/format";
+import { formatCompactCurrency, formatCurrency, formatDateTime } from "../../lib/format";
 
 function AdminOrdersPage() {
   const toast = useToast();
@@ -51,7 +51,7 @@ function AdminOrdersPage() {
       const response = await getAdminOrders();
       setOrders((response || []).map(mapAdminOrderDto));
     } catch (loadError) {
-      setError(loadError.response?.data?.message || "Khong tai duoc du lieu don hang admin.");
+      setError(loadError.response?.data?.message || "Không tải được dữ liệu đơn hàng admin.");
     } finally {
       setLoading(false);
     }
@@ -68,7 +68,7 @@ function AdminOrdersPage() {
       setFinancialStats(response || null);
     } catch (loadError) {
       setFinancialStats(null);
-      setError(loadError.response?.data?.message || "Khong tai duoc thong ke tai chinh admin.");
+      setError(loadError.response?.data?.message || "Không tải được thống kê tài chính admin.");
     }
   }
 
@@ -83,11 +83,11 @@ function AdminOrdersPage() {
         status: statusValue,
         ...(statusValue === "REJECTED" ? { rejectReason: reviewTarget.latestRefundReason || "Rejected by admin" } : {}),
       });
-      toast.success(statusValue === "APPROVED" ? "Da duyet yeu cau hoan tien." : "Da tu choi yeu cau hoan tien.");
+      toast.success(statusValue === "APPROVED" ? "Đã duyệt yêu cầu hoàn tiền." : "Đã từ chối yêu cầu hoàn tiền.");
       setReviewTarget(null);
       await loadOrders();
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong review duoc yeu cau hoan tien.");
+      toast.error(submitError.response?.data?.message || "Không review được yêu cầu hoàn tiền.");
     } finally {
       setSubmitting(false);
     }
@@ -130,45 +130,45 @@ function AdminOrdersPage() {
   }, [orders, spotlightOrderId]);
 
   if (loading) {
-    return <LoadingSpinner label="Dang tai admin orders..." />;
+    return <LoadingSpinner label="Đang tải đơn hàng admin..." />;
   }
 
   if (error) {
-    return <EmptyState title="Khong tai duoc don hang admin" description={error} />;
+    return <EmptyState title="Không tải được đơn hàng admin" description={error} />;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Orders"
-        title="Revenue and order monitoring"
-        description="Admin theo doi don hang, thanh toan, settlement va cac yeu cau huy/hoan tien cho don VNPAY."
+        title="Giám sát doanh thu và đơn hàng"
+        description="Admin theo dõi đơn hàng, thanh toán, settlement và các yêu cầu hủy/hoàn tiền cho đơn VNPAY."
       />
 
       {spotlightOrderId ? (
         <div className="rounded-[2rem] border border-sky-200 bg-sky-50 p-5 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.24em] text-sky-700">Deep link</p>
+          <p className="text-xs uppercase tracking-[0.24em] text-sky-700">Liên kết sâu</p>
           <h3 className="mt-2 text-lg font-semibold text-slate-900">
-            {spotlightOrder ? `Dang nhan manh don ${spotlightOrder.code}` : `Khong tim thay don #${spotlightOrderId}`}
+            {spotlightOrder ? `Đang nhấn mạnh đơn ${spotlightOrder.code}` : `Không tìm thấy đơn #${spotlightOrderId}`}
           </h3>
         </div>
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <AdminStatCard label="Tong don" value={summary.total.toLocaleString("vi-VN")} meta="Theo bo loc hien tai" tone="cyan" />
-        <AdminStatCard label="Tong doanh thu" value={formatCurrency(summary.grossRevenue)} meta="Theo bo loc backend" tone="emerald" />
-        <AdminStatCard label="Hoa hong tam tinh" value={formatCurrency(summary.pendingCommission)} meta="Chua vao vi that" tone="amber" />
-        <AdminStatCard label="Hoa hong da ghi nhan" value={formatCurrency(summary.settledCommission)} meta="Da vao vi sau settlement" tone="amber" />
-        <AdminStatCard label="Phi nen tang tam tinh" value={formatCurrency(summary.pendingPlatformFee)} meta="Chua vao vi nen tang" tone="rose" />
+        <AdminStatCard label="Tổng đơn" value={summary.total.toLocaleString("vi-VN")} meta="Theo bộ lọc hiện tại" tone="cyan" />
+        <AdminStatCard label="Tổng doanh thu" value={formatCompactCurrency(summary.grossRevenue)} tooltip={formatCurrency(summary.grossRevenue)} meta="Theo bộ lọc backend" tone="emerald" />
+        <AdminStatCard label="Hoa hồng tạm tính" value={formatCompactCurrency(summary.pendingCommission)} tooltip={formatCurrency(summary.pendingCommission)} meta="Chưa vào ví thật" tone="amber" />
+        <AdminStatCard label="Hoa hồng đã ghi nhận" value={formatCompactCurrency(summary.settledCommission)} tooltip={formatCurrency(summary.settledCommission)} meta="Đã vào ví sau settlement" tone="amber" />
+        <AdminStatCard label="Phí nền tảng tạm tính" value={formatCompactCurrency(summary.pendingPlatformFee)} tooltip={formatCurrency(summary.pendingPlatformFee)} meta="Chưa vào ví nền tảng" tone="rose" />
         <AdminStatCard label="Seller da xac nhan" value={summary.confirmed.toLocaleString("vi-VN")} meta="Dieu kien ghi nhan hoa hong" tone="rose" />
       </div>
 
       <div className="grid gap-4 rounded-[2rem] border border-slate-300 bg-white p-6 shadow-sm lg:grid-cols-[1.5fr_0.7fr_0.7fr]">
-        <Input label="Tim kiem" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Ma don, buyer, shop..." />
+        <Input label="Tìm kiếm" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Mã đơn, khách mua, shop..." />
         <label className="block space-y-2">
-          <span className="text-sm font-medium text-slate-800">Order status</span>
+          <span className="text-sm font-medium text-slate-800">Trạng thái đơn</span>
           <select className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900" value={status} onChange={(event) => setStatus(event.target.value)}>
-            <option value="ALL">Tat ca</option>
+            <option value="ALL">Tất cả</option>
             <option value="CREATED">CREATED</option>
             <option value="PENDING_PAYMENT">PENDING_PAYMENT</option>
             <option value="PAID">PAID</option>
@@ -179,11 +179,11 @@ function AdminOrdersPage() {
           </select>
         </label>
         <label className="block space-y-2">
-          <span className="text-sm font-medium text-slate-800">Seller settlement</span>
+          <span className="text-sm font-medium text-slate-800">Xác nhận settlement của seller</span>
           <select className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900" value={sellerConfirmed} onChange={(event) => setSellerConfirmed(event.target.value)}>
-            <option value="ALL">Tat ca</option>
-            <option value="CONFIRMED">Da xac nhan</option>
-            <option value="PENDING">Chua xac nhan</option>
+            <option value="ALL">Tất cả</option>
+            <option value="CONFIRMED">Đã xác nhận</option>
+            <option value="PENDING">Chưa xác nhận</option>
           </select>
         </label>
       </div>
@@ -202,7 +202,7 @@ function AdminOrdersPage() {
           },
           {
             key: "buyer",
-            title: "Buyer / Shop",
+            title: "Khách mua / Shop",
             render: (row) => (
               <div>
                 <p>{row.buyer}</p>
@@ -219,23 +219,23 @@ function AdminOrdersPage() {
               </span>
             ),
           },
-          { key: "totalAmount", title: "Tong tien", render: (row) => formatCurrency(row.totalAmount) },
-          { key: "paymentStatus", title: "Thanh toan", render: (row) => <StatusBadge status={row.paymentStatus} /> },
-          { key: "orderStatus", title: "Don hang", render: (row) => <StatusBadge status={row.orderStatus} /> },
+          { key: "totalAmount", title: "Tổng tiền", render: (row) => formatCurrency(row.totalAmount) },
+          { key: "paymentStatus", title: "Thanh toán", render: (row) => <StatusBadge status={row.paymentStatus} /> },
+          { key: "orderStatus", title: "Đơn hàng", render: (row) => <StatusBadge status={row.orderStatus} /> },
           {
             key: "refund",
-            title: "Refund request",
+            title: "Yêu cầu hoàn tiền",
             render: (row) =>
               row.latestRefundStatus ? <StatusBadge status={row.latestRefundStatus} /> : <span className="text-sm text-slate-500">--</span>,
           },
           {
             key: "actions",
-            title: "Tac vu",
+            title: "Tác vụ",
             render: (row) =>
               row.latestRefundStatus === "PENDING" ? (
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" onClick={() => setReviewTarget(row)}>
-                    Duyet refund
+                    Duyệt refund
                   </Button>
                 </div>
               ) : (
@@ -245,22 +245,22 @@ function AdminOrdersPage() {
         ]}
         rows={filtered}
         rowClassName={(row) => (String(row.id) === String(spotlightOrderId) ? "bg-sky-50" : "")}
-        emptyTitle="Khong co don hang phu hop"
-        emptyDescription="Thu doi bo loc theo status hoac search theo ma don."
+        emptyTitle="Không có đơn hàng phù hợp"
+        emptyDescription="Thử đổi bộ lọc theo trạng thái hoặc tìm theo mã đơn."
       />
 
       <ConfirmModal
         open={Boolean(reviewTarget)}
-        title="Duyet yeu cau hoan tien"
-        description={`Don ${reviewTarget?.code} dang co yeu cau refund pending. Chon duyet de hoan tien, hoac dong modal va tu choi.`}
-        confirmLabel="Duyet"
+        title="Duyệt yêu cầu hoàn tiền"
+        description={`Đơn ${reviewTarget?.code} đang có yêu cầu refund pending. Chọn duyệt để hoàn tiền, hoặc đóng modal và từ chối.`}
+        confirmLabel="Duyệt"
         loading={submitting}
         onClose={() => setReviewTarget(null)}
         onConfirm={() => handleReviewRefund("APPROVED")}
       >
         <div className="mt-4 flex justify-end">
           <Button variant="danger" loading={submitting} onClick={() => handleReviewRefund("REJECTED")}>
-            Tu choi
+            Từ chối
           </Button>
         </div>
       </ConfirmModal>

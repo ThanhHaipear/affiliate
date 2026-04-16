@@ -107,7 +107,7 @@ describe("app router", () => {
     await seedAuthSession({
       accessToken: "token",
       refreshToken: "refresh",
-      currentUser: { id: "1", roles: ["affiliate"], profile: {} },
+      currentUser: { id: "1", roles: ["affiliate"], profile: { affiliateStatus: "PENDING" } },
       roles: ["affiliate"],
       activeDashboardRole: "affiliate",
     });

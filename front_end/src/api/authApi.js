@@ -61,17 +61,17 @@ async function getCurrentUser() {
 }
 
 async function forgotPassword(payload) {
-  const response = await axiosClient.post("/api/auth/forgot-password", payload);
+  const response = await axiosClient.post(ENDPOINTS.auth.forgotPassword, payload);
   return unwrapResponseData(response);
 }
 
 async function changePassword(payload) {
-  const response = await axiosClient.post("/api/auth/change-password", payload);
+  const response = await axiosClient.post(ENDPOINTS.auth.changePassword, payload);
   return unwrapResponseData(response);
 }
 
 async function enrollAffiliate(payload) {
-  const response = await axiosClient.post("/api/auth/enroll-affiliate", payload);
+  const response = await axiosClient.post(ENDPOINTS.auth.enrollAffiliate, payload);
   return normalizeAuthPayload(unwrapResponseData(response));
 }
 

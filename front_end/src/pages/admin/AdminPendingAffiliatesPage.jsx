@@ -35,7 +35,7 @@ function AdminPendingAffiliatesPage() {
       const response = await getAdminOverview();
       setPendingAffiliates(mapAdminOverview(response).pendingAffiliates);
     } catch (loadError) {
-      setError(loadError.response?.data?.message || "Khong tai duoc danh sach affiliate cho duyet.");
+      setError(loadError.response?.data?.message || "Không tải được danh sách affiliate chờ duyệt.");
     } finally {
       setLoading(false);
     }
@@ -61,16 +61,16 @@ function AdminPendingAffiliatesPage() {
       setSubmitting(true);
       if (action.type === "approve") {
         await approveAffiliate(action.row.id);
-        toast.success("Da duyet affiliate.");
+        toast.success("Đã duyệt affiliate.");
       } else {
         await rejectAffiliate(action.row.id, { rejectReason });
-        toast.success("Da tu choi affiliate.");
+        toast.success("Đã từ chối affiliate.");
       }
       setAction(null);
       setRejectReason("");
       await loadAffiliates();
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong cap nhat duoc trang thai affiliate.");
+      toast.error(submitError.response?.data?.message || "Không cập nhật được trạng thái affiliate.");
     } finally {
       setSubmitting(false);
     }
@@ -81,31 +81,31 @@ function AdminPendingAffiliatesPage() {
   }
 
   if (error) {
-    return <EmptyState title="Khong tai duoc affiliate pending" description={error} />;
+    return <EmptyState title="Không tải được affiliate chờ duyệt" description={error} />;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Affiliate review"
-        title="Pending affiliates"
-        description="Danh sach nay dang doc truc tiep tu backend. Approve chi nen duoc thuc hien khi affiliate da co KYC va payment account hop le."
+        eyebrow="Duyệt affiliate"
+        title="Affiliate chờ duyệt"
+        description="Danh sách này đang đọc trực tiếp từ backend. Chỉ nên duyệt khi affiliate đã có KYC và payment account hợp lệ."
       />
       <FilterBar
         searchValue={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Search name, email, or activity status"
+        searchPlaceholder="Tìm tên, email hoặc trạng thái hoạt động"
         filters={[
           {
             key: "channel",
-            label: "Activity status",
+            label: "Trạng thái hoạt động",
             value: channel,
             onChange: setChannel,
             options: [
-              { label: "All statuses", value: "ALL" },
-              { label: "Active", value: "ACTIVE" },
-              { label: "Inactive", value: "INACTIVE" },
-              { label: "Locked", value: "LOCKED" },
+              { label: "Tất cả trạng thái", value: "ALL" },
+              { label: "Đang hoạt động", value: "ACTIVE" },
+              { label: "Không hoạt động", value: "INACTIVE" },
+              { label: "Đã khóa", value: "LOCKED" },
             ],
           },
         ]}
@@ -113,25 +113,25 @@ function AdminPendingAffiliatesPage() {
       <DataTable
         columns={[
           { key: "fullName", title: "Affiliate" },
-          { key: "primaryChannel", title: "Activity" },
-          { key: "paymentMethod", title: "Payout" },
-          { key: "submittedAt", title: "Submitted", render: (row) => formatDateTime(row.submittedAt) },
-          { key: "riskLevel", title: "Risk" },
+          { key: "primaryChannel", title: "Hoạt động" },
+          { key: "paymentMethod", title: "Nhận chi trả" },
+          { key: "submittedAt", title: "Ngày gửi", render: (row) => formatDateTime(row.submittedAt) },
+          { key: "riskLevel", title: "Rủi ro" },
           {
             key: "actions",
-            title: "Actions",
+            title: "Thao tác",
             render: (row) => (
               <div className="flex gap-2">
                 <Link to={`/admin/affiliates/${row.id}`}>
                   <Button size="sm" variant="secondary">
-                    Detail
+                    Chi tiết
                   </Button>
                 </Link>
                 <Button size="sm" onClick={() => setAction({ type: "approve", row })}>
-                  Approve
+                  Duyệt
                 </Button>
                 <Button size="sm" variant="danger" onClick={() => setAction({ type: "reject", row })}>
-                  Reject
+                  Từ chối
                 </Button>
               </div>
             ),
@@ -139,13 +139,13 @@ function AdminPendingAffiliatesPage() {
         ]}
         rows={rows}
         keyField="rowKey"
-        emptyTitle="Khong con affiliate cho duyet"
-        emptyDescription="Backend hien tai khong tra ve affiliate pending nao."
+        emptyTitle="Không còn affiliate chờ duyệt"
+        emptyDescription="Backend hiện tại không trả về affiliate pending nào."
       />
       <ConfirmModal
         open={Boolean(action)}
-        title={action?.type === "approve" ? "Approve affiliate" : "Reject affiliate"}
-        description={`Review decision for ${action?.row?.fullName || ""}.`}
+        title={action?.type === "approve" ? "Duyệt affiliate" : "Từ chối affiliate"}
+        description={`Xác nhận quyết định review cho ${action?.row?.fullName || ""}.`}
         confirmVariant={action?.type === "approve" ? "primary" : "danger"}
         onClose={() => {
           setAction(null);
@@ -156,10 +156,10 @@ function AdminPendingAffiliatesPage() {
       >
         {action?.type === "reject" ? (
           <Input
-            label="Reject reason"
+            label="Lý do từ chối"
             value={rejectReason}
             onChange={(event) => setRejectReason(event.target.value)}
-            placeholder="Specify missing KYC or payout evidence"
+            placeholder="Nêu rõ KYC hoặc bằng chứng nhận chi trả còn thiếu"
           />
         ) : null}
       </ConfirmModal>

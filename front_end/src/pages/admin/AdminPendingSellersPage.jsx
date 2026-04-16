@@ -36,7 +36,7 @@ function AdminPendingSellersPage() {
       const response = await getAdminOverview();
       setPendingSellers(mapAdminOverview(response).pendingSellers);
     } catch (loadError) {
-      setError(loadError.response?.data?.message || "Khong tai duoc danh sach seller cho duyet.");
+      setError(loadError.response?.data?.message || "Không tải được danh sách seller chờ duyệt.");
     } finally {
       setLoading(false);
     }
@@ -62,16 +62,16 @@ function AdminPendingSellersPage() {
       setSubmitting(true);
       if (action.type === "approve") {
         await approveSeller(action.row.id);
-        toast.success("Da duyet seller.");
+        toast.success("Đã duyệt seller.");
       } else {
         await rejectSeller(action.row.id, { rejectReason });
-        toast.success("Da tu choi seller.");
+        toast.success("Đã từ chối seller.");
       }
       setAction(null);
       setRejectReason("");
       await loadSellers();
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong cap nhat duoc trang thai seller.");
+      toast.error(submitError.response?.data?.message || "Không cập nhật được trạng thái seller.");
     } finally {
       setSubmitting(false);
     }
@@ -82,31 +82,31 @@ function AdminPendingSellersPage() {
   }
 
   if (error) {
-    return <EmptyState title="Khong tai duoc seller pending" description={error} />;
+    return <EmptyState title="Không tải được seller chờ duyệt" description={error} />;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Seller review"
-        title="Pending sellers"
-        description="Danh sach nay dang doc truc tiep tu backend. Approve chi nen duoc thuc hien khi seller da co KYC va tai khoan nhan tien hop le."
+        eyebrow="Duyệt seller"
+        title="Seller chờ duyệt"
+        description="Danh sách này đang đọc trực tiếp từ backend. Chỉ nên duyệt khi seller đã có KYC và tài khoản nhận tiền hợp lệ."
       />
       <FilterBar
         searchValue={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Search shop, owner, or email"
+        searchPlaceholder="Tìm shop, chủ sở hữu hoặc email"
         filters={[
           {
             key: "risk",
-            label: "Risk",
+            label: "Rủi ro",
             value: risk,
             onChange: setRisk,
             options: [
-              { label: "All risk levels", value: "ALL" },
-              { label: "Low", value: "LOW" },
-              { label: "Medium", value: "MEDIUM" },
-              { label: "High", value: "HIGH" },
+              { label: "Tất cả mức rủi ro", value: "ALL" },
+              { label: "Thấp", value: "LOW" },
+              { label: "Trung bình", value: "MEDIUM" },
+              { label: "Cao", value: "HIGH" },
             ],
           },
         ]}
@@ -114,26 +114,26 @@ function AdminPendingSellersPage() {
       <DataTable
         columns={[
           { key: "shopName", title: "Shop" },
-          { key: "ownerName", title: "Owner" },
-          { key: "category", title: "Category" },
-          { key: "submittedAt", title: "Submitted", render: (row) => formatDateTime(row.submittedAt) },
-          { key: "riskLevel", title: "Risk", render: (row) => row.riskLevel },
+          { key: "ownerName", title: "Chủ sở hữu" },
+          { key: "category", title: "Ngành hàng" },
+          { key: "submittedAt", title: "Ngày gửi", render: (row) => formatDateTime(row.submittedAt) },
+          { key: "riskLevel", title: "Rủi ro", render: (row) => row.riskLevel },
           { key: "kycStatus", title: "KYC", render: (row) => <StatusBadge status={row.kycStatus} /> },
           {
             key: "actions",
-            title: "Actions",
+            title: "Thao tác",
             render: (row) => (
               <div className="flex gap-2">
                 <Link to={`/admin/sellers/${row.id}`}>
                   <Button size="sm" variant="secondary">
-                    Detail
+                    Chi tiết
                   </Button>
                 </Link>
                 <Button size="sm" onClick={() => setAction({ type: "approve", row })}>
-                  Approve
+                  Duyệt
                 </Button>
                 <Button size="sm" variant="danger" onClick={() => setAction({ type: "reject", row })}>
-                  Reject
+                  Từ chối
                 </Button>
               </div>
             ),
@@ -141,13 +141,13 @@ function AdminPendingSellersPage() {
         ]}
         rows={rows}
         keyField="rowKey"
-        emptyTitle="Khong con seller cho duyet"
-        emptyDescription="Backend hien tai khong tra ve seller pending nao."
+        emptyTitle="Không còn seller chờ duyệt"
+        emptyDescription="Backend hiện tại không trả về seller pending nào."
       />
       <ConfirmModal
         open={Boolean(action)}
-        title={action?.type === "approve" ? "Approve seller" : "Reject seller"}
-        description={`Review decision for ${action?.row?.shopName || ""}.`}
+        title={action?.type === "approve" ? "Duyệt seller" : "Từ chối seller"}
+        description={`Xác nhận quyết định review cho ${action?.row?.shopName || ""}.`}
         confirmVariant={action?.type === "approve" ? "primary" : "danger"}
         onClose={() => {
           setAction(null);
@@ -158,10 +158,10 @@ function AdminPendingSellersPage() {
       >
         {action?.type === "reject" ? (
           <Input
-            label="Reject reason"
+            label="Lý do từ chối"
             value={rejectReason}
             onChange={(event) => setRejectReason(event.target.value)}
-            placeholder="Explain what is missing or invalid"
+            placeholder="Nêu rõ phần còn thiếu hoặc không hợp lệ"
           />
         ) : null}
       </ConfirmModal>

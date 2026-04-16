@@ -15,7 +15,7 @@ import StatusBadge from "../../../components/common/StatusBadge";
 import { useToast } from "../../../hooks/useToast";
 import { mapOrderDto } from "../../../lib/apiMappers";
 import { formatDateTime } from "../../../lib/format";
-import { buildSellerOrderTimeline } from "../../../mock/sellerPortalData";
+import { buildSellerOrderTimeline } from "../../../lib/sellerOrders";
 
 function getSellerOrderActions(order) {
   const isTerminal = ["CANCELLED", "REFUNDED", "COMPLETED"].includes(order?.order_status);

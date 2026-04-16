@@ -5,7 +5,7 @@ import EmptyState from "../../../components/common/EmptyState";
 import MoneyText from "../../../components/common/MoneyText";
 import PageHeader from "../../../components/common/PageHeader";
 import StatCard from "../../../components/common/StatCard";
-import { formatDateTime } from "../../../lib/format";
+import { formatCompactCurrency, formatCurrency, formatDateTime } from "../../../lib/format";
 
 function isOrderActive(order = {}) {
   return !["CANCELLED", "REFUNDED"].includes(order.status);
@@ -25,6 +25,10 @@ function sumAffiliateCommission(items = []) {
 
 function sumSellerNet(items = []) {
   return items.reduce((sum, item) => sum + Number(item.sellerNetAmount || 0), 0);
+}
+
+function CompactRevenueValue({ value }) {
+  return <span title={formatCurrency(value)}>{formatCompactCurrency(value)}</span>;
 }
 
 function SellerRevenuePage() {
@@ -121,17 +125,17 @@ function SellerRevenuePage() {
       {!loading && !error ? (
         <>
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            <StatCard label="Tổng doanh thu" value={<MoneyText value={summary.grossRevenue} />} tone="emerald" strong />
-            <StatCard label="Doanh thu affiliate" value={<MoneyText value={summary.affiliateRevenue} />} tone="amber" strong />
-            <StatCard label="Doanh thu trực tiếp" value={<MoneyText value={summary.directRevenue} />} tone="cyan" strong />
-            <StatCard label="Phí nền tảng tạm tính" value={<MoneyText value={summary.pendingPlatformFee} />} tone="rose" strong />
-            <StatCard label="Phí nền tảng đã ghi nhận" value={<MoneyText value={summary.settledPlatformFee} />} tone="rose" strong />
-            <StatCard label="Hoa hồng tạm tính" value={<MoneyText value={summary.pendingCommission} />} tone="amber" strong />
-            <StatCard label="Hoa hồng đã ghi nhận" value={<MoneyText value={summary.settledCommission} />} tone="amber" strong />
-            <StatCard label="Seller net tạm tính" value={<MoneyText value={summary.pendingSellerNet} />} tone="cyan" strong />
+            <StatCard label="Tổng doanh thu" value={<CompactRevenueValue value={summary.grossRevenue} />} tone="emerald" strong />
+            <StatCard label="Doanh thu affiliate" value={<CompactRevenueValue value={summary.affiliateRevenue} />} tone="amber" strong />
+            <StatCard label="Doanh thu trực tiếp" value={<CompactRevenueValue value={summary.directRevenue} />} tone="cyan" strong />
+            <StatCard label="Phí nền tảng tạm tính" value={<CompactRevenueValue value={summary.pendingPlatformFee} />} tone="rose" strong />
+            <StatCard label="Phí nền tảng đã ghi nhận" value={<CompactRevenueValue value={summary.settledPlatformFee} />} tone="rose" strong />
+            <StatCard label="Hoa hồng tạm tính" value={<CompactRevenueValue value={summary.pendingCommission} />} tone="amber" strong />
+            <StatCard label="Hoa hồng đã ghi nhận" value={<CompactRevenueValue value={summary.settledCommission} />} tone="amber" strong />
+            <StatCard label="Seller net tạm tính" value={<CompactRevenueValue value={summary.pendingSellerNet} />} tone="cyan" strong />
             <StatCard
               label="Doanh thu thực nhận"
-              value={<MoneyText value={summary.settledSellerNet} />}
+              value={<CompactRevenueValue value={summary.settledSellerNet} />}
               hint="Chỉ tính các đơn hợp lệ đã xác nhận nhận tiền"
               tone="emerald"
               strong

@@ -17,7 +17,7 @@ const registerBodySchema = z.object({
   email: z.string().email(),
   phone: z.string().min(8).optional(),
   password: z.string().min(6),
-  role: z.enum(["SELLER", "AFFILIATE", "CUSTOMER"]),
+  role: z.enum(["SELLER", "CUSTOMER"]),
   fullName: z.string().min(2),
   shopName: z.string().min(2).optional(),
   businessName: z.string().min(2).optional(),

@@ -56,7 +56,7 @@ function AdminProductDetailPage() {
       setProduct(match || null);
       setSelectedImage(match?.gallery?.[0] || "");
     } catch (loadError) {
-      setError(loadError.response?.data?.message || "Khong tai duoc chi tiet san pham.");
+      setError(loadError.response?.data?.message || "Không tải được chi tiết sản phẩm.");
     } finally {
       setLoading(false);
     }
@@ -69,35 +69,30 @@ function AdminProductDetailPage() {
 
     try {
       setSubmitting(true);
-      const requests = [];
-
       if (product.catalogReview.available) {
-        requests.push(
+        await (
           action === "approve"
             ? approveProduct(product.catalogReview.reviewEntityId)
-            : rejectProduct(product.catalogReview.reviewEntityId, { rejectReason }),
+            : rejectProduct(product.catalogReview.reviewEntityId, { rejectReason })
         );
-      }
-
-      if (product.affiliateReview.available) {
-        requests.push(
+      } else if (product.affiliateReview.available) {
+        await (
           action === "approve"
             ? approveAffiliateSetting(product.affiliateReview.reviewEntityId)
-            : rejectAffiliateSetting(product.affiliateReview.reviewEntityId, { rejectReason }),
+            : rejectAffiliateSetting(product.affiliateReview.reviewEntityId, { rejectReason })
         );
       }
 
-      await Promise.all(requests);
       toast.success(
         action === "approve"
-          ? "Da duyet san pham va cac cau hinh lien quan."
-          : "Da tu choi san pham va cac cau hinh lien quan.",
+          ? "Đã duyệt sản phẩm và các cấu hình liên quan."
+          : "Đã từ chối sản phẩm và các cấu hình liên quan.",
       );
       setAction(null);
       setRejectReason("");
       await loadProduct();
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong cap nhat duoc san pham.");
+      toast.error(submitError.response?.data?.message || "Không cập nhật được sản phẩm.");
     } finally {
       setSubmitting(false);
     }
@@ -110,9 +105,9 @@ function AdminProductDetailPage() {
   if (!product) {
     return (
       <EmptyState
-        title="Product not found"
-        description={error || "San pham nay khong con nam trong danh sach cho duyet hoac backend khong tra ve ban ghi."}
-        actionLabel="Back to pending products"
+        title="Không tìm thấy sản phẩm"
+        description={error || "Sản phẩm này không còn nằm trong danh sách chờ duyệt hoặc backend không trả về bản ghi."}
+        actionLabel="Quay lại danh sách sản phẩm chờ duyệt"
         onAction={() => window.history.back()}
       />
     );
@@ -123,32 +118,32 @@ function AdminProductDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Product detail"
+        eyebrow="Chi tiết sản phẩm"
         title={product.name}
         description={product.description}
         action={
           <div className="flex gap-3">
             <Button variant="danger" onClick={() => setAction("reject")}>
-              Reject product
+              Từ chối sản phẩm
             </Button>
-            <Button onClick={() => setAction("approve")}>Approve product</Button>
+            <Button onClick={() => setAction("approve")}>Duyệt sản phẩm</Button>
           </div>
         }
       />
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <DetailPanel eyebrow="Commercial data" title="Pricing and commission">
+        <DetailPanel eyebrow="Dữ liệu thương mại" title="Giá bán và hoa hồng">
           <div className="grid gap-3 sm:grid-cols-2">
             <InfoItem label="Seller" value={product.sellerName} />
-            <InfoItem label="Review status" value={product.reviewSummary} />
-            <InfoItem label="Danh muc san pham" value={product.productCategory} />
-            <InfoItem label="Price" value={product.price ? product.price.toLocaleString("vi-VN") : "--"} />
-            <InfoItem label="Commission" value={product.commissionRate || "--"} />
-            <InfoItem label="Stock" value={product.stock === null ? "--" : String(product.stock)} />
-            <InfoItem label="Submitted" value={formatDateTime(product.submittedAt)} />
-            <InfoItem label="Risk" value={product.riskLevel} />
+            <InfoItem label="Trạng thái review" value={product.reviewSummary} />
+            <InfoItem label="Danh mục sản phẩm" value={product.productCategory} />
+            <InfoItem label="Giá" value={product.price ? product.price.toLocaleString("vi-VN") : "--"} />
+            <InfoItem label="Hoa hồng" value={product.commissionRate || "--"} />
+            <InfoItem label="Tồn kho" value={product.stock === null ? "--" : String(product.stock)} />
+            <InfoItem label="Ngày gửi" value={formatDateTime(product.submittedAt)} />
+            <InfoItem label="Rủi ro" value={product.riskLevel} />
           </div>
         </DetailPanel>
-        <DetailPanel eyebrow="Approval status" title="One review decision">
+        <DetailPanel eyebrow="Trạng thái duyệt" title="Một quyết định review">
           <div className="space-y-4">
             <div className="flex items-center gap-3 rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4">
               <StatusBadge status={product.reviewStatus} />
@@ -156,17 +151,17 @@ function AdminProductDetailPage() {
             </div>
             <div className="space-y-3">
               <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">
-                Catalog review: {product.catalogReview.available ? "Dang cho duyet" : product.catalogReview.status}
+                Review catalog: {product.catalogReview.available ? "Đang chờ duyệt" : product.catalogReview.status}
               </div>
               <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">
-                Affiliate review: {product.affiliateReview.available ? "Dang cho duyet" : product.affiliateReview.status}
+                Review affiliate: {product.affiliateReview.available ? "Đang chờ duyệt" : product.affiliateReview.status}
               </div>
             </div>
           </div>
         </DetailPanel>
       </div>
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <DetailPanel eyebrow="Product media" title="Gallery and content">
+        <DetailPanel eyebrow="Media sản phẩm" title="Bộ ảnh và nội dung">
           {gallery.length ? (
             <div className="space-y-4">
               <div className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/[0.03]">
@@ -182,49 +177,49 @@ function AdminProductDetailPage() {
             </div>
           ) : (
             <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">
-              San pham nay chua co anh de admin review.
+              Sản phẩm này chưa có ảnh để admin review.
             </div>
           )}
           <div className="mt-4 rounded-[1.5rem] bg-white/[0.04] p-4 text-sm leading-7 text-slate-300">
             {product.description}
           </div>
         </DetailPanel>
-        <DetailPanel eyebrow="Variants" title="Bien the va ton kho">
+        <DetailPanel eyebrow="Biến thể" title="Biến thể và tồn kho">
           {product.variants?.length ? (
             <div className="space-y-3">
               {product.variants.map((variant) => (
                 <div key={variant.id} className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">
                   <p className="font-semibold text-white">{variant.name}</p>
                   <p className="mt-2">SKU: {variant.sku}</p>
-                  <p>Gia: {variant.price.toLocaleString("vi-VN")}</p>
-                  <p>Ton kho: {variant.quantity}</p>
+                  <p>Giá: {variant.price.toLocaleString("vi-VN")}</p>
+                  <p>Tồn kho: {variant.quantity}</p>
                 </div>
               ))}
             </div>
           ) : (
             <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">
-              Chua co bien the trong ho so san pham.
+              Chưa có biến thể trong hồ sơ sản phẩm.
             </div>
           )}
         </DetailPanel>
       </div>
       <DetailPanel
-        eyebrow="Moderation note"
-        title="Risk and approval context"
+        eyebrow="Ghi chú kiểm duyệt"
+        title="Bối cảnh rủi ro và phê duyệt"
         footer={
           <Link to="/admin/products/pending">
-            <Button variant="secondary">Back to pending products</Button>
+            <Button variant="secondary">Quay lại danh sách sản phẩm chờ duyệt</Button>
           </Link>
         }
       >
         <div className="rounded-[1.5rem] bg-white/[0.04] p-4 text-sm leading-7 text-slate-300">
-          Admin chi can dua ra mot quyet dinh duy nhat cho san pham nay. Neu san pham dang co catalog pending va affiliate pending, hanh dong approve hoac reject se dong bo ca hai phan cung mot ly do review.
+          Admin chỉ cần đưa ra một quyết định duy nhất cho sản phẩm này. Nếu sản phẩm đang có catalog pending và affiliate pending, hành động duyệt hoặc từ chối sẽ đồng bộ cả hai phần cùng một lý do review.
         </div>
       </DetailPanel>
       <ConfirmModal
         open={Boolean(action)}
-        title={action === "approve" ? "Approve product" : "Reject product"}
-        description={`Xac nhan ${action || "review"} cho ${product.name}. Neu san pham dang co catalog va affiliate pending, he thong se cap nhat ca hai cung mot luc.`}
+        title={action === "approve" ? "Duyệt sản phẩm" : "Từ chối sản phẩm"}
+        description={`Xác nhận ${action === "approve" ? "duyệt" : "từ chối"} cho ${product.name}. Nếu sản phẩm đang có catalog và affiliate pending, hệ thống sẽ cập nhật cả hai cùng một lúc.`}
         confirmVariant={action === "approve" ? "primary" : "danger"}
         onClose={() => {
           setAction(null);
@@ -235,10 +230,10 @@ function AdminProductDetailPage() {
       >
         {action === "reject" ? (
           <Input
-            label="Reject reason"
+            label="Lý do từ chối"
             value={rejectReason}
             onChange={(event) => setRejectReason(event.target.value)}
-            placeholder="Explain policy or quality issue"
+            placeholder="Nêu rõ vấn đề về chính sách hoặc chất lượng"
           />
         ) : null}
       </ConfirmModal>

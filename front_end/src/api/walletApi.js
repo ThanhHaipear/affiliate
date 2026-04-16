@@ -1,23 +1,24 @@
-﻿import { axiosClient } from "./axiosClient";
+import { axiosClient } from "./axiosClient";
+import { ENDPOINTS } from "./endpoints";
 import { unwrapResponseData } from "./response";
 
 async function getWalletSummary(params) {
-  const response = await axiosClient.get("/api/wallets/me", { params });
+  const response = await axiosClient.get(ENDPOINTS.wallets.me, { params });
   return unwrapResponseData(response);
 }
 
 async function getWithdrawalRequests(params) {
-  const response = await axiosClient.get("/api/withdrawals/me", { params });
+  const response = await axiosClient.get(ENDPOINTS.withdrawals.me, { params });
   return unwrapResponseData(response);
 }
 
 async function getWithdrawalRequestContext() {
-  const response = await axiosClient.get("/api/withdrawals/me/context");
+  const response = await axiosClient.get(ENDPOINTS.withdrawals.context);
   return unwrapResponseData(response);
 }
 
 async function createWithdrawalRequest(payload) {
-  const response = await axiosClient.post("/api/withdrawals", payload);
+  const response = await axiosClient.post(ENDPOINTS.withdrawals.create, payload);
   return unwrapResponseData(response);
 }
 

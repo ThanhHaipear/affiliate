@@ -51,9 +51,17 @@ function RoleGuard({
   redirectTo = "/unauthorized",
 }) {
   const roles = useAuthStore((state) => state.roles);
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const affiliateStatus = currentUser?.profile?.affiliateStatus || null;
+  const hasAffiliateRole = roles.includes("affiliate");
+  const canAccessAffiliate = hasAffiliateRole || affiliateStatus === "APPROVED";
 
   if (!hasRequiredRole(roles, allowedRoles)) {
     return React.createElement(Navigate, { to: redirectTo, replace: true });
+  }
+
+  if (allowedRoles.includes("affiliate") && !canAccessAffiliate) {
+    return React.createElement(Navigate, { to: "/dashboard/customer/affiliate", replace: true });
   }
 
   return children || React.createElement(Outlet);

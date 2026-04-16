@@ -14,6 +14,8 @@ exports.findAccountByEmail = (email) => prisma.account.findUnique({
     accountRoles: {
       include: { role: true },
     },
+    customerProfile: true,
+    affiliate: true,
   },
 });
 
@@ -28,6 +30,8 @@ exports.findExistingAccount = ({ email }) => {
       accountRoles: {
         include: { role: true },
       },
+      customerProfile: true,
+      affiliate: true,
     },
   });
 };
@@ -38,6 +42,7 @@ exports.findAccountById = (id) => prisma.account.findUnique({
     accountRoles: {
       include: { role: true },
     },
+    customerProfile: true,
     affiliate: true,
   },
 });
@@ -153,7 +158,7 @@ exports.createAccountGraph = (data) => prisma.$transaction(async (tx) => {
 
   return tx.account.findUnique({
     where: { id: account.id },
-    include: { accountRoles: { include: { role: true } } },
+    include: { accountRoles: { include: { role: true } }, customerProfile: true, affiliate: true },
   });
 });
 
@@ -163,16 +168,10 @@ exports.createAffiliateRole = (accountId, data) => prisma.$transaction(async (tx
     where: { id: accountId },
     include: {
       accountRoles: { include: { role: true } },
+      customerProfile: true,
       affiliate: true,
     },
   });
-
-  const role = await tx.role.findUnique({ where: { code: "AFFILIATE" } });
-  const hasAffiliateRole = account.accountRoles.some((item) => item.role.code === "AFFILIATE");
-
-  if (!hasAffiliateRole) {
-    await tx.accountRole.create({ data: { accountId, roleId: role.id } });
-  }
 
   if (!account.affiliate) {
     await tx.affiliate.create({
@@ -229,7 +228,7 @@ exports.createAffiliateRole = (accountId, data) => prisma.$transaction(async (tx
 
   return tx.account.findUnique({
     where: { id: accountId },
-    include: { accountRoles: { include: { role: true } }, affiliate: true },
+    include: { accountRoles: { include: { role: true } }, customerProfile: true, affiliate: true },
   });
 });
 

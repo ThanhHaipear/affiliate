@@ -42,7 +42,7 @@ function AdminPendingProductsPage() {
       const response = await getAdminOverview();
       setPendingProducts(mapAdminOverview(response).groupedPendingProducts);
     } catch (loadError) {
-      setError(loadError.response?.data?.message || "Khong tai duoc danh sach san pham cho duyet.");
+      setError(loadError.response?.data?.message || "Không tải được danh sách sản phẩm chờ duyệt.");
     } finally {
       setLoading(false);
     }
@@ -74,35 +74,30 @@ function AdminPendingProductsPage() {
 
     try {
       setSubmitting(true);
-      const requests = [];
-
       if (action.row.catalogReview.available) {
-        requests.push(
+        await (
           action.type === "approve"
             ? approveProduct(action.row.catalogReview.reviewEntityId)
-            : rejectProduct(action.row.catalogReview.reviewEntityId, { rejectReason }),
+            : rejectProduct(action.row.catalogReview.reviewEntityId, { rejectReason })
         );
-      }
-
-      if (action.row.affiliateReview.available) {
-        requests.push(
+      } else if (action.row.affiliateReview.available) {
+        await (
           action.type === "approve"
             ? approveAffiliateSetting(action.row.affiliateReview.reviewEntityId)
-            : rejectAffiliateSetting(action.row.affiliateReview.reviewEntityId, { rejectReason }),
+            : rejectAffiliateSetting(action.row.affiliateReview.reviewEntityId, { rejectReason })
         );
       }
 
-      await Promise.all(requests);
       toast.success(
         action.type === "approve"
-          ? "Da duyet san pham va cac cau hinh lien quan."
-          : "Da tu choi san pham va cac cau hinh lien quan.",
+          ? "Đã duyệt sản phẩm và các cấu hình liên quan."
+          : "Đã từ chối sản phẩm và các cấu hình liên quan.",
       );
       setAction(null);
       setRejectReason("");
       await loadProducts();
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong cap nhat duoc trang thai san pham.");
+      toast.error(submitError.response?.data?.message || "Không cập nhật được trạng thái sản phẩm.");
     } finally {
       setSubmitting(false);
     }
@@ -113,45 +108,45 @@ function AdminPendingProductsPage() {
   }
 
   if (error) {
-    return <EmptyState title="Khong tai duoc product pending" description={error} />;
+    return <EmptyState title="Không tải được sản phẩm chờ duyệt" description={error} />;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Product review"
-        title="Pending products"
-        description="Moi san pham chi duyet mot lan. Khi admin approve hoac reject, he thong se cap nhat toan bo phan catalog va affiliate dang cho duyet cua san pham do."
+        eyebrow="Duyệt sản phẩm"
+        title="Sản phẩm chờ duyệt"
+        description="Mỗi sản phẩm chỉ duyệt một lần. Khi admin duyệt hoặc từ chối, hệ thống sẽ cập nhật toàn bộ phần catalog và affiliate đang chờ duyệt của sản phẩm đó."
       />
       <FilterBar
         searchValue={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Search product or seller"
+        searchPlaceholder="Tìm sản phẩm hoặc seller"
         filters={[
           {
             key: "category",
-            label: "Pending scope",
+            label: "Phạm vi chờ duyệt",
             value: category,
             onChange: setCategory,
             options: [
-              { label: "Tat ca", value: "ALL" },
-              { label: "Co catalog pending", value: "CATALOG" },
-              { label: "Co affiliate pending", value: "AFFILIATE" },
+              { label: "Tất cả", value: "ALL" },
+              { label: "Có catalog pending", value: "CATALOG" },
+              { label: "Có affiliate pending", value: "AFFILIATE" },
             ],
           },
         ]}
       />
       <DataTable
         columns={[
-          { key: "name", title: "Product" },
+          { key: "name", title: "Sản phẩm" },
           { key: "sellerName", title: "Seller" },
-          { key: "productCategory", title: "Danh muc" },
-          { key: "price", title: "Price / Base", render: (row) => (row.price ? row.price.toLocaleString("vi-VN") : "--") },
-          { key: "commissionRate", title: "Commission", render: (row) => row.commissionRate || "--" },
-          { key: "submittedAt", title: "Submitted", render: (row) => formatDateTime(row.submittedAt) },
+          { key: "productCategory", title: "Danh mục" },
+          { key: "price", title: "Giá / Giá gốc", render: (row) => (row.price ? row.price.toLocaleString("vi-VN") : "--") },
+          { key: "commissionRate", title: "Hoa hồng", render: (row) => row.commissionRate || "--" },
+          { key: "submittedAt", title: "Ngày gửi", render: (row) => formatDateTime(row.submittedAt) },
           {
             key: "reviewStatus",
-            title: "Review status",
+            title: "Trạng thái review",
             render: (row) => (
               <div className="space-y-2">
                 <StatusBadge status={row.reviewStatus} />
@@ -161,27 +156,27 @@ function AdminPendingProductsPage() {
           },
           {
             key: "actions",
-            title: "Actions",
+            title: "Thao tác",
             render: (row) => (
               <div className="flex flex-wrap items-center gap-2">
                 <Link to={`/admin/products/${row.productId}`}>
-                  <Button size="sm" variant="secondary">Detail</Button>
+                  <Button size="sm" variant="secondary">Chi tiết</Button>
                 </Link>
-                <Button size="sm" onClick={() => setAction({ type: "approve", row })}>Approve</Button>
-                <Button size="sm" variant="danger" onClick={() => setAction({ type: "reject", row })}>Reject</Button>
+                <Button size="sm" onClick={() => setAction({ type: "approve", row })}>Duyệt</Button>
+                <Button size="sm" variant="danger" onClick={() => setAction({ type: "reject", row })}>Từ chối</Button>
               </div>
             ),
           },
         ]}
         rows={rows}
         keyField="rowKey"
-        emptyTitle="Khong con san pham cho duyet"
-        emptyDescription="Backend hien tai khong tra ve san pham pending nao."
+        emptyTitle="Không còn sản phẩm chờ duyệt"
+        emptyDescription="Backend hiện tại không trả về sản phẩm pending nào."
       />
       <ConfirmModal
         open={Boolean(action)}
-        title={action?.type === "approve" ? "Approve product" : "Reject product"}
-        description={`Xac nhan ${action?.type === "approve" ? "duyet" : "tu choi"} ${action?.row?.name || "san pham"}. Neu san pham dang co catalog va affiliate pending, he thong se cap nhat ca hai cung mot luc.`}
+        title={action?.type === "approve" ? "Duyệt sản phẩm" : "Từ chối sản phẩm"}
+        description={`Xác nhận ${action?.type === "approve" ? "duyệt" : "từ chối"} ${action?.row?.name || "sản phẩm"}. Nếu sản phẩm đang có catalog và affiliate pending, hệ thống sẽ cập nhật cả hai cùng một lúc.`}
         confirmVariant={action?.type === "approve" ? "primary" : "danger"}
         onClose={() => {
           setAction(null);
@@ -192,10 +187,10 @@ function AdminPendingProductsPage() {
       >
         {action?.type === "reject" ? (
           <Input
-            label="Reject reason"
+            label="Lý do từ chối"
             value={rejectReason}
             onChange={(event) => setRejectReason(event.target.value)}
-            placeholder="Explain policy or quality issue"
+            placeholder="Nêu rõ vấn đề về chính sách hoặc chất lượng"
           />
         ) : null}
       </ConfirmModal>
