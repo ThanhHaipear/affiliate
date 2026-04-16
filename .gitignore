@@ -14,6 +14,13 @@ front_end/.env
 docker-compose.yml
 DOCKER.md
 
+# private local data / notes
+*.sql
+prompt*.md
+back_end/prompt.md
+*.bak_restore_shipping
+tatus
+
 # dependencies
 node_modules/
 back_end/node_modules/
