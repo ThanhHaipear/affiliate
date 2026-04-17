@@ -239,7 +239,7 @@ exports.checkout = async (accountId, payload) =>
     const feeConfig = await getCurrentPlatformFee(tx);
     if (!feeConfig) throw new Error("Missing active platform fee config");
 
-    const platformFeeType = feeConfig.feeType;
+    const platformFeeType = "PERCENT";
     const platformFeeValue = Number(feeConfig.feeValue);
 
     let subtotal = 0;
@@ -254,15 +254,11 @@ exports.checkout = async (accountId, payload) =>
       }
 
       const lineTotal = Number(item.variant.price) * item.quantity;
-      const commissionType = item.product.affiliateSetting?.commissionType || null;
       const commissionValue = item.product.affiliateSetting ? Number(item.product.affiliateSetting.commissionValue) : 0;
       const commissionAmount = item.affiliateId
-        ? commissionType === "PERCENT"
-          ? Math.floor((lineTotal * commissionValue) / 100)
-          : commissionValue
+        ? Math.floor((lineTotal * commissionValue) / 100)
         : 0;
-      const platformFeeAmount =
-        platformFeeType === "PERCENT" ? Math.floor((lineTotal * platformFeeValue) / 100) : platformFeeValue;
+      const platformFeeAmount = Math.floor((lineTotal * platformFeeValue) / 100);
       const sellerNetAmount = lineTotal - commissionAmount - platformFeeAmount;
 
       subtotal += lineTotal;
@@ -270,7 +266,7 @@ exports.checkout = async (accountId, payload) =>
         item,
         inventory,
         lineTotal,
-        commissionType,
+        commissionType: "PERCENT",
         commissionValue,
         commissionAmount,
         platformFeeAmount,

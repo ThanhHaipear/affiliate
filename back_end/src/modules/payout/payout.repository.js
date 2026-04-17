@@ -1,6 +1,11 @@
 const prisma = require("../../config/prisma");
 const { generateTxnCode } = require("../../utils/code");
 
+exports.findBatchById = (batchId) => prisma.payoutBatch.findUnique({
+  where: { id: BigInt(batchId) },
+  include: { items: true, withdrawals: true },
+});
+
 exports.createBatch = (adminId, payload) => prisma.$transaction(async (tx) => {
   const withdrawals = await tx.withdrawal.findMany({
     where: { id: { in: payload.withdrawalIds.map((id) => BigInt(id)) }, status: "APPROVED" },
@@ -85,6 +90,14 @@ exports.processBatch = (batchId, adminId, transactionCodePrefix) => prisma.$tran
       }
     }
   });
+
+  if (!batch) {
+    throw new Error("Payout batch not found");
+  }
+
+  if (batch.status === "COMPLETED") {
+    return tx.payoutBatch.findUnique({ where: { id: BigInt(batchId) }, include: { items: true, withdrawals: true } });
+  }
 
   for (const item of batch.items) {
     await tx.payoutBatchItem.update({

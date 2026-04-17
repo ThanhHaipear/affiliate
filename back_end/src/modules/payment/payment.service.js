@@ -157,18 +157,6 @@ const buildVnpayCallbackResult = async (payload) => {
   };
 };
 
-exports.payOrder = async (accountId, orderId, payload) => {
-  const order = await prisma.order.findUnique({ where: { id: BigInt(orderId) } });
-  const payment = await prisma.payment.findFirst({ where: { orderId: BigInt(orderId) } });
-
-  if (!order || order.buyerId !== accountId) throw new AppError("Order not found", 404);
-  if (!payment) throw new AppError("Payment not found", 404);
-  if (order.status !== "PENDING_PAYMENT") throw new AppError("Order is not waiting for payment", 400);
-  if (payment.status !== "PENDING") throw new AppError("Payment has already been processed", 400);
-
-  return paymentRepository.markPaid(orderId, payload.transactionCode);
-};
-
 exports.createVnpayPaymentUrl = async (accountId, orderId, payload, req) => {
   ensureVnpayConfigured();
 

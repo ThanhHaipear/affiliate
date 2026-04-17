@@ -65,7 +65,6 @@ exports.getPlatformSettings = async () => adminRepository.getPlatformSettings();
 exports.updatePlatformFee = async (adminId, payload) => {
   try {
     return await adminRepository.updatePlatformFee({
-      feeType: payload.feeType,
       feeValue: payload.feeValue,
       adminId,
     });

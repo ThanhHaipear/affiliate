@@ -158,7 +158,6 @@ Default admin test account created by bootstrap:
 ### Payments
 | Method | Path | Access | Description |
 | --- | --- | --- | --- |
-| POST | `/api/payments/:orderId/pay` | Auth | Mark an order as paid. |
 | POST | `/api/payments/:orderId/seller-confirm` | SELLER | Seller confirms money received, unlocking commission flow. |
 | POST | `/api/payments/:orderId/refund` | Auth | Refund an order. |
 

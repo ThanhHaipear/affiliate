@@ -1,6 +1,12 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { getAdminWithdrawalSummary, getAdminWithdrawals, reviewWithdrawal } from "../../api/adminApi";
+import {
+  createPayoutBatch,
+  createPayoutBatchVnpayUrl,
+  getAdminWithdrawalSummary,
+  getAdminWithdrawals,
+  reviewWithdrawal,
+} from "../../api/adminApi";
 import AdminStatCard from "../../components/admin/AdminStatCard";
 import Button from "../../components/common/Button";
 import DataTable from "../../components/common/DataTable";
@@ -131,6 +137,51 @@ function AdminPendingWithdrawalsPage() {
     }
   }
 
+  async function handlePayout(row) {
+    const paymentAccount = row.raw?.affiliatePaymentAccount || row.raw?.sellerPaymentAccount || {};
+    let batchId = row.raw?.payoutBatchId || null;
+
+    try {
+      setActionId(row.id);
+
+      if (!batchId) {
+        const createdBatch = await createPayoutBatch({
+          payoutDate: new Date().toISOString(),
+          type: paymentAccount.type || row.raw?.ownerType || "BANK_TRANSFER",
+          withdrawalIds: [Number(row.id)],
+          bankName: paymentAccount.bankName || undefined,
+          branch: paymentAccount.branch || undefined,
+          note: `Payout batch cho yêu cầu rút tiền #${row.id} qua VNPAY sandbox`,
+        });
+
+        batchId = createdBatch?.id;
+
+        setApprovedWithdrawals((current) =>
+          current.map((item) =>
+            String(item.id) === String(row.id)
+              ? mapWithdrawalDto({
+                  ...row.raw,
+                  payoutBatchId: createdBatch?.id,
+                  status: "PROCESSING",
+                })
+              : item,
+          ),
+        );
+      }
+
+      const vnpay = await createPayoutBatchVnpayUrl(batchId, {});
+      if (!vnpay?.paymentUrl) {
+        throw new Error("Không tạo được URL VNPAY cho payout batch.");
+      }
+
+      window.location.href = vnpay.paymentUrl;
+    } catch (payError) {
+      toast.error(payError.response?.data?.message || payError.message || "Không khởi tạo được thanh toán payout qua VNPAY.");
+    } finally {
+      setActionId(null);
+    }
+  }
+
   const pendingSummary = useMemo(() => {
     return pendingWithdrawals.reduce(
       (result, item) => {
@@ -151,8 +202,29 @@ function AdminPendingWithdrawalsPage() {
     ...baseColumns,
     {
       key: "note",
-      title: "Ghi chu",
-      render: (row) => row.raw?.note || row.raw?.payoutBatchId ? `Batch #${row.raw?.payoutBatchId || "--"}` : "Đã duyệt",
+      title: "Ghi chú",
+      render: (row) => (row.raw?.payoutBatchId ? `Batch #${row.raw.payoutBatchId}` : row.raw?.note || "Đã duyệt"),
+    },
+    {
+      key: "approved_actions",
+      title: "Thanh toán",
+      render: (row) => {
+        if (row.status === "PAID") {
+          return <span className="text-sm font-medium text-emerald-700">Đã thanh toán</span>;
+        }
+
+        return (
+          <Button
+            size="sm"
+            variant={row.status === "PROCESSING" ? "secondary" : "primary"}
+            loading={actionId === row.id}
+            disabled={Boolean(actionId)}
+            onClick={() => handlePayout(row)}
+          >
+            {row.status === "PROCESSING" ? "Thanh toán lại VNPAY" : "Thanh toán VNPAY"}
+          </Button>
+        );
+      },
     },
   ];
 
@@ -160,13 +232,23 @@ function AdminPendingWithdrawalsPage() {
     ...baseColumns,
     {
       key: "actions",
-          title: "Thao tác",
+      title: "Thao tác",
       render: (row) => (
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" loading={actionId === row.id} disabled={Boolean(actionId)} onClick={() => handleReview(row.id, "APPROVED")}>
+          <Button
+            size="sm"
+            loading={actionId === row.id}
+            disabled={Boolean(actionId)}
+            onClick={() => handleReview(row.id, "APPROVED")}
+          >
             Duyệt
           </Button>
-          <Button size="sm" variant="danger" disabled={Boolean(actionId)} onClick={() => handleReview(row.id, "REJECTED")}>
+          <Button
+            size="sm"
+            variant="danger"
+            disabled={Boolean(actionId)}
+            onClick={() => handleReview(row.id, "REJECTED")}
+          >
             Từ chối
           </Button>
         </div>
@@ -179,7 +261,7 @@ function AdminPendingWithdrawalsPage() {
       <PageHeader
         eyebrow="Admin"
         title="Yêu cầu duyệt rút tiền"
-        description="Admin duyệt yêu cầu withdrawal của seller và affiliate. Bên dưới hiển thị cả hàng đợi chờ duyệt và danh sách đã duyệt thực tế."
+        description="Admin duyệt yêu cầu withdrawal của seller và affiliate. Sau khi duyệt, có thể chuyển tiếp payout qua VNPAY sandbox để hoàn tất chi trả."
         action={
           <Link
             to="/admin/commissions"
@@ -219,7 +301,7 @@ function AdminPendingWithdrawalsPage() {
             <div className="rounded-[2rem] border border-slate-200 bg-white/95 p-6 shadow-sm">
               <p className="text-xs uppercase tracking-[0.3em] text-emerald-700">Đã duyệt</p>
               <h2 className="mt-2 text-2xl font-semibold text-slate-900">Danh sách đã duyệt</h2>
-              <p className="mt-3 text-sm leading-7 text-slate-600">Hiện toàn bộ yêu cầu rút tiền đã được admin duyệt thực tế, gồm cả request đang chờ payout và request đã payout.</p>
+              <p className="mt-3 text-sm leading-7 text-slate-600">Các yêu cầu đã duyệt có thể được tạo payout batch và chuyển sang VNPAY sandbox để xác nhận chi trả thật.</p>
             </div>
             <DataTable
               columns={approvedColumns}

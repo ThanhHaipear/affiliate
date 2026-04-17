@@ -50,8 +50,7 @@ exports.fraudAlertsQuerySchema = z.object({
 
 exports.platformFeeSchema = z.object({
   body: z.object({
-    feeType: z.enum(["PERCENT", "FLAT"]),
-    feeValue: z.coerce.number().positive(),
+    feeValue: z.coerce.number().min(0).max(100),
   }),
 });
 

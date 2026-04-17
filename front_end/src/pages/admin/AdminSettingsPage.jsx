@@ -17,7 +17,7 @@ function getFeePreview(activeFee) {
     return "--";
   }
 
-  return `${activeFee.feeValue} ${activeFee.feeType}`;
+  return `${activeFee.feeValue}%`;
 }
 
 function calcRate(amount, base) {
@@ -59,7 +59,6 @@ function AdminSettingsPage() {
   const [savingFee, setSavingFee] = useState(false);
   const [savingWithdrawal, setSavingWithdrawal] = useState(false);
   const [error, setError] = useState("");
-  const [feeType, setFeeType] = useState("PERCENT");
   const [feeValue, setFeeValue] = useState("5");
   const [minAmount, setMinAmount] = useState("100000");
   const [maxAmount, setMaxAmount] = useState("50000000");
@@ -83,7 +82,6 @@ function AdminSettingsPage() {
 
       const activeFee = settingsResponse?.activePlatformFee || settingsResponse?.latestPlatformFee;
       if (activeFee) {
-        setFeeType(activeFee.feeType || "PERCENT");
         setFeeValue(String(activeFee.feeValue || 5));
       }
 
@@ -104,7 +102,7 @@ function AdminSettingsPage() {
 
     try {
       setSavingFee(true);
-      await updatePlatformFee({ feeType, feeValue: Number(feeValue) });
+      await updatePlatformFee({ feeValue: Number(feeValue) });
       toast.success("Đã cập nhật platform fee.");
       await loadSettings();
     } catch (submitError) {
@@ -288,21 +286,15 @@ function AdminSettingsPage() {
               Giá trị này sẽ được dùng cho các đơn mới sau thời điểm cập nhật. Đơn đã tạo trước đó vẫn giữ snapshot phí cũ.
             </p>
           </div>
-          <label className="block space-y-2">
-            <span className="text-sm font-medium text-slate-800">Loại phí</span>
-            <select className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900" value={feeType} onChange={(event) => setFeeType(event.target.value)}>
-              <option value="PERCENT">PERCENT</option>
-              <option value="FLAT">FLAT</option>
-            </select>
-          </label>
           <Input
-            label="Giá trị phí"
+            label="Giá trị phí (%)"
             type="number"
-            min="1"
+            min="0"
+            max="100"
             step="1"
             value={feeValue}
             onChange={(event) => setFeeValue(event.target.value)}
-            hint={feeType === "PERCENT" ? "Mặc định 5 cho 5%" : "Giá trị VND cố định mỗi đơn"}
+            hint="Mặc định 5 cho 5% phí nền tảng."
           />
           <Button type="submit" loading={savingFee}>Lưu platform fee</Button>
         </form>

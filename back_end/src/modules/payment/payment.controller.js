@@ -2,11 +2,6 @@ const asyncHandler = require("../../utils/async-handler");
 const { successResponse } = require("../../utils/api-response");
 const paymentService = require("./payment.service");
 
-exports.payOrder = asyncHandler(async (req, res) => {
-  const data = await paymentService.payOrder(req.user.id, req.params.orderId, req.validated.body);
-  successResponse(res, data, "Order paid");
-});
-
 exports.createVnpayPaymentUrl = asyncHandler(async (req, res) => {
   const data = await paymentService.createVnpayPaymentUrl(req.user.id, req.params.orderId, req.validated.body, req);
   successResponse(res, data, "VNPAY payment URL created");

@@ -16,6 +16,8 @@ import {
   refundSellerOrder,
 } from "../../../api/sellerApi";
 
+const completedOrderStatusClassName = "bg-sky-50 text-sky-800";
+
 function getSellerOrderActions(order) {
   const isTerminal = ["CANCELLED", "REFUNDED", "COMPLETED"].includes(order.order_status);
   const hasPendingRefundRequest = order.raw?.refunds?.some((refund) => refund.status === "PENDING");
@@ -231,7 +233,16 @@ function SellerOrdersPage({ orders: initialOrders, onConfirmReceivedMoney }) {
               ),
             },
             { key: "amount", title: "Gia tri", render: (row) => <MoneyText value={row.amount} /> },
-            { key: "order_status", title: "Trang thai don", render: (row) => <StatusBadge status={row.order_status} /> },
+            {
+              key: "order_status",
+              title: "Trang thai don",
+              render: (row) => (
+                <StatusBadge
+                  status={row.order_status}
+                  className={row.order_status === "COMPLETED" ? completedOrderStatusClassName : ""}
+                />
+              ),
+            },
             { key: "payment_status", title: "Thanh toan", render: (row) => <StatusBadge status={row.payment_status} /> },
             { key: "created_at", title: "Ngay tao", render: (row) => formatDateTime(row.created_at) },
             {
@@ -239,7 +250,7 @@ function SellerOrdersPage({ orders: initialOrders, onConfirmReceivedMoney }) {
               title: "Tac vu",
               render: (row) => {
                 if (row.seller_confirmed_received_money) {
-                  return <StatusBadge status="COMPLETED" />;
+                  return <StatusBadge status="COMPLETED" className={completedOrderStatusClassName} />;
                 }
 
                 if (row.order_status === "REFUNDED") {

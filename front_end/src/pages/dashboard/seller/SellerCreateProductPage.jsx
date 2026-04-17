@@ -15,6 +15,11 @@ function SellerCreateProductPage() {
     try {
       setLoading(true);
 
+      if (Number(values.stock) <= 0) {
+        toast.error("Tồn kho phải lớn hơn 0 khi tạo sản phẩm mới.");
+        return;
+      }
+
       if (!values.imageFiles?.length) {
         toast.error("Hãy chọn ít nhất 1 ảnh sản phẩm trước khi tạo.");
         return;
@@ -51,7 +56,22 @@ function SellerCreateProductPage() {
         description="Tạo sản phẩm mới cho shop. Nếu bật affiliate, cấu hình hoa hồng sẽ được gửi admin duyệt."
       />
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <ProductForm submitLabel="Tạo sản phẩm" loading={loading} onSubmit={handleSubmit} />
+        <ProductForm
+          submitLabel="Tạo sản phẩm"
+          loading={loading}
+          onSubmit={handleSubmit}
+          stockMin={1}
+          defaultValues={{
+            name: "",
+            description: "",
+            price: "",
+            category: "Digital Product",
+            stock: 1,
+            commission_type: "PERCENT",
+            commission_value: 10,
+            imageUrls: [],
+          }}
+        />
         <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
           <h3 className="text-xl font-semibold text-slate-900">Quy trình affiliate</h3>
           <div className="mt-4 space-y-3 text-sm leading-7 text-slate-600">

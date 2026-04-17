@@ -5,7 +5,6 @@ const { authenticate } = require("../../middlewares/auth.middleware");
 const { authorize } = require("../../middlewares/role.middleware");
 const { validate } = require("../../middlewares/validate.middleware");
 const {
-  payOrderSchema,
   createVnpayPaymentSchema,
   changePaymentMethodSchema,
   vnpayCallbackSchema,
@@ -18,7 +17,6 @@ const router = express.Router();
 
 router.get("/vnpay-ipn", controller.handleVnpayIpn);
 router.post("/vnpay-return/confirm", validate(vnpayCallbackSchema), controller.confirmVnpayReturn);
-router.post("/:orderId/pay", authenticate, authorize("CUSTOMER"), validate(payOrderSchema), controller.payOrder);
 router.post("/:orderId/vnpay-url", authenticate, authorize("CUSTOMER"), validate(createVnpayPaymentSchema), controller.createVnpayPaymentUrl);
 router.patch("/:orderId/payment-method", authenticate, authorize("CUSTOMER"), validate(changePaymentMethodSchema), controller.changePaymentMethod);
 router.post("/:orderId/cancel", authenticate, authorize("CUSTOMER"), validate(cancelOrderSchema), controller.cancelOrder);

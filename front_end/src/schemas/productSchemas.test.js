@@ -32,7 +32,7 @@ describe("product schemas", () => {
   it("rejects invalid commission value", () => {
     const result = affiliateSettingSchema.safeParse({
       product_id: "prod-1",
-      commission_type: "FIXED",
+      commission_type: "PERCENT",
       commission_value: 0,
     });
 

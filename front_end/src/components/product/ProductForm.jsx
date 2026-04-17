@@ -4,7 +4,6 @@ import { useForm } from "react-hook-form";
 import Button from "../common/Button";
 import FileUploadField from "../common/FileUploadField";
 import Input from "../common/Input";
-import Select from "../common/Select";
 import { productSchema } from "../../schemas/productSchemas";
 
 function ProductForm({
@@ -13,6 +12,7 @@ function ProductForm({
   loading = false,
   submitLabel = "Lưu sản phẩm",
   successMessage = "Sản phẩm đã được lưu và sẵn sàng cho bước phê duyệt.",
+  stockMin = 0,
 }) {
   const initialValues = useMemo(
     () =>
@@ -21,12 +21,12 @@ function ProductForm({
         description: "",
         price: "",
         category: "Digital Product",
-        stock: 0,
+        stock: stockMin > 0 ? stockMin : 0,
         commission_type: "PERCENT",
         commission_value: 10,
         imageUrls: [],
       },
-    [defaultValues],
+    [defaultValues, stockMin],
   );
 
   const {
@@ -59,6 +59,16 @@ function ProductForm({
     };
   }, [imageFiles]);
 
+  const stockRegister = register(
+    "stock",
+    stockMin > 0
+      ? {
+          validate: (value) =>
+            Number(value) >= stockMin || `Tồn kho phải lớn hơn hoặc bằng ${stockMin}.`,
+        }
+      : undefined,
+  );
+
   return (
     <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6">
       <form
@@ -66,6 +76,7 @@ function ProductForm({
         onSubmit={handleSubmit((values) =>
           onSubmit?.({
             ...values,
+            commission_type: "PERCENT",
             imageUrls: initialValues.imageUrls || [],
             imageFiles,
           }),
@@ -74,20 +85,23 @@ function ProductForm({
         <Input label="Tên sản phẩm" error={errors.name?.message} {...register("name")} />
         <Input label="Danh mục" error={errors.category?.message} {...register("category")} />
         <Input label="Giá bán (VND)" error={errors.price?.message} {...register("price")} />
-        <Input label="Tồn kho" error={errors.stock?.message} {...register("stock")} />
-        <Select
-          label="Kiểu hoa hồng"
-          error={errors.commission_type?.message}
-          options={[
-            { label: "Phần trăm", value: "PERCENT" },
-            { label: "Cố định", value: "FIXED" },
-          ]}
-          {...register("commission_type")}
-        />
         <Input
-          label="Giá trị hoa hồng"
+          label="Tồn kho"
+          type="number"
+          min={String(stockMin)}
+          step="1"
+          error={errors.stock?.message}
+          {...stockRegister}
+        />
+        <input type="hidden" value="PERCENT" {...register("commission_type")} />
+        <Input
+          label="Hoa hồng affiliate (%)"
+          type="number"
+          min="0"
+          max="100"
+          step="1"
           error={errors.commission_value?.message}
-          hint="Nếu chọn phần trăm thì nhập theo %, nếu chọn cố định thì nhập theo VND."
+          hint="Nhập phần trăm hoa hồng áp dụng cho affiliate của sản phẩm này."
           {...register("commission_value")}
         />
         <div className="md:col-span-2">

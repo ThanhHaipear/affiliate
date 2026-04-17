@@ -30,6 +30,11 @@ module.exports = {
   vnpayHashSecret: trimEnv(process.env.VNPAY_HASH_SECRET),
   vnpayPaymentUrl: trimEnv(process.env.VNPAY_PAYMENT_URL) || "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html",
   vnpayReturnUrl: trimEnv(process.env.VNPAY_RETURN_URL),
+  vnpayPayoutReturnUrl:
+    trimEnv(process.env.VNPAY_PAYOUT_RETURN_URL) ||
+    (trimEnv(process.env.FRONTEND_BASE_URL)
+      ? `${trimEnv(process.env.FRONTEND_BASE_URL).replace(/\/+$/, "")}/payment/vnpay-return?flow=payout-batch`
+      : ""),
   vnpayIpnUrl: trimEnv(process.env.VNPAY_IPN_URL),
   vnpayOrderType: trimEnv(process.env.VNPAY_ORDER_TYPE) || "other",
   vnpayLocale: trimEnv(process.env.VNPAY_LOCALE) || "vn",

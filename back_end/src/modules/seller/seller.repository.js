@@ -149,7 +149,7 @@ exports.upsertProductAffiliateSetting = (sellerId, productId, payload) => prisma
     where: { productId },
     update: {
       sellerId,
-      commissionType: payload.commissionType,
+      commissionType: "PERCENT",
       commissionValue: BigInt(payload.commissionValue),
       isEnabled: payload.isEnabled ?? true,
       approvalStatus: "PENDING",
@@ -159,7 +159,7 @@ exports.upsertProductAffiliateSetting = (sellerId, productId, payload) => prisma
     create: {
       sellerId,
       productId,
-      commissionType: payload.commissionType,
+      commissionType: "PERCENT",
       commissionValue: BigInt(payload.commissionValue),
       isEnabled: payload.isEnabled ?? true,
       approvalStatus: "PENDING",

@@ -623,7 +623,7 @@ exports.getPlatformSettings = async () => {
   };
 };
 
-exports.updatePlatformFee = ({ feeType, feeValue, adminId }) =>
+exports.updatePlatformFee = ({ feeValue, adminId }) =>
   prisma.$transaction(async (tx) => {
     const now = new Date();
 
@@ -637,7 +637,7 @@ exports.updatePlatformFee = ({ feeType, feeValue, adminId }) =>
 
     const created = await tx.platformFeeConfig.create({
       data: {
-        feeType,
+        feeType: "PERCENT",
         feeValue: BigInt(Math.round(Number(feeValue))),
         effectiveFrom: now,
         createdAt: now,
@@ -650,7 +650,7 @@ exports.updatePlatformFee = ({ feeType, feeValue, adminId }) =>
         action: "ADMIN_UPDATE_PLATFORM_FEE",
         targetType: "PLATFORM_FEE_CONFIG",
         targetId: created.id,
-        description: `Platform fee updated to ${feeType}:${feeValue}`,
+        description: `Platform fee updated to PERCENT:${feeValue}`,
         createdAt: now,
       },
     });

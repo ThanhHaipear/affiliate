@@ -100,6 +100,9 @@ const ENDPOINTS = {
   },
   payoutBatches: {
     list: `${API_PREFIX}/payout-batches`,
+    create: `${API_PREFIX}/payout-batches`,
+    vnpayUrl: (batchId) => `${API_PREFIX}/payout-batches/${batchId}/vnpay-url`,
+    vnpayReturnConfirm: `${API_PREFIX}/payout-batches/vnpay-return/confirm`,
   },
 };
 

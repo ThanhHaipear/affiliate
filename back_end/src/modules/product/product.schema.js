@@ -13,7 +13,7 @@ exports.createProductSchema = z.object({
       variantName: z.string().optional(),
       options: z.any().optional(),
       price: z.coerce.number().int().nonnegative(),
-      quantity: z.coerce.number().int().nonnegative()
+      quantity: z.coerce.number().int().positive()
     })).min(1)
   })
 });

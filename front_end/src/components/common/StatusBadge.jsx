@@ -24,12 +24,13 @@ const statusStyles = {
   LOW: "bg-sky-50 text-sky-800",
 };
 
-function StatusBadge({ status }) {
+function StatusBadge({ status, className = "" }) {
   return (
     <span
       className={cn(
         "inline-flex rounded-full px-3 py-1 text-xs font-medium",
         statusStyles[status] || "bg-slate-100 text-slate-700",
+        className,
       )}
     >
       {formatStatusLabel(status)}

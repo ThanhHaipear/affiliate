@@ -90,11 +90,7 @@ function SellerProductDetailPage() {
             <Metric label="Danh mục" value={product.category} />
             <Metric
               label="Hoa hồng affiliate"
-              value={
-                product.commission_type === "PERCENT"
-                  ? `${Number(product.commission_value || 0).toLocaleString("vi-VN")}%`
-                  : <MoneyText value={product.commission_value || 0} />
-              }
+              value={`${Number(product.commission_value || 0).toLocaleString("vi-VN")}%`}
             />
           </div>
           <div className="mt-5 rounded-[1.5rem] bg-slate-50 p-5">

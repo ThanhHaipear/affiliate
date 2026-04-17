@@ -1,11 +1,5 @@
 const { z } = require("zod");
 
-exports.payOrderSchema = z.object({
-  body: z.object({
-    transactionCode: z.string().optional()
-  })
-});
-
 exports.createVnpayPaymentSchema = z.object({
   body: z.object({
     bankCode: z.union([z.string().min(2), z.literal("")]).optional(),

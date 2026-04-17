@@ -17,6 +17,8 @@ import { mapOrderDto } from "../../../lib/apiMappers";
 import { formatDateTime } from "../../../lib/format";
 import { buildSellerOrderTimeline } from "../../../lib/sellerOrders";
 
+const completedOrderStatusClassName = "bg-sky-50 text-sky-800";
+
 function getSellerOrderActions(order) {
   const isTerminal = ["CANCELLED", "REFUNDED", "COMPLETED"].includes(order?.order_status);
   const hasPendingRefundRequest = order?.raw?.refunds?.some((refund) => refund.status === "PENDING");
@@ -200,7 +202,15 @@ function SellerOrderDetailPage() {
               <Metric label="Ngay dat" value={formatDateTime(order.raw.createdAt)} />
               <Metric label="Tong tien" value={<MoneyText value={order.amount} />} />
               <Metric label="Thanh toan" value={<StatusBadge status={order.payment_status} />} />
-              <Metric label="Trang thai don" value={<StatusBadge status={order.order_status} />} />
+              <Metric
+                label="Trang thai don"
+                value={
+                  <StatusBadge
+                    status={order.order_status}
+                    className={order.order_status === "COMPLETED" ? completedOrderStatusClassName : ""}
+                  />
+                }
+              />
               <Metric
                 label="Affiliate"
                 value={

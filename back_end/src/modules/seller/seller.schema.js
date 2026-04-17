@@ -36,8 +36,8 @@ exports.paymentSchema = z.object({
 
 exports.affiliateSettingSchema = z.object({
   body: z.object({
-    commissionType: z.enum(["PERCENT", "FIXED"]),
-    commissionValue: z.coerce.number().int().positive(),
+    commissionType: z.literal("PERCENT"),
+    commissionValue: z.coerce.number().int().min(0).max(100),
     isEnabled: z.boolean().optional()
   })
 });

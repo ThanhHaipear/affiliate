@@ -101,9 +101,7 @@ function ProductCard({ product, actionLabel, onAction }) {
               <p className="mt-1">
                 Hoa hồng:{" "}
                 <span className="font-medium text-emerald-700">
-                  {product.commission_type === "PERCENT"
-                    ? `${product.commission_value}%`
-                    : `${product.commission_value.toLocaleString("vi-VN")} VND`}
+                  {product.commission_value}%
                 </span>
               </p>
               <p className="mt-1 text-xs text-slate-500">

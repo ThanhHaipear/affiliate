@@ -117,6 +117,21 @@ async function getPayoutBatches(params) {
   return unwrapResponseData(response);
 }
 
+async function createPayoutBatch(payload) {
+  const response = await axiosClient.post(ENDPOINTS.payoutBatches.create, payload);
+  return unwrapResponseData(response);
+}
+
+async function createPayoutBatchVnpayUrl(batchId, payload) {
+  const response = await axiosClient.post(ENDPOINTS.payoutBatches.vnpayUrl(batchId), payload || {});
+  return unwrapResponseData(response);
+}
+
+async function confirmPayoutBatchVnpayReturn(payload) {
+  const response = await axiosClient.post(ENDPOINTS.payoutBatches.vnpayReturnConfirm, payload);
+  return unwrapResponseData(response);
+}
+
 async function getPendingWithdrawals(params) {
   const response = await axiosClient.get(ENDPOINTS.withdrawals.pendingList, { params });
   return unwrapResponseData(response);
@@ -152,6 +167,9 @@ export {
   approveAffiliateSetting,
   approveProduct,
   approveSeller,
+  confirmPayoutBatchVnpayReturn,
+  createPayoutBatch,
+  createPayoutBatchVnpayUrl,
   getAdminFinancialStats,
   getAdminOrders,
   getAdminOverview,
