@@ -27,6 +27,7 @@ import RegisterPage from "../pages/auth/RegisterPage";
 import RegisterCustomerPage from "../pages/auth/RegisterCustomerPage";
 import RegisterSellerPage from "../pages/auth/RegisterSellerPage";
 import ForgotPasswordPage from "../pages/auth/ForgotPasswordPage";
+import ResetPasswordPage from "../pages/auth/ResetPasswordPage";
 import CustomerProfilePage from "../pages/dashboard/customer/CustomerProfilePage";
 import CartPage from "../pages/dashboard/customer/CartPage";
 import CheckoutPage from "../pages/dashboard/customer/CheckoutPage";
@@ -202,6 +203,7 @@ const routes = [
           { path: "register/seller", element: <RegisterSellerPage /> },
           { path: "register/affiliate", element: <Navigate to="/auth/register/customer" replace /> },
           { path: "forgot-password", element: <ForgotPasswordPage /> },
+          { path: "reset-password", element: <ResetPasswordPage /> },
         ],
       },
       {

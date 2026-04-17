@@ -241,3 +241,44 @@ exports.changePassword = (id, passwordHash) => prisma.account.update({
   where: { id },
   data: { passwordHash, updatedAt: new Date() },
 });
+
+exports.invalidatePasswordResetTokens = (accountId) => prisma.passwordResetToken.updateMany({
+  where: {
+    accountId,
+    consumedAt: null,
+  },
+  data: {
+    consumedAt: new Date(),
+  },
+});
+
+exports.createPasswordResetToken = ({ accountId, tokenHash, expiresAt }) =>
+  prisma.passwordResetToken.create({
+    data: {
+      accountId,
+      tokenHash,
+      expiresAt,
+      createdAt: new Date(),
+    },
+  });
+
+exports.findActivePasswordResetToken = (tokenHash) =>
+  prisma.passwordResetToken.findFirst({
+    where: {
+      tokenHash,
+      consumedAt: null,
+      expiresAt: {
+        gt: new Date(),
+      },
+    },
+    include: {
+      account: true,
+    },
+  });
+
+exports.consumePasswordResetToken = (id) => prisma.passwordResetToken.update({
+  where: { id },
+  data: {
+    consumedAt: new Date(),
+  },
+});

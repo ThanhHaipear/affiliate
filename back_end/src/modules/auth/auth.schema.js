@@ -116,7 +116,19 @@ exports.changePasswordSchema = z.object({
 
 exports.forgotPasswordSchema = z.object({
   body: z.object({
-    email: z.string().email(),
+    email: z.string().email()
+  })
+});
+
+exports.verifyResetPasswordTokenSchema = z.object({
+  query: z.object({
+    token: z.string().min(20)
+  })
+});
+
+exports.resetPasswordWithTokenSchema = z.object({
+  body: z.object({
+    token: z.string().min(20),
     newPassword: z.string().min(6)
   })
 });

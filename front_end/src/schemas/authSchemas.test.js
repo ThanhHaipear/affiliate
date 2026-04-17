@@ -1,9 +1,10 @@
-﻿import {
+import {
   forgotPasswordSchema,
   loginSchema,
   registerAffiliateSchema,
   registerCustomerSchema,
   registerSellerSchema,
+  resetPasswordSchema,
 } from "./authSchemas";
 
 describe("auth schemas", () => {
@@ -67,9 +68,16 @@ describe("auth schemas", () => {
   it("accepts valid forgot password input", () => {
     const result = forgotPasswordSchema.safeParse({
       email: "user@example.com",
-      newPassword: "12345678",
-      confirmPassword: "12345678",
     });
     expect(result.success).toBe(true);
+  });
+
+  it("requires matching reset password confirmation", () => {
+    const result = resetPasswordSchema.safeParse({
+      newPassword: "12345678",
+      confirmPassword: "87654321",
+    });
+
+    expect(result.success).toBe(false);
   });
 });

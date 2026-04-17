@@ -24,6 +24,16 @@ exports.logout = asyncHandler(async (_req, res) => {
 
 exports.forgotPassword = asyncHandler(async (req, res) => {
   const data = await authService.forgotPassword(req.validated.body);
+  successResponse(res, data, "Password reset request received");
+});
+
+exports.verifyResetPasswordToken = asyncHandler(async (req, res) => {
+  const data = await authService.verifyResetPasswordToken(req.validated.query);
+  successResponse(res, data, "Reset token is valid");
+});
+
+exports.resetPasswordWithToken = asyncHandler(async (req, res) => {
+  const data = await authService.resetPasswordWithToken(req.validated.body);
   successResponse(res, data, "Password reset successful");
 });
 

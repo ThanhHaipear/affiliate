@@ -84,6 +84,9 @@ const affiliateEnrollmentSchema = z.object({
 
 const forgotPasswordSchema = z.object({
   email: z.string().email("Email không hợp lệ."),
+});
+
+const resetPasswordSchema = z.object({
   newPassword: z.string().min(8, "Mật khẩu mới tối thiểu 8 ký tự."),
   confirmPassword: z.string().min(8, "Xác nhận mật khẩu tối thiểu 8 ký tự."),
 }).refine((data) => data.newPassword === data.confirmPassword, {
@@ -98,4 +101,5 @@ export {
   registerAffiliateSchema,
   registerCustomerSchema,
   registerSellerSchema,
+  resetPasswordSchema,
 };

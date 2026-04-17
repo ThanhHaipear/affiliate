@@ -1,9 +1,11 @@
-﻿import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const mockGet = vi.fn();
 const mockPost = vi.fn();
 
 vi.mock("./axiosClient", () => ({
   axiosClient: {
+    get: mockGet,
     post: mockPost,
   },
 }));
@@ -12,6 +14,7 @@ describe("authApi", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.stubEnv("VITE_USE_MOCK_AUTH", "false");
+    mockGet.mockReset();
     mockPost.mockReset();
   });
 
@@ -61,5 +64,46 @@ describe("authApi", () => {
       refreshToken: "refresh-1",
     });
     expect(result.roles).toEqual(["seller"]);
+  });
+
+  it("calls reset password verify endpoint", async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        data: {
+          valid: true,
+          email: "user@example.com",
+        },
+      },
+    });
+
+    const { verifyResetPasswordToken } = await import("./authApi");
+    const result = await verifyResetPasswordToken("plain-token");
+
+    expect(mockGet).toHaveBeenCalledWith("/api/auth/reset-password/verify", {
+      params: { token: "plain-token" },
+    });
+    expect(result.valid).toBe(true);
+  });
+
+  it("calls reset password endpoint", async () => {
+    mockPost.mockResolvedValue({
+      data: {
+        data: {
+          reset: true,
+        },
+      },
+    });
+
+    const { resetPassword } = await import("./authApi");
+    const result = await resetPassword({
+      token: "plain-token",
+      newPassword: "12345678",
+    });
+
+    expect(mockPost).toHaveBeenCalledWith("/api/auth/reset-password", {
+      token: "plain-token",
+      newPassword: "12345678",
+    });
+    expect(result.reset).toBe(true);
   });
 });

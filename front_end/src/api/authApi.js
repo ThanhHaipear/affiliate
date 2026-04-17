@@ -65,6 +65,18 @@ async function forgotPassword(payload) {
   return unwrapResponseData(response);
 }
 
+async function verifyResetPasswordToken(token) {
+  const response = await axiosClient.get(ENDPOINTS.auth.verifyResetPasswordToken, {
+    params: { token },
+  });
+  return unwrapResponseData(response);
+}
+
+async function resetPassword(payload) {
+  const response = await axiosClient.post(ENDPOINTS.auth.resetPassword, payload);
+  return unwrapResponseData(response);
+}
+
 async function changePassword(payload) {
   const response = await axiosClient.post(ENDPOINTS.auth.changePassword, payload);
   return unwrapResponseData(response);
@@ -75,4 +87,15 @@ async function enrollAffiliate(payload) {
   return normalizeAuthPayload(unwrapResponseData(response));
 }
 
-export { changePassword, enrollAffiliate, forgotPassword, getCurrentUser, login, logout, refreshSession, register };
+export {
+  changePassword,
+  enrollAffiliate,
+  forgotPassword,
+  getCurrentUser,
+  login,
+  logout,
+  refreshSession,
+  register,
+  resetPassword,
+  verifyResetPasswordToken,
+};

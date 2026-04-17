@@ -7,6 +7,14 @@ const getAffiliateOrThrow = async (accountId) => {
   return affiliate;
 };
 
+const getApprovedAffiliateOrThrow = async (accountId) => {
+  const affiliate = await getAffiliateOrThrow(accountId);
+  if (affiliate.kycStatus !== "APPROVED") {
+    throw new AppError("Affiliate account is not approved", 403);
+  }
+  return affiliate;
+};
+
 exports.getProfile = (accountId) => getAffiliateOrThrow(accountId);
 exports.updateProfile = async (accountId, payload) => {
   await getAffiliateOrThrow(accountId);
@@ -25,6 +33,6 @@ exports.addPaymentAccount = async (accountId, payload) => {
   return affiliateRepository.createPaymentAccount(accountId, payload);
 };
 exports.getStats = async (accountId) => {
-  await getAffiliateOrThrow(accountId);
+  await getApprovedAffiliateOrThrow(accountId);
   return affiliateRepository.getStats(accountId);
 };

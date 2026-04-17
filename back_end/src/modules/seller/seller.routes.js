@@ -2,22 +2,27 @@ const express = require("express");
 
 const controller = require("./seller.controller");
 const { authenticate } = require("../../middlewares/auth.middleware");
-const { authorize } = require("../../middlewares/role.middleware");
+const { requireApprovedSeller, requireSellerProfile } = require("../../middlewares/seller.middleware");
 const { validate } = require("../../middlewares/validate.middleware");
 const { upsertProfileSchema, kycSchema, paymentSchema, affiliateSettingSchema } = require("./seller.schema");
 
 const router = express.Router();
 
-router.use(authenticate, authorize("SELLER"));
+router.use(authenticate, requireSellerProfile);
 router.get("/profile", controller.getProfile);
-router.get("/stats", controller.getStats);
-router.get("/orders", controller.listOrders);
-router.get("/products", controller.listProducts);
-router.get("/products/:productId", controller.getProduct);
-router.get("/affiliate-settings", controller.listAffiliateSettings);
 router.put("/profile", validate(upsertProfileSchema), controller.upsertProfile);
 router.post("/kyc", validate(kycSchema), controller.submitKyc);
 router.post("/payment-accounts", validate(paymentSchema), controller.addPaymentAccount);
-router.put("/products/:productId/affiliate-setting", validate(affiliateSettingSchema), controller.upsertProductAffiliateSetting);
+router.get("/stats", requireApprovedSeller, controller.getStats);
+router.get("/orders", requireApprovedSeller, controller.listOrders);
+router.get("/products", requireApprovedSeller, controller.listProducts);
+router.get("/products/:productId", requireApprovedSeller, controller.getProduct);
+router.get("/affiliate-settings", requireApprovedSeller, controller.listAffiliateSettings);
+router.put(
+  "/products/:productId/affiliate-setting",
+  requireApprovedSeller,
+  validate(affiliateSettingSchema),
+  controller.upsertProductAffiliateSetting,
+);
 
 module.exports = router;

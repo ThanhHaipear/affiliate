@@ -705,6 +705,10 @@ exports.updateWithdrawalConfig = ({ minAmount, maxAmount, adminId }) =>
 exports.reviewSeller = ({ sellerId, adminId, status, rejectReason }) =>
   prisma.$transaction(async (tx) => {
     const seller = await tx.seller.findUnique({ where: { id: sellerId }, include: { paymentAccounts: true } });
+    if (!seller) {
+      throw new Error("Seller not found");
+    }
+
     const updateData = {
       approvalStatus: status,
       approvedBy: adminId,
@@ -715,6 +719,12 @@ exports.reviewSeller = ({ sellerId, adminId, status, rejectReason }) =>
 
     if (status === "APPROVED" && seller.paymentAccounts.length === 0) {
       throw new Error("Seller must have at least one payment account before approval");
+    }
+
+    if (status === "APPROVED") {
+      await addRoleIfMissing(tx, seller.ownerAccountId, "SELLER");
+    } else {
+      await removeRoleIfPresent(tx, seller.ownerAccountId, "SELLER");
     }
 
     const updatedSeller = await tx.seller.update({ where: { id: sellerId }, data: updateData });
@@ -754,6 +764,9 @@ exports.reviewAffiliate = ({ affiliateId, adminId, status, rejectReason }) =>
       where: { accountId: affiliateId },
       include: { paymentAccounts: true, kyc: true },
     });
+    if (!affiliate) {
+      throw new Error("Affiliate not found");
+    }
 
     if (status === "APPROVED" && affiliate.paymentAccounts.length === 0) {
       throw new Error("Affiliate must have at least one payment account before approval");
@@ -774,24 +787,17 @@ exports.reviewAffiliate = ({ affiliateId, adminId, status, rejectReason }) =>
 
     const updatedAffiliate = await tx.affiliate.update({
       where: { accountId: affiliateId },
-      data: { kycStatus: status, updatedAt: new Date() },
-    });
-
-    const affiliateRole = await tx.role.findUnique({ where: { code: "AFFILIATE" } });
-    const existingAffiliateRole = await tx.accountRole.findFirst({
-      where: {
-        accountId: affiliateId,
-        roleId: affiliateRole.id,
+      data: {
+        kycStatus: status,
+        activityStatus: status === "APPROVED" ? "ACTIVE" : affiliate.activityStatus,
+        updatedAt: new Date(),
       },
     });
 
-    if (status === "APPROVED" && !existingAffiliateRole) {
-      await tx.accountRole.create({
-        data: {
-          accountId: affiliateId,
-          roleId: affiliateRole.id,
-        },
-      });
+    if (status === "APPROVED") {
+      await addRoleIfMissing(tx, affiliateId, "AFFILIATE");
+    } else {
+      await removeRoleIfPresent(tx, affiliateId, "AFFILIATE");
     }
 
     await tx.activityLog.create({

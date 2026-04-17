@@ -7,6 +7,8 @@ const ENDPOINTS = {
     logout: `${API_PREFIX}/auth/logout`,
     refreshToken: `${API_PREFIX}/auth/refresh-token`,
     forgotPassword: `${API_PREFIX}/auth/forgot-password`,
+    verifyResetPasswordToken: `${API_PREFIX}/auth/reset-password/verify`,
+    resetPassword: `${API_PREFIX}/auth/reset-password`,
     changePassword: `${API_PREFIX}/auth/change-password`,
     enrollAffiliate: `${API_PREFIX}/auth/enroll-affiliate`,
   },

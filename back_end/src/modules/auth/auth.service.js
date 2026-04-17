@@ -1,6 +1,9 @@
 ﻿const AppError = require("../../utils/app-error");
 const { comparePassword, hashPassword } = require("../../utils/password");
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require("../../utils/jwt");
+const env = require("../../config/env");
+const { isMailerConfigured, getMissingSmtpConfigKeys, sendPasswordResetEmail } = require("../../utils/mailer");
+const { generatePasswordResetToken, hashPasswordResetToken } = require("../../utils/password-reset");
 const authRepository = require("./auth.repository");
 
 const buildAuthPayload = (account) => {
@@ -102,14 +105,79 @@ exports.refreshToken = async ({ refreshToken }) => {
 
 exports.logout = async () => ({ loggedOut: true });
 
-exports.forgotPassword = async ({ email, newPassword }) => {
+const buildPasswordResetUrl = (token) => {
+  const baseUrl = env.passwordResetUrl || (env.frontendBaseUrl ? `${env.frontendBaseUrl}/auth/reset-password` : "");
+  if (!baseUrl) {
+    throw new AppError("Password reset URL is not configured", 500);
+  }
+
+  const separator = baseUrl.includes("?") ? "&" : "?";
+  return `${baseUrl}${separator}token=${encodeURIComponent(token)}`;
+};
+
+exports.forgotPassword = async ({ email }) => {
   const account = await authRepository.findAccountByEmail(email);
   if (!account) {
-    return { reset: true };
+    return {
+      resetRequested: true,
+      delivery: "noop",
+    };
+  }
+
+  if (!isMailerConfigured()) {
+    const missingKeys = getMissingSmtpConfigKeys();
+    throw new AppError(`SMTP mailer is not configured. Missing: ${missingKeys.join(", ")}`, 503);
+  }
+
+  const token = generatePasswordResetToken();
+  const tokenHash = hashPasswordResetToken(token);
+  const expiresAt = new Date(Date.now() + env.passwordResetTokenTtlMinutes * 60 * 1000);
+
+  await authRepository.invalidatePasswordResetTokens(account.id);
+  await authRepository.createPasswordResetToken({
+    accountId: account.id,
+    tokenHash,
+    expiresAt,
+  });
+
+  await sendPasswordResetEmail({
+    toEmail: account.email,
+    resetUrl: buildPasswordResetUrl(token),
+  });
+
+  return {
+    resetRequested: true,
+    delivery: "email",
+  };
+};
+
+exports.verifyResetPasswordToken = async ({ token }) => {
+  const tokenHash = hashPasswordResetToken(token);
+  const resetToken = await authRepository.findActivePasswordResetToken(tokenHash);
+
+  if (!resetToken) {
+    throw new AppError("Reset token is invalid or expired", 400);
+  }
+
+  return {
+    valid: true,
+    email: resetToken.account.email,
+    expiresAt: resetToken.expiresAt,
+  };
+};
+
+exports.resetPasswordWithToken = async ({ token, newPassword }) => {
+  const tokenHash = hashPasswordResetToken(token);
+  const resetToken = await authRepository.findActivePasswordResetToken(tokenHash);
+
+  if (!resetToken) {
+    throw new AppError("Reset token is invalid or expired", 400);
   }
 
   const passwordHash = await hashPassword(newPassword);
-  await authRepository.changePassword(account.id, passwordHash);
+  await authRepository.changePassword(resetToken.accountId, passwordHash);
+  await authRepository.consumePasswordResetToken(resetToken.id);
+  await authRepository.invalidatePasswordResetTokens(resetToken.accountId);
 
   return { reset: true };
 };
