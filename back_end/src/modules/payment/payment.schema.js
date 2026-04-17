@@ -13,6 +13,12 @@ exports.createVnpayPaymentSchema = z.object({
   })
 });
 
+exports.changePaymentMethodSchema = z.object({
+  body: z.object({
+    paymentMethod: z.enum(["COD", "VNPAY"]),
+  }),
+});
+
 exports.vnpayCallbackSchema = z.object({
   body: z.object({
     vnp_Amount: z.union([z.string(), z.number()]),

@@ -927,3 +927,50 @@ exports.cancelPendingPaymentOrder = (orderId, actorId, reason) => prisma.$transa
 
   return tx.order.findUnique({ where: { id: order.id }, include: { items: true, payments: true } });
 });
+
+exports.changePendingPaymentMethod = (orderId, actorId, paymentMethod) => prisma.$transaction(async (tx) => {
+  const order = await tx.order.findUnique({
+    where: { id: BigInt(orderId) },
+    include: {
+      payments: true,
+    },
+  });
+
+  const payment = order?.payments?.[0] || null;
+  const changedAt = new Date();
+
+  await tx.payment.update({
+    where: { id: payment.id },
+    data: {
+      method: paymentMethod,
+    },
+  });
+
+  await tx.activityLog.create({
+    data: {
+      accountId: actorId,
+      action: "ORDER_PAYMENT_METHOD_CHANGED",
+      targetType: "ORDER",
+      targetId: order.id,
+      description: `Customer changed payment method for order ${order.orderCode} from ${payment.method} to ${paymentMethod}`,
+      createdAt: changedAt,
+    },
+  });
+
+  await tx.notification.create({
+    data: {
+      accountId: order.buyerId,
+      title: "Payment method updated",
+      content: `Payment method for order ${order.orderCode} has been changed to ${paymentMethod}.`,
+      type: "ORDER_PAYMENT_METHOD_CHANGED",
+      targetType: "ORDER",
+      targetId: order.id,
+      createdAt: changedAt,
+    },
+  });
+
+  return tx.order.findUnique({
+    where: { id: order.id },
+    include: { items: true, payments: true },
+  });
+});

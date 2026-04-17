@@ -51,6 +51,11 @@ async function createVnpayPaymentUrl(orderId, payload) {
   return unwrapResponseData(response);
 }
 
+async function changeOrderPaymentMethod(orderId, payload) {
+  const response = await axiosClient.patch(ENDPOINTS.payments.paymentMethod(orderId), payload);
+  return unwrapResponseData(response);
+}
+
 async function confirmVnpayReturn(payload) {
   const response = await axiosClient.post(ENDPOINTS.payments.vnpayReturnConfirm, payload);
   return unwrapResponseData(response);
@@ -58,6 +63,7 @@ async function confirmVnpayReturn(payload) {
 
 export {
   createCheckoutOrder,
+  changeOrderPaymentMethod,
   createVnpayPaymentUrl,
   cancelCustomerOrder,
   confirmVnpayReturn,

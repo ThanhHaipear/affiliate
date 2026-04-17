@@ -7,6 +7,7 @@ const { validate } = require("../../middlewares/validate.middleware");
 const {
   payOrderSchema,
   createVnpayPaymentSchema,
+  changePaymentMethodSchema,
   vnpayCallbackSchema,
   confirmReceiptSchema,
   refundOrderSchema,
@@ -19,6 +20,7 @@ router.get("/vnpay-ipn", controller.handleVnpayIpn);
 router.post("/vnpay-return/confirm", validate(vnpayCallbackSchema), controller.confirmVnpayReturn);
 router.post("/:orderId/pay", authenticate, authorize("CUSTOMER"), validate(payOrderSchema), controller.payOrder);
 router.post("/:orderId/vnpay-url", authenticate, authorize("CUSTOMER"), validate(createVnpayPaymentSchema), controller.createVnpayPaymentUrl);
+router.patch("/:orderId/payment-method", authenticate, authorize("CUSTOMER"), validate(changePaymentMethodSchema), controller.changePaymentMethod);
 router.post("/:orderId/cancel", authenticate, authorize("CUSTOMER"), validate(cancelOrderSchema), controller.cancelOrder);
 router.post("/:orderId/seller-cancel", authenticate, authorize("SELLER"), validate(cancelOrderSchema), controller.cancelOrderBySeller);
 router.post("/:orderId/seller-confirm", authenticate, authorize("SELLER"), validate(confirmReceiptSchema), controller.confirmSellerReceivedMoney);

@@ -242,6 +242,7 @@ function ProductDetailPage() {
         variantId: Number(product.variant_id),
         quantity: normalizedQuantity,
         attributionToken: trackedAffiliateSource?.token || undefined,
+        mergeWithExisting: !redirectToCheckout,
       });
       toast.success("Đã thêm sản phẩm vào giỏ hàng.");
       if (redirectToCheckout && cartItem?.id) {

@@ -12,6 +12,11 @@ exports.createVnpayPaymentUrl = asyncHandler(async (req, res) => {
   successResponse(res, data, "VNPAY payment URL created");
 });
 
+exports.changePaymentMethod = asyncHandler(async (req, res) => {
+  const data = await paymentService.changePaymentMethod(req.user.id, req.params.orderId, req.validated.body);
+  successResponse(res, data, "Payment method updated");
+});
+
 exports.confirmVnpayReturn = asyncHandler(async (req, res) => {
   const data = await paymentService.confirmVnpayReturn(req.validated.body);
   successResponse(res, data, "VNPAY return verified");

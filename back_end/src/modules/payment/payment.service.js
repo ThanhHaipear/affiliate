@@ -14,6 +14,19 @@ const paymentRepository = require("./payment.repository");
 const VNPAY_SUPPORTED_METHODS = new Set(["VNPAY", "CARD"]);
 const ADMIN_REVIEW_PAYMENT_METHODS = new Set(["VNPAY", "CARD"]);
 
+const buildVnpayTxnRef = (orderId) => `${orderId}-${Date.now()}`;
+
+const extractOrderIdFromTxnRef = (txnRef) => {
+  const raw = String(txnRef || "").trim();
+  if (!raw) {
+    return null;
+  }
+
+  const [orderIdPart] = raw.split("-");
+  const orderId = Number(orderIdPart);
+  return Number.isInteger(orderId) ? orderId : null;
+};
+
 const ensureVnpayConfigured = () => {
   if (!env.vnpayTmnCode || !env.vnpayHashSecret || !env.vnpayReturnUrl) {
     throw new AppError("VNPAY is not configured", 500);
@@ -49,7 +62,7 @@ const buildVnpayCallbackResult = async (payload) => {
     };
   }
 
-  const orderId = Number(payload.vnp_TxnRef);
+  const orderId = extractOrderIdFromTxnRef(payload.vnp_TxnRef);
   const order = Number.isInteger(orderId) ? await getOrderWithPayments(orderId) : null;
   if (!order) {
     return {
@@ -189,7 +202,7 @@ exports.createVnpayPaymentUrl = async (accountId, orderId, payload, req) => {
     vnp_TmnCode: env.vnpayTmnCode,
     vnp_Amount: Number(payment.amount) * 100,
     vnp_CurrCode: "VND",
-    vnp_TxnRef: order.id.toString(),
+    vnp_TxnRef: buildVnpayTxnRef(order.id),
     vnp_OrderInfo: normalizeOrderInfo(`Thanh toan don hang ${order.orderCode}`),
     vnp_OrderType: env.vnpayOrderType,
     vnp_ReturnUrl: env.vnpayReturnUrl,
@@ -209,6 +222,32 @@ exports.createVnpayPaymentUrl = async (accountId, orderId, payload, req) => {
     orderCode: order.orderCode,
     expiresAt: expiresAt.toISOString(),
   };
+};
+
+exports.changePaymentMethod = async (accountId, orderId, payload) => {
+  const order = await prisma.order.findUnique({
+    where: { id: BigInt(orderId) },
+    include: { payments: true },
+  });
+
+  if (!order || order.buyerId !== accountId) {
+    throw new AppError("Order not found", 404);
+  }
+
+  const payment = order.payments?.[0];
+  if (!payment) {
+    throw new AppError("Payment not found", 404);
+  }
+
+  if (order.status !== "PENDING_PAYMENT" || payment.status !== "PENDING") {
+    throw new AppError("Only pending unpaid orders can change payment method", 400);
+  }
+
+  if (payment.method === payload.paymentMethod) {
+    throw new AppError("Order is already using this payment method", 400);
+  }
+
+  return paymentRepository.changePendingPaymentMethod(orderId, accountId, payload.paymentMethod);
 };
 
 exports.confirmVnpayReturn = async (payload) => {

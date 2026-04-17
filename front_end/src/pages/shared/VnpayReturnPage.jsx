@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { confirmVnpayReturn } from "../../api/orderApi";
 import Button from "../../components/common/Button";
 import EmptyState from "../../components/common/EmptyState";
@@ -8,32 +8,25 @@ import { useToast } from "../../hooks/useToast";
 
 function VnpayReturnPage() {
   const location = useLocation();
-  const navigate = useNavigate();
   const toast = useToast();
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
-  const processedSearchRef = useRef("");
+  const toastRef = useRef(toast);
 
   const payload = useMemo(() => Object.fromEntries(searchParams.entries()), [searchParams]);
 
   useEffect(() => {
+    toastRef.current = toast;
+  }, [toast]);
+
+  useEffect(() => {
     let active = true;
-    const searchKey = location.search;
-
-    // Prevent duplicate verification in React StrictMode and repeated rerenders.
-    if (processedSearchRef.current === searchKey) {
-      return () => {
-        active = false;
-      };
-    }
-
-    processedSearchRef.current = searchKey;
 
     async function verifyReturn() {
       if (!payload.vnp_TxnRef || !payload.vnp_SecureHash) {
-        setError("Thieu du lieu tra ve tu VNPAY.");
+        setError("Thiếu dữ liệu trả về từ VNPAY.");
         setLoading(false);
         return;
       }
@@ -47,18 +40,18 @@ function VnpayReturnPage() {
 
         setResult(response);
         if (response.success) {
-          toast.success("VNPAY xac nhan giao dich thanh cong.");
+          toastRef.current.success("VNPAY xác nhận giao dịch thành công.");
         } else {
-          toast.error("VNPAY tra ve trang thai chua thanh toan thanh cong.");
+          toastRef.current.error("VNPAY trả về trạng thái chưa thanh toán thành công.");
         }
       } catch (loadError) {
         if (!active) {
           return;
         }
 
-        const message = loadError.response?.data?.message || "Khong xac minh duoc ket qua VNPAY.";
+        const message = loadError.response?.data?.message || "Không xác minh được kết quả VNPAY.";
         setError(message);
-        toast.error(message);
+        toastRef.current.error(message);
       } finally {
         if (active) {
           setLoading(false);
@@ -71,25 +64,13 @@ function VnpayReturnPage() {
     return () => {
       active = false;
     };
-  }, [location.search, payload, toast]);
-
-  useEffect(() => {
-    if (!result?.orderId || !result?.success) {
-      return undefined;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      navigate(`/dashboard/customer/orders/${result.orderId}`, { replace: true });
-    }, 1800);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [navigate, result]);
+  }, [location.search, payload]);
 
   if (loading) {
     return (
       <EmptyState
-        title="Dang xac minh giao dich"
-        description="He thong dang kiem tra checksum va trang thai tra ve tu VNPAY."
+        title="Đang xác minh giao dịch"
+        description="Hệ thống đang kiểm tra checksum và trạng thái trả về từ VNPAY."
       />
     );
   }
@@ -97,10 +78,10 @@ function VnpayReturnPage() {
   if (error) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Thanh toan" title="Khong xac minh duoc giao dich" description={error} />
+        <PageHeader eyebrow="Thanh toán" title="Không xác minh được giao dịch" description={error} />
         <div className="flex gap-3">
           <Link to="/dashboard/customer/orders">
-            <Button variant="secondary">Ve danh sach don hang</Button>
+            <Button variant="secondary">Về danh sách đơn hàng</Button>
           </Link>
         </div>
       </div>
@@ -110,35 +91,35 @@ function VnpayReturnPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Thanh toan"
-        title={result?.success ? "Thanh toan thanh cong" : "Thanh toan chua thanh cong"}
+        eyebrow="Thanh toán"
+        title={result?.success ? "Giao dịch thành công" : "Thanh toán chưa thành công"}
         description={
           result?.success
-            ? "He thong dang chuyen ban ve trang chi tiet don hang."
-            : "Ban co the quay ve don hang de thanh toan lai hoac kiem tra trang thai."
+            ? "Giao dịch đã được xác nhận thành công. Bạn có thể chọn nút điều hướng bên dưới."
+            : "Bạn có thể quay về đơn hàng để thanh toán lại hoặc kiểm tra trạng thái."
         }
       />
       <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
         <div className="space-y-3 text-sm text-slate-600">
           <p>
-            Ma don: <span className="font-semibold text-slate-900">{result?.orderId}</span>
+            Mã đơn: <span className="font-semibold text-slate-900">{result?.orderId}</span>
           </p>
           <p>
-            Ma phan hoi VNPAY: <span className="font-semibold text-slate-900">{result?.responseCode || "--"}</span>
+            Mã phản hồi VNPAY: <span className="font-semibold text-slate-900">{result?.responseCode || "--"}</span>
           </p>
           <p>
-            Ma giao dich VNPAY: <span className="font-semibold text-slate-900">{result?.transactionNo || "--"}</span>
+            Mã giao dịch VNPAY: <span className="font-semibold text-slate-900">{result?.transactionNo || "--"}</span>
           </p>
           <p>
-            Ngan hang: <span className="font-semibold text-slate-900">{result?.bankCode || "--"}</span>
+            Ngân hàng: <span className="font-semibold text-slate-900">{result?.bankCode || "--"}</span>
           </p>
         </div>
         <div className="mt-6 flex gap-3">
-          <Link to={`/dashboard/customer/orders/${result?.orderId || ""}`}>
-            <Button>Xem don hang</Button>
+          <Link to="/">
+            <Button>Về trang chủ</Button>
           </Link>
           <Link to="/dashboard/customer/orders">
-            <Button variant="secondary">Ve danh sach don</Button>
+            <Button variant="secondary">Về danh sách đơn</Button>
           </Link>
         </div>
       </div>

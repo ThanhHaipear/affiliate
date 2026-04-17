@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { cancelCustomerOrder, createVnpayPaymentUrl, getCustomerOrderDetail } from "../../../api/orderApi";
+import { cancelCustomerOrder, changeOrderPaymentMethod, createVnpayPaymentUrl, getCustomerOrderDetail } from "../../../api/orderApi";
 import Button from "../../../components/common/Button";
 import ConfirmModal from "../../../components/common/ConfirmModal";
 import EmptyState from "../../../components/common/EmptyState";
@@ -23,6 +23,7 @@ function OrderDetailPage() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [creatingPayment, setCreatingPayment] = useState(false);
+  const [changingToCod, setChangingToCod] = useState(false);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [reviewItem, setReviewItem] = useState(null);
   const [reviewEligibility, setReviewEligibility] = useState(null);
@@ -87,6 +88,7 @@ function OrderDetailPage() {
     !hasPendingRefundRequest;
   const canCancelOrder = canDirectCancelOrder || canRequestCancelOrder;
   const canPayWithVnpay = order.order_status === "PENDING_PAYMENT" && ["VNPAY", "CARD"].includes(payment?.method);
+  const canSwitchToCod = order.order_status === "PENDING_PAYMENT" && ["VNPAY", "CARD"].includes(payment?.method) && payment?.status === "PENDING";
 
   async function handleCancelOrder() {
     try {
@@ -115,6 +117,19 @@ function OrderDetailPage() {
       toast.error(submitError.response?.data?.message || "Khong tao duoc phien thanh toan VNPAY.");
     } finally {
       setCreatingPayment(false);
+    }
+  }
+
+  async function handleSwitchToCod() {
+    try {
+      setChangingToCod(true);
+      await changeOrderPaymentMethod(orderId, { paymentMethod: "COD" });
+      await reloadOrder();
+      toast.success("Đã chuyển phương thức thanh toán sang COD.");
+    } catch (submitError) {
+      toast.error(submitError.response?.data?.message || "Không đổi được phương thức thanh toán.");
+    } finally {
+      setChangingToCod(false);
     }
   }
 
@@ -179,7 +194,12 @@ function OrderDetailPage() {
           <div className="flex gap-3">
             {canPayWithVnpay ? (
               <Button loading={creatingPayment} onClick={handlePayWithVnpay}>
-                Thanh toan VNPAY
+                Thanh toán VNPAY
+              </Button>
+            ) : null}
+            {canSwitchToCod ? (
+              <Button variant="secondary" loading={changingToCod} onClick={handleSwitchToCod}>
+                Chuyển sang COD
               </Button>
             ) : null}
             {canCancelOrder ? (

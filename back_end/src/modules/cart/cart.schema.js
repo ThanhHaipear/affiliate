@@ -5,7 +5,8 @@ exports.addItemSchema = z.object({
     productId: z.coerce.number().int().positive(),
     variantId: z.coerce.number().int().positive(),
     quantity: z.coerce.number().int().positive(),
-    attributionToken: z.string().optional()
+    attributionToken: z.string().optional(),
+    mergeWithExisting: z.coerce.boolean().optional(),
   })
 });
 

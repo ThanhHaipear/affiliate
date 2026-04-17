@@ -65,6 +65,7 @@ const ENDPOINTS = {
     refund: (orderId) => `${API_PREFIX}/payments/${orderId}/refund`,
     sellerCancel: (orderId) => `${API_PREFIX}/payments/${orderId}/seller-cancel`,
     sellerConfirm: (orderId) => `${API_PREFIX}/payments/${orderId}/seller-confirm`,
+    paymentMethod: (orderId) => `${API_PREFIX}/payments/${orderId}/payment-method`,
     vnpayUrl: (orderId) => `${API_PREFIX}/payments/${orderId}/vnpay-url`,
     vnpayReturnConfirm: `${API_PREFIX}/payments/vnpay-return/confirm`,
   },

@@ -127,9 +127,12 @@ exports.addItem = async (accountId, payload) =>
       throw new Error("Product variant is unavailable");
     }
 
-    const existing = await tx.cartItem.findFirst({
-      where: buildCartItemIdentityWhere(cart.id, payload.variantId, attribution),
-    });
+    const shouldMergeWithExisting = payload.mergeWithExisting !== false;
+    const existing = shouldMergeWithExisting
+      ? await tx.cartItem.findFirst({
+        where: buildCartItemIdentityWhere(cart.id, payload.variantId, attribution),
+      })
+      : null;
 
     if (payload.quantity <= 0) {
       throw new Error("Quantity must be greater than 0");
