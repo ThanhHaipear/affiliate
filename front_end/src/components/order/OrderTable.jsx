@@ -16,7 +16,7 @@ function OrderTable({ rows = [], showSellerConfirmation = false, actionsTitle = 
   if (showSellerConfirmation) {
     columns.push({
       key: "seller_confirmed_received_money",
-      title: "Received Money",
+      title: "Order Completed",
       render: (row) => (
         <StatusBadge status={row.seller_confirmed_received_money ? "APPROVED" : "PENDING"} />
       ),

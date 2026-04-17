@@ -9,6 +9,7 @@ import StatusBadge from "../../../components/common/StatusBadge";
 import { useToast } from "../../../hooks/useToast";
 import { formatCurrency, formatDateTime } from "../../../lib/format";
 import { mapAffiliateLinkDto } from "../../../lib/apiMappers";
+import { copyText } from "../../../lib/clipboard";
 
 function AffiliateLinksPage() {
   const toast = useToast();
@@ -64,7 +65,11 @@ function AffiliateLinksPage() {
 
     const url = `${window.location.origin}/products/${link.product_id}?ref=${link.short_code}`;
     try {
-      await navigator.clipboard.writeText(url);
+      const copied = await copyText(url);
+      if (!copied) {
+        throw new Error("COPY_FAILED");
+      }
+
       setSelectedLinkId(link.id);
       toast.success("Đã sao chép link đang chọn.");
     } catch {

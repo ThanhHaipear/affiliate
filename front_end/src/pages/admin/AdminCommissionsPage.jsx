@@ -4,8 +4,25 @@ import AdminStatCard from "../../components/admin/AdminStatCard";
 import DataTable from "../../components/common/DataTable";
 import EmptyState from "../../components/common/EmptyState";
 import PageHeader from "../../components/common/PageHeader";
-import StatusBadge from "../../components/common/StatusBadge";
-import { formatCompactCurrency, formatCurrency, formatDateTime } from "../../lib/format";
+import { formatCompactCurrency, formatCurrency, formatDateTime, formatStatusLabel } from "../../lib/format";
+
+function renderBatchStatus(status) {
+  const normalizedStatus = String(status || "").trim();
+
+  if (normalizedStatus === "COMPLETED") {
+    return (
+      <span className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800">
+        Tiền đã chi trả
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+      {formatStatusLabel(normalizedStatus)}
+    </span>
+  );
+}
 
 function AdminCommissionsPage() {
   const [batches, setBatches] = useState([]);
@@ -59,8 +76,8 @@ function AdminCommissionsPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Admin"
-        title="Quản lý hoa hồng"
-        description="Backend chưa có admin commissions endpoint riêng, nên trang này đang dùng dữ liệu thật từ payout batches để theo dõi các đợt chi trả."
+        title="Các đợt chi trả"
+        description="Trang này dùng dữ liệu thật từ payout batches để theo dõi các đợt chi trả affiliate theo từng batch."
       />
       <div className="grid gap-4 md:grid-cols-3">
         <AdminStatCard
@@ -79,7 +96,7 @@ function AdminCommissionsPage() {
           label="Tổng tiền đã chi"
           value={formatCompactCurrency(summary.totalAmount)}
           tooltip={formatCurrency(summary.totalAmount)}
-          meta={`${summary.completed} batch da hoan tat`}
+          meta={`${summary.completed} batch đã chi trả`}
           tone="emerald"
         />
       </div>
@@ -88,15 +105,15 @@ function AdminCommissionsPage() {
         <DataTable
           columns={[
             { key: "id", title: "Mã batch" },
-            { key: "type", title: "Loai" },
-            { key: "totalRequests", title: "So yeu cau" },
+            { key: "type", title: "Loại" },
+            { key: "totalRequests", title: "Số yêu cầu" },
             { key: "totalAmount", title: "Tổng tiền", render: (row) => formatCurrency(row.totalAmount) },
-            { key: "status", title: "Trạng thái", render: (row) => <StatusBadge status={row.status} /> },
+            { key: "status", title: "Trạng thái", render: (row) => renderBatchStatus(row.status) },
             { key: "payoutDate", title: "Ngày chi trả", render: (row) => formatDateTime(row.payoutDate) },
           ]}
           rows={batches}
           emptyTitle="Chưa có payout batch"
-          emptyDescription="Backend đã nối API thật, nhưng hiện tại chưa có batch chi trả nào."
+          emptyDescription="Hiện tại chưa có batch chi trả nào."
         />
       ) : null}
     </div>

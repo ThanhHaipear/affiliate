@@ -16,6 +16,7 @@ DOCKER.md
 
 # private local data / notes
 *.sql
+prompt.md
 prompt*.md
 back_end/prompt.md
 *.bak_restore_shipping

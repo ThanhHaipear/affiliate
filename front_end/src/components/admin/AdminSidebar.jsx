@@ -23,7 +23,7 @@ const navigationGroups = [
     items: [
       { label: "Đơn hàng", to: "/admin/orders", hint: "Đơn hàng và yêu cầu hoàn tiền" },
       { label: "Duyệt rút tiền", to: "/admin/withdrawals/pending", hint: "Yêu cầu chi trả đang chờ" },
-      { label: "Hoa hồng", to: "/admin/commissions", hint: "Đợt chi trả affiliate" },
+      { label: "Các đợt chi trả", to: "/admin/commissions", hint: "Chi trả affiliate theo batch" },
       { label: "Phát hiện gian lận", to: "/admin/fraud-detection", hint: "Tín hiệu rủi ro" },
     ],
   },

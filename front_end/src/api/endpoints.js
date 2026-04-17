@@ -48,6 +48,7 @@ const ENDPOINTS = {
   products: {
     list: `${API_PREFIX}/products`,
     detail: (productId) => `${API_PREFIX}/products/${productId}`,
+    reviews: (productId) => `${API_PREFIX}/products/${productId}/reviews`,
   },
   orders: {
     list: `${API_PREFIX}/orders`,

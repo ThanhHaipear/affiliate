@@ -6,7 +6,7 @@ describe("CopyBox", () => {
   it("renders link value", () => {
     render(<CopyBox value="https://example.com/ref-1" />);
 
-    expect(screen.getByText("https://example.com/ref-1")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("https://example.com/ref-1")).toBeInTheDocument();
   });
 
   it("copies text and updates button label", async () => {
@@ -15,9 +15,9 @@ describe("CopyBox", () => {
     navigator.clipboard.writeText = writeText;
     render(<CopyBox value="https://example.com/ref-1" />);
 
-    await user.click(screen.getByRole("button", { name: /Copy link/i }));
+    await user.click(screen.getByRole("button", { name: /Sao chép link/i }));
 
     expect(writeText).toHaveBeenCalledWith("https://example.com/ref-1");
-    expect(screen.getByRole("button", { name: /Da copy/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Đã sao chép/i })).toBeInTheDocument();
   });
 });

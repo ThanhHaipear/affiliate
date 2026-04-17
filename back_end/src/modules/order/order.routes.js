@@ -6,8 +6,8 @@ const { authorize } = require("../../middlewares/role.middleware");
 
 const router = express.Router();
 
-router.use(authenticate, authorize("CUSTOMER"));
-router.get("/", controller.listOrders);
-router.get("/:orderId", controller.getOrder);
+router.use(authenticate);
+router.get("/", authorize("CUSTOMER"), controller.listOrders);
+router.get("/:orderId", authorize("CUSTOMER", "SELLER"), controller.getOrder);
 
 module.exports = router;

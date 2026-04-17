@@ -4,9 +4,11 @@ import { cancelCustomerOrder, createVnpayPaymentUrl, getCustomerOrderDetail } fr
 import Button from "../../../components/common/Button";
 import ConfirmModal from "../../../components/common/ConfirmModal";
 import EmptyState from "../../../components/common/EmptyState";
+import Modal from "../../../components/common/Modal";
 import MoneyText from "../../../components/common/MoneyText";
 import PageHeader from "../../../components/common/PageHeader";
 import StatusBadge from "../../../components/common/StatusBadge";
+import { createProductReview, getProductReviews } from "../../../api/productApi";
 import OrderStatusTimeline from "../../../components/order/OrderStatusTimeline";
 import { useToast } from "../../../hooks/useToast";
 import { formatDateTime } from "../../../lib/format";
@@ -21,6 +23,13 @@ function OrderDetailPage() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [creatingPayment, setCreatingPayment] = useState(false);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewItem, setReviewItem] = useState(null);
+  const [reviewEligibility, setReviewEligibility] = useState(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewRating, setReviewRating] = useState("5");
+  const [reviewComment, setReviewComment] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -109,6 +118,57 @@ function OrderDetailPage() {
     }
   }
 
+  async function openReviewModal(item) {
+    try {
+      setReviewItem(item);
+      setReviewModalOpen(true);
+      setReviewComment("");
+      setReviewRating("5");
+      setReviewLoading(true);
+      const response = await getProductReviews(item.productId);
+      setReviewEligibility(response?.viewer || null);
+    } catch (_error) {
+      setReviewEligibility(null);
+    } finally {
+      setReviewLoading(false);
+    }
+  }
+
+  function closeReviewModal() {
+    setReviewModalOpen(false);
+    setReviewItem(null);
+    setReviewEligibility(null);
+    setReviewComment("");
+    setReviewRating("5");
+  }
+
+  async function handleSubmitReview() {
+    if (!reviewItem?.productId) {
+      return;
+    }
+
+    try {
+      setReviewSubmitting(true);
+      await createProductReview(reviewItem.productId, {
+        rating: Number(reviewRating),
+        comment: reviewComment.trim(),
+      });
+      setReviewEligibility({
+        hasPurchased: true,
+        hasReviewed: true,
+        canReview: false,
+        reason: "Bạn đã đánh giá sản phẩm này rồi.",
+      });
+      setReviewComment("");
+      setReviewRating("5");
+      toast.success("Đã gửi đánh giá sản phẩm.");
+    } catch (submitError) {
+      toast.error(submitError.response?.data?.message || "Không gửi được đánh giá.");
+    } finally {
+      setReviewSubmitting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -184,7 +244,14 @@ function OrderDetailPage() {
                       <p className="font-semibold text-slate-900">{item.productNameSnapshot || `San pham #${item.productId}`}</p>
                       <p className="mt-1 text-sm text-slate-500">So luong: {item.quantity}</p>
                     </div>
-                    <MoneyText value={item.lineTotal || item.unitPrice || 0} className="font-semibold text-slate-900" />
+                    <div className="flex flex-col items-end gap-2">
+                      <MoneyText value={item.lineTotal || item.unitPrice || 0} className="font-semibold text-slate-900" />
+                      {order.order_status === "COMPLETED" ? (
+                        <Button size="sm" onClick={() => openReviewModal(item)}>
+                          Đánh giá
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -220,6 +287,50 @@ function OrderDetailPage() {
         onClose={() => setCancelOpen(false)}
         onConfirm={handleCancelOrder}
       />
+      <Modal
+        open={reviewModalOpen}
+        title={reviewItem ? `Đánh giá ${reviewItem.productNameSnapshot || `Sản phẩm #${reviewItem.productId}`}` : "Đánh giá sản phẩm"}
+        description="Chỉ sản phẩm trong đơn đã giao thành công và chưa được bạn đánh giá mới cho phép gửi review."
+        onClose={closeReviewModal}
+        footer={
+          reviewEligibility?.canReview ? (
+            <div className="flex justify-end">
+              <Button onClick={handleSubmitReview} loading={reviewSubmitting}>
+                Gửi đánh giá
+              </Button>
+            </div>
+          ) : null
+        }
+      >
+        {reviewLoading ? (
+          <p className="text-sm leading-7 text-slate-300">Đang kiểm tra điều kiện đánh giá.</p>
+        ) : reviewEligibility?.canReview ? (
+          <div className="space-y-3">
+            <select
+              value={reviewRating}
+              onChange={(event) => setReviewRating(event.target.value)}
+              className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none"
+            >
+              {[5, 4, 3, 2, 1].map((value) => (
+                <option key={value} value={value}>
+                  {value} sao
+                </option>
+              ))}
+            </select>
+            <textarea
+              value={reviewComment}
+              onChange={(event) => setReviewComment(event.target.value)}
+              rows={4}
+              className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none"
+              placeholder="Chia sẻ cảm nhận của bạn về sản phẩm"
+            />
+          </div>
+        ) : (
+          <div className="rounded-[1.5rem] bg-slate-800/80 p-4 text-sm leading-7 text-slate-300">
+            {reviewEligibility?.reason || "Sản phẩm này hiện chưa thể đánh giá."}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

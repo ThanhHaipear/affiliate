@@ -12,6 +12,16 @@ exports.getProduct = asyncHandler(async (req, res) => {
   successResponse(res, data, "Product loaded");
 });
 
+exports.listProductReviews = asyncHandler(async (req, res) => {
+  const data = await productService.listProductReviews(req.params.productId, req.user);
+  successResponse(res, data, "Product reviews loaded");
+});
+
+exports.createProductReview = asyncHandler(async (req, res) => {
+  const data = await productService.createProductReview(req.user.id, req.params.productId, req.validated.body);
+  successResponse(res, data, "Product review created", 201);
+});
+
 exports.createProduct = asyncHandler(async (req, res) => {
   const data = await productService.createProduct(req.user.id, req.validated.body);
   successResponse(res, data, "Product created", 201);

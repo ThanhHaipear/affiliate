@@ -17,3 +17,13 @@ exports.createProductSchema = z.object({
     })).min(1)
   })
 });
+
+exports.createReviewSchema = z.object({
+  body: z.object({
+    rating: z.coerce.number().int().min(1).max(5),
+    comment: z.string().trim().max(1000).optional().default(""),
+  }),
+  params: z.object({
+    productId: z.coerce.number().int().positive(),
+  }),
+});

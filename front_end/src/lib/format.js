@@ -17,7 +17,7 @@ const statusLabelMap = {
   REJECTED: "Đã từ chối",
   PAID: "Đã thanh toán",
   PROCESSING: "Đang xử lý",
-  COMPLETED: "Đã chốt tiền",
+  COMPLETED: "Đơn đã hoàn tất",
   CANCELLED: "Đã hủy",
   REFUNDED: "Đã hoàn tiền",
   ORDER_REFUND_REQUESTED: "Đang chờ duyệt hoàn tiền",

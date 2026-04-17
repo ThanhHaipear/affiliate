@@ -12,6 +12,16 @@ async function getProductDetail(productIdOrSlug) {
   return unwrapResponseData(response);
 }
 
+async function getProductReviews(productId) {
+  const response = await axiosClient.get(ENDPOINTS.products.reviews(productId));
+  return unwrapResponseData(response);
+}
+
+async function createProductReview(productId, payload) {
+  const response = await axiosClient.post(ENDPOINTS.products.reviews(productId), payload);
+  return unwrapResponseData(response);
+}
+
 async function getSellerProducts(params) {
   const response = await axiosClient.get(ENDPOINTS.seller.products, { params });
   return unwrapResponseData(response);
@@ -60,9 +70,11 @@ async function updateSellerAffiliateSetting(productId, payload) {
 }
 
 export {
+  createProductReview,
   createSellerProduct,
   getProductDetail,
   getProducts,
+  getProductReviews,
   getSellerAffiliateSettings,
   getSellerProductDetail,
   getSellerProducts,

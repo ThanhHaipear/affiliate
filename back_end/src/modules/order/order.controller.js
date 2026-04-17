@@ -8,6 +8,6 @@ exports.listOrders = asyncHandler(async (req, res) => {
 });
 
 exports.getOrder = asyncHandler(async (req, res) => {
-  const data = await orderService.getOrder(req.params.orderId);
+  const data = await orderService.getOrder(req.user.id, req.user.roles, req.params.orderId);
   successResponse(res, data, "Order loaded");
 });

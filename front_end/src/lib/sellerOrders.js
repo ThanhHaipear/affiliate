@@ -34,9 +34,9 @@ function buildSellerOrderTimeline(order) {
   if (isSettled) {
     events.push({
       id: `${order.id}-settled`,
-      label: "Da chot tien",
+      label: "Don da hoan tat",
       time: order.sellerConfirmedAt || order.updatedAt || order.createdAt,
-      description: "Shop da xac nhan nhan tien. He thong da chot tien shop, phi san va hoa hong affiliate neu co.",
+      description: "Shop da xac nhan nhan tien. He thong da hoan tat don hang va ghi nhan tien shop, phi san va hoa hong affiliate neu co.",
     });
     return events;
   }

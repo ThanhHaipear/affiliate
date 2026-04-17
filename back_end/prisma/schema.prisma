@@ -117,6 +117,7 @@ model Account {
   activityLogs              ActivityLog[]
   fraudAlertsProcessed      FraudAlert[]              @relation("FraudAlertProcessedBy")
   affiliateLockedBy         Affiliate[]               @relation("AffiliateLockedBy")
+  productReviews            ProductReview[]
 
   @@index([status, createdAt])
   @@map("accounts")
@@ -394,6 +395,7 @@ model Product {
   cartItems           CartItem[]
   orderItems          OrderItem[]
   commissionItems     AffiliateCommissionItem[]
+  reviews             ProductReview[]
 
   @@index([sellerId, createdAt])
   @@index([status, createdAt])
@@ -685,8 +687,27 @@ model OrderItem {
   attributionSession       AttributionSession?      @relation(fields: [attributionSessionId], references: [id])
   affiliateLink            AffiliateLink?           @relation(fields: [affiliateLinkId], references: [id])
   commissionItem           AffiliateCommissionItem?
+  productReview            ProductReview?
 
   @@map("order_items")
+}
+
+model ProductReview {
+  id         BigInt    @id @default(autoincrement())
+  productId  Int       @map("product_id")
+  accountId  Int       @map("account_id")
+  orderItemId BigInt   @unique @map("order_item_id")
+  rating     Int
+  comment    String?   @db.Text
+  createdAt  DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt  DateTime? @map("updated_at") @db.Timestamp(0)
+  product    Product   @relation(fields: [productId], references: [id])
+  account    Account   @relation(fields: [accountId], references: [id])
+  orderItem  OrderItem @relation(fields: [orderItemId], references: [id])
+
+  @@index([productId, createdAt])
+  @@index([accountId])
+  @@map("product_reviews")
 }
 
 model Payment {
@@ -949,5 +970,4 @@ model FraudAlert {
   @@index([processedBy])
   @@map("fraud_alerts")
 }
-
 

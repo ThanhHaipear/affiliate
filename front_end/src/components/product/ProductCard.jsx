@@ -10,6 +10,9 @@ function ProductCard({ product, actionLabel, onAction }) {
   const showAffiliateInfo = Boolean(actionLabel);
   const stock = Number(product.stock || 0);
   const isOutOfStock = stock <= 0;
+  const soldCount = Number(product.sold || 0);
+  const reviewCount = Number(product.review_count || 0);
+  const hasReviewSummary = soldCount > 0 || reviewCount > 0;
 
   useEffect(() => {
     const sync = () => setWishlisted(isWishlisted(product.id));
@@ -62,10 +65,18 @@ function ProductCard({ product, actionLabel, onAction }) {
             <p className="text-xs uppercase tracking-[0.3em] text-cyan-700">{product.category}</p>
             <h3 className="mt-2 text-xl font-semibold text-slate-900">{product.name}</h3>
           </div>
-          <div className="text-right">
-            <p className="text-xs uppercase tracking-[0.24em] text-slate-400">{product.rating || 4.8} / 5</p>
-            <p className="mt-1 text-sm text-slate-500">{product.sold || 0} đã bán</p>
-          </div>
+          {hasReviewSummary ? (
+            <div className="text-right">
+              {reviewCount > 0 && product.rating != null ? (
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-400">
+                  {Number(product.rating).toFixed(1)} / 5
+                </p>
+              ) : null}
+              {soldCount > 0 ? (
+                <p className="mt-1 text-sm text-slate-500">{soldCount} đã bán</p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         <p className="text-sm leading-7 text-slate-600">{product.description}</p>
         <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">

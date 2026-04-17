@@ -43,9 +43,24 @@ exports.listOrders = (accountId, roles) => {
   });
 };
 
-exports.getOrder = async (orderId) => {
-  const order = await prisma.order.findUnique({
-    where: { id: BigInt(orderId) },
+exports.getOrder = async (accountId, roles, orderId) => {
+  const where = {
+    id: BigInt(orderId),
+  };
+
+  if (roles.includes("SELLER") && roles.includes("CUSTOMER")) {
+    where.OR = [
+      { buyerId: accountId },
+      { seller: { ownerAccountId: accountId } },
+    ];
+  } else if (roles.includes("SELLER")) {
+    where.seller = { ownerAccountId: accountId };
+  } else {
+    where.buyerId = accountId;
+  }
+
+  const order = await prisma.order.findFirst({
+    where,
     include: {
       items: true,
       payments: true,

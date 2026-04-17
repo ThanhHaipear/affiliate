@@ -22,6 +22,18 @@ exports.getProduct = async (productId) => {
   return product;
 };
 
+exports.listProductReviews = async (productId, viewer = null) => {
+  const product = await productRepository.findApprovedProductById(Number(productId));
+  if (!product) throw new AppError("Product not found", 404);
+  return productRepository.listProductReviews(Number(productId), viewer);
+};
+
+exports.createProductReview = async (accountId, productId, payload) => {
+  const product = await productRepository.findApprovedProductById(Number(productId));
+  if (!product) throw new AppError("Product not found", 404);
+  return productRepository.createProductReview(accountId, Number(productId), payload);
+};
+
 exports.createProduct = async (accountId, payload) => {
   const seller = await getSellerOrThrow(accountId);
   ensureApprovedSeller(seller);
