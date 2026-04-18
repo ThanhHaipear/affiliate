@@ -381,6 +381,7 @@ model Product {
   lockReason          String?                   @map("lock_reason") @db.Text
   lockedAt            DateTime?                 @map("locked_at") @db.Timestamp(0)
   lockedBy            Int?                      @map("locked_by")
+  sellerHiddenAt      DateTime?                 @map("seller_hidden_at") @db.Timestamp(0)
   createdAt           DateTime?                 @map("created_at") @db.Timestamp(0)
   updatedAt           DateTime?                 @map("updated_at") @db.Timestamp(0)
   seller              Seller                    @relation(fields: [sellerId], references: [id])

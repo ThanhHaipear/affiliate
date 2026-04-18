@@ -15,6 +15,11 @@ exports.getDashboard = async () => {
 
 exports.getAccounts = async (query) => adminRepository.listAccounts(query);
 
+exports.getProducts = async (query) =>
+  adminRepository.listProducts({
+    limit: query?.limit ? Number(query.limit) : undefined,
+  });
+
 exports.lockAccount = async (accountId, adminId, payload) => {
   try {
     return await adminRepository.lockAccount({
@@ -115,6 +120,28 @@ exports.reviewProductAffiliate = async (settingId, adminId, payload) =>
 exports.reviewRefund = async (refundId, adminId, payload) => {
   try {
     return await adminRepository.reviewRefund({ refundId, adminId, ...payload });
+  } catch (error) {
+    throw new AppError(error.message, 400);
+  }
+};
+
+exports.getProductById = async (productId) => {
+  const product = await adminRepository.getProductById(Number(productId));
+  if (!product) {
+    throw new AppError("Product not found", 404);
+  }
+
+  return product;
+};
+
+exports.setProductVisibility = async (productId, adminId, payload) => {
+  try {
+    return await adminRepository.setProductVisibility({
+      productId: Number(productId),
+      adminId,
+      visible: payload.visible,
+      reason: payload.reason,
+    });
   } catch (error) {
     throw new AppError(error.message, 400);
   }

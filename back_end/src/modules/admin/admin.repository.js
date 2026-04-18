@@ -61,7 +61,7 @@ exports.findPendingCatalogProducts = () => prisma.product.findMany({
     variants: { include: { inventory: true } },
     affiliateSetting: true,
   },
-  orderBy: { createdAt: "desc" },
+  orderBy: { updatedAt: "desc" },
 });
 
 exports.findPendingProducts = () => prisma.productAffiliateSetting.findMany({
@@ -77,7 +77,7 @@ exports.findPendingProducts = () => prisma.productAffiliateSetting.findMany({
     },
     seller: true,
   },
-  orderBy: { createdAt: "desc" },
+  orderBy: { updatedAt: "desc" },
 });
 
 exports.listAccounts = ({ q, role, status }) =>
@@ -954,4 +954,98 @@ exports.reviewProductAffiliate = ({ settingId, adminId, status, rejectReason }) 
 
 exports.reviewRefund = ({ refundId, adminId, status, rejectReason }) =>
   paymentRepository.reviewRefundRequest({ refundId, adminId, status, rejectReason });
+
+exports.getProductById = (productId) => prisma.product.findUnique({
+  where: { id: Number(productId) },
+  include: {
+    seller: true,
+    category: true,
+    images: true,
+    variants: { include: { inventory: true } },
+    affiliateSetting: true,
+  },
+});
+
+exports.listProducts = ({ limit } = {}) => prisma.product.findMany({
+  include: {
+    seller: true,
+    category: true,
+    images: true,
+    variants: { include: { inventory: true } },
+    affiliateSetting: true,
+  },
+  orderBy: { updatedAt: "desc" },
+  ...(limit ? { take: limit } : {}),
+});
+
+exports.setProductVisibility = ({ productId, adminId, visible, reason }) =>
+  prisma.$transaction(async (tx) => {
+    const product = await tx.product.findUnique({
+      where: { id: Number(productId) },
+      include: {
+        seller: true,
+        category: true,
+        images: true,
+        variants: { include: { inventory: true } },
+        affiliateSetting: true,
+      },
+    });
+
+    if (!product) {
+      throw new Error("Product not found");
+    }
+
+    const now = new Date();
+    const updated = await tx.product.update({
+      where: { id: Number(productId) },
+      data: visible
+        ? {
+            sellerHiddenAt: null,
+            lockReason: null,
+            lockedAt: null,
+            lockedBy: null,
+            updatedAt: now,
+          }
+        : {
+            lockReason: reason || "Hidden by admin",
+            lockedAt: now,
+            lockedBy: adminId,
+            updatedAt: now,
+          },
+      include: {
+        seller: true,
+        category: true,
+        images: true,
+        variants: { include: { inventory: true } },
+        affiliateSetting: true,
+      },
+    });
+
+    await tx.activityLog.create({
+      data: {
+        accountId: adminId,
+        action: visible ? "ADMIN_SHOW_PRODUCT" : "ADMIN_HIDE_PRODUCT",
+        targetType: "PRODUCT",
+        targetId: BigInt(productId),
+        description: `${visible ? "Admin showed" : "Admin hid"} product ${product.name || `#${productId}`}`,
+        createdAt: now,
+      },
+    });
+
+    await tx.notification.create({
+      data: {
+        accountId: product.seller.ownerAccountId,
+        title: visible ? "Product shown by admin" : "Product hidden by admin",
+        content: visible
+          ? `Admin has made product ${product.name || `#${productId}`} visible again.`
+          : reason || `Admin has hidden product ${product.name || `#${productId}`}.`,
+        type: visible ? "PRODUCT_SHOWN_BY_ADMIN" : "PRODUCT_HIDDEN_BY_ADMIN",
+        targetType: "PRODUCT",
+        targetId: BigInt(productId),
+        createdAt: now,
+      },
+    });
+
+    return updated;
+  });
 

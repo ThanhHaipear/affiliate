@@ -33,6 +33,13 @@ function mapProductDto(product = {}) {
     seller_id: product.sellerId ?? product.seller?.id ?? null,
     seller_name: product.seller?.shopName || "Unknown seller",
     approval_status: product.status || "PENDING",
+    seller_hidden: Boolean(product.sellerHiddenAt),
+    admin_hidden: Boolean(product.lockedAt),
+    visibility_status: product.lockedAt
+      ? "HIDDEN_BY_ADMIN"
+      : product.sellerHiddenAt
+        ? "HIDDEN_BY_SELLER"
+        : "ACTIVE",
     rating: product.ratingAverage == null ? null : Number(product.ratingAverage),
     review_count: toNumber(product.reviewCount),
     sold: toNumber(product.soldCount),

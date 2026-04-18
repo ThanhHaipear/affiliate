@@ -54,3 +54,13 @@ exports.upsertProductAffiliateSetting = async (accountId, productId, payload) =>
   const seller = await getApprovedSellerOrThrow(accountId);
   return sellerRepository.upsertProductAffiliateSetting(seller.id, Number(productId), payload);
 };
+
+exports.setProductVisibility = async (accountId, productId, payload) => {
+  const seller = await getApprovedSellerOrThrow(accountId);
+
+  try {
+    return await sellerRepository.setProductVisibility(seller.id, Number(productId), payload.visible);
+  } catch (error) {
+    throw new AppError(error.message, 400);
+  }
+};

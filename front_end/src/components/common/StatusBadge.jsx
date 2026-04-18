@@ -22,6 +22,8 @@ const statusStyles = {
   HIGH: "bg-rose-50 text-rose-800",
   MEDIUM: "bg-amber-50 text-amber-800",
   LOW: "bg-sky-50 text-sky-800",
+  HIDDEN_BY_SELLER: "bg-slate-100 text-slate-700",
+  HIDDEN_BY_ADMIN: "bg-rose-50 text-rose-800",
 };
 
 function StatusBadge({ status, className = "" }) {

@@ -31,6 +31,8 @@ const statusLabelMap = {
   LOW: "Thấp",
   PENDING_PAYMENT: "Chờ thanh toán",
   ORDER_PAID: "Đơn đã thanh toán",
+  HIDDEN_BY_SELLER: "Seller đang ẩn",
+  HIDDEN_BY_ADMIN: "Admin đang ẩn",
 };
 
 function formatCurrency(value = 0) {

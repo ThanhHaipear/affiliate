@@ -1,17 +1,20 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { getSellerProducts } from "../../../api/productApi";
+import { getSellerProducts, setSellerProductVisibility } from "../../../api/productApi";
 import Button from "../../../components/common/Button";
 import DataTable from "../../../components/common/DataTable";
 import EmptyState from "../../../components/common/EmptyState";
 import MoneyText from "../../../components/common/MoneyText";
 import PageHeader from "../../../components/common/PageHeader";
 import StatusBadge from "../../../components/common/StatusBadge";
+import { useToast } from "../../../hooks/useToast";
 import { mapProductDto } from "../../../lib/apiMappers";
 
 function SellerProductsPage() {
+  const toast = useToast();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [submittingId, setSubmittingId] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -50,6 +53,31 @@ function SellerProductsPage() {
     [products],
   );
 
+  async function handleToggleVisibility(product) {
+    try {
+      setSubmittingId(String(product.id));
+      const nextVisible = product.seller_hidden || product.admin_hidden;
+
+      if (product.admin_hidden && nextVisible) {
+        toast.error("Sản phẩm đang bị admin ẩn nên seller không thể tự mở lại.");
+        return;
+      }
+
+      const updated = await setSellerProductVisibility(product.id, {
+        visible: nextVisible,
+      });
+
+      setProducts((current) =>
+        current.map((item) => (String(item.id) === String(product.id) ? mapProductDto(updated) : item)),
+      );
+      toast.success(nextVisible ? "Đã mở lại sản phẩm." : "Đã ẩn sản phẩm khỏi shop.");
+    } catch (submitError) {
+      toast.error(submitError.response?.data?.message || "Không cập nhật được trạng thái hiển thị.");
+    } finally {
+      setSubmittingId("");
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -72,6 +100,7 @@ function SellerProductsPage() {
             { key: "price_label", title: "Gi\u00e1", render: (row) => <MoneyText value={row.price} /> },
             { key: "stock", title: "T\u1ed3n kho" },
             { key: "approval_status", title: "Tr\u1ea1ng th\u00e1i", render: (row) => <StatusBadge status={row.approval_status} /> },
+            { key: "visibility_status", title: "Hi\u1ec3n th\u1ecb", render: (row) => <StatusBadge status={row.visibility_status} /> },
             {
               key: "actions",
               title: "Thao t\u00e1c",
@@ -79,6 +108,14 @@ function SellerProductsPage() {
                 <div className="flex gap-2">
                   <Link to={`/dashboard/seller/products/${row.id}`} className="text-sm font-medium text-sky-700">{"Chi ti\u1ebft"}</Link>
                   <Link to={`/dashboard/seller/products/${row.id}/edit`} className="text-sm font-medium text-emerald-700">{"Ch\u1ec9nh s\u1eeda"}</Link>
+                  <Button
+                    size="sm"
+                    variant={row.seller_hidden || row.admin_hidden ? "secondary" : "ghost"}
+                    loading={submittingId === String(row.id)}
+                    onClick={() => handleToggleVisibility(row)}
+                  >
+                    {row.seller_hidden || row.admin_hidden ? "Hiện" : "Ẩn"}
+                  </Button>
                 </div>
               ),
             },

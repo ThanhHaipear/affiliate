@@ -41,3 +41,12 @@ exports.affiliateSettingSchema = z.object({
     isEnabled: z.boolean().optional()
   })
 });
+
+exports.productVisibilitySchema = z.object({
+  body: z.object({
+    visible: z.boolean(),
+  }),
+  params: z.object({
+    productId: z.coerce.number().int().positive(),
+  }),
+});

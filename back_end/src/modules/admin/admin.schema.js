@@ -7,6 +7,22 @@ exports.reviewSchema = z.object({
   }),
 });
 
+exports.productActionParamsSchema = z.object({
+  params: z.object({
+    productId: z.coerce.number().int().positive(),
+  }),
+});
+
+exports.productVisibilitySchema = z.object({
+  body: z.object({
+    visible: z.boolean(),
+    reason: z.string().trim().max(500).optional(),
+  }),
+  params: z.object({
+    productId: z.coerce.number().int().positive(),
+  }),
+});
+
 exports.lockAccountSchema = z.object({
   body: z.object({
     reason: z.string().trim().max(500).optional(),
@@ -31,6 +47,12 @@ exports.accountListQuerySchema = z.object({
     q: z.string().trim().optional(),
     role: z.string().trim().optional(),
     status: z.string().trim().optional(),
+  }),
+});
+
+exports.adminProductsQuerySchema = z.object({
+  query: z.object({
+    limit: z.coerce.number().int().positive().max(50).optional(),
   }),
 });
 

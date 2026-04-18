@@ -51,3 +51,8 @@ exports.upsertProductAffiliateSetting = asyncHandler(async (req, res) => {
   const data = await sellerService.upsertProductAffiliateSetting(req.user.id, req.params.productId, req.validated.body);
   successResponse(res, data, "Product affiliate setting saved");
 });
+
+exports.setProductVisibility = asyncHandler(async (req, res) => {
+  const data = await sellerService.setProductVisibility(req.user.id, req.params.productId, req.validated.body);
+  successResponse(res, data, "Product visibility updated");
+});

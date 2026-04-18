@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { getAdminFinancialStats, getAdminOverview } from "../../api/adminApi";
+import {
+  getAdminFinancialStats,
+  getAdminOverview,
+  getAdminProducts,
+  setAdminProductVisibility,
+} from "../../api/adminApi";
 import AdminStatCard from "../../components/admin/AdminStatCard";
 import DetailPanel from "../../components/admin/DetailPanel";
 import LoadingSkeleton from "../../components/admin/LoadingSkeleton";
@@ -8,14 +13,23 @@ import Button from "../../components/common/Button";
 import DataTable from "../../components/common/DataTable";
 import EmptyState from "../../components/common/EmptyState";
 import PageHeader from "../../components/common/PageHeader";
+import Pagination from "../../components/common/Pagination";
 import StatusBadge from "../../components/common/StatusBadge";
+import { useToast } from "../../hooks/useToast";
 import { mapAdminOverview } from "../../lib/adminMappers";
+import { mapProductDto } from "../../lib/apiMappers";
 import { formatCompactCurrency, formatCurrency, formatDateTime } from "../../lib/format";
 
+const PRODUCTS_PER_PAGE = 8;
+
 function AdminDashboardPage() {
+  const toast = useToast();
   const [overview, setOverview] = useState(null);
+  const [products, setProducts] = useState([]);
   const [financialStats, setFinancialStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [productSubmittingId, setProductSubmittingId] = useState("");
+  const [productPage, setProductPage] = useState(1);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -25,14 +39,19 @@ function AdminDashboardPage() {
       try {
         setLoading(true);
         setError("");
-        const [overviewResponse, financialStatsResponse] = await Promise.all([
+        const [overviewResponse, financialStatsResponse, productsResponse] = await Promise.all([
           getAdminOverview(),
           getAdminFinancialStats(),
+          getAdminProducts(),
         ]);
-        if (active) {
-          setOverview(mapAdminOverview(overviewResponse));
-          setFinancialStats(financialStatsResponse || null);
+
+        if (!active) {
+          return;
         }
+
+        setOverview(mapAdminOverview(overviewResponse));
+        setFinancialStats(financialStatsResponse || null);
+        setProducts((productsResponse || []).map(mapProductDto));
       } catch (loadError) {
         if (active) {
           setError(loadError.response?.data?.message || "Không tải được dữ liệu admin từ backend.");
@@ -61,12 +80,51 @@ function AdminDashboardPage() {
       .slice(0, 6);
   }, [overview]);
 
+  const productTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(products.length / PRODUCTS_PER_PAGE)),
+    [products.length],
+  );
+
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (productPage - 1) * PRODUCTS_PER_PAGE;
+    return products.slice(startIndex, startIndex + PRODUCTS_PER_PAGE);
+  }, [productPage, products]);
+
+  useEffect(() => {
+    if (productPage > productTotalPages) {
+      setProductPage(productTotalPages);
+    }
+  }, [productPage, productTotalPages]);
+
+  async function handleToggleProductVisibility(product) {
+    try {
+      setProductSubmittingId(String(product.id));
+      const updated = await setAdminProductVisibility(product.id, {
+        visible: product.admin_hidden,
+      });
+
+      setProducts((current) =>
+        current.map((item) => (String(item.id) === String(product.id) ? mapProductDto(updated) : item)),
+      );
+      toast.success(product.admin_hidden ? "Đã hiện lại sản phẩm." : "Đã ẩn sản phẩm.");
+    } catch (submitError) {
+      toast.error(submitError.response?.data?.message || "Không cập nhật được trạng thái hiển thị của sản phẩm.");
+    } finally {
+      setProductSubmittingId("");
+    }
+  }
+
   if (loading) {
     return <LoadingSkeleton rows={5} cards={4} />;
   }
 
   if (error || !overview) {
-    return <EmptyState title="Không tải được bảng điều khiển admin" description={error || "Backend không trả về dữ liệu dashboard."} />;
+    return (
+      <EmptyState
+        title="Không tải được bảng điều khiển admin"
+        description={error || "Backend không trả về dữ liệu dashboard."}
+      />
+    );
   }
 
   return (
@@ -74,7 +132,7 @@ function AdminDashboardPage() {
       <PageHeader
         eyebrow="Admin"
         title="Tổng quan quản trị"
-        description="Trang này đang đọc dữ liệu thật từ backend cho hàng đợi duyệt seller, affiliate và sản phẩm. Với sản phẩm, admin chỉ đưa ra một quyết định duy nhất cho mỗi sản phẩm, dù backend vẫn lưu riêng catalog và affiliate setting."
+        description="Dashboard này đọc dữ liệu thật từ backend cho hàng chờ duyệt, tài chính nền tảng và danh sách sản phẩm để admin ẩn hoặc hiện trực tiếp."
         action={
           <Link to="/admin/products/pending">
             <Button>Mở hàng đợi duyệt</Button>
@@ -141,7 +199,7 @@ function AdminDashboardPage() {
               Dashboard, tài khoản, đơn hàng, fraud alerts và phí nền tảng hiện đang đọc dữ liệu thật từ database.
             </div>
             <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4">
-              Product moderation đã được hợp nhất về mặt giao diện: admin ra một quyết định, frontend sẽ đồng bộ cả review catalog và affiliate khi cần.
+              Product moderation đã được hợp nhất về mặt giao diện và dashboard giờ có thêm khu vực ẩn hiện sản phẩm trực tiếp.
             </div>
           </div>
         </DetailPanel>
@@ -175,7 +233,7 @@ function AdminDashboardPage() {
               "Tài khoản admin: danh sách account, khóa, mở khóa.",
               "Đơn hàng admin: tổng hợp order status, payment status, settlement.",
               "Phát hiện gian lận: fraud alerts từ database và trạng thái review thủ công.",
-              "Cài đặt admin: platform fee active và withdrawal configs."
+              "Cài đặt admin: platform fee active và withdrawal configs.",
             ].map((item) => (
               <div key={item} className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">
                 {item}
@@ -184,6 +242,58 @@ function AdminDashboardPage() {
           </div>
         </DetailPanel>
       </div>
+
+      <DetailPanel
+        eyebrow="Sản phẩm"
+        title="Ẩn hiện sản phẩm ngay trên dashboard"
+        footer={
+          <Link to="/admin/products/pending">
+            <Button variant="secondary">Mở khu vực sản phẩm</Button>
+          </Link>
+        }
+      >
+        <div className="space-y-4">
+          <DataTable
+            columns={[
+              { key: "name", title: "Sản phẩm" },
+              { key: "seller_name", title: "Seller" },
+              { key: "price", title: "Giá", render: (row) => formatCurrency(row.price || 0) },
+              { key: "approval_status", title: "Duyệt", render: (row) => <StatusBadge status={row.approval_status} /> },
+              { key: "visibility_status", title: "Hiển thị", render: (row) => <StatusBadge status={row.visibility_status} /> },
+              {
+                key: "actions",
+                title: "Thao tác",
+                render: (row) => (
+                  <div className="flex flex-wrap gap-2">
+                    <Link to={`/admin/products/${row.id}`}>
+                      <Button size="sm" variant="secondary">Chi tiết</Button>
+                    </Link>
+                    <Button
+                      size="sm"
+                      variant={row.admin_hidden ? "secondary" : "danger"}
+                      loading={productSubmittingId === String(row.id)}
+                      onClick={() => handleToggleProductVisibility(row)}
+                    >
+                      {row.admin_hidden ? "Hiện" : "Ẩn"}
+                    </Button>
+                  </div>
+                ),
+              },
+            ]}
+            rows={paginatedProducts}
+            emptyTitle="Chưa có sản phẩm"
+            emptyDescription="Backend chưa trả về sản phẩm nào cho dashboard admin."
+          />
+
+          {products.length > PRODUCTS_PER_PAGE ? (
+            <Pagination
+              page={productPage}
+              totalPages={productTotalPages}
+              onPageChange={setProductPage}
+            />
+          ) : null}
+        </div>
+      </DetailPanel>
     </div>
   );
 }

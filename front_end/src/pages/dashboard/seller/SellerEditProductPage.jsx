@@ -68,7 +68,7 @@ function SellerEditProductPage() {
         commissionValue: Number(values.commission_value),
         isEnabled: true,
       });
-      toast.success("Đã cập nhật sản phẩm.");
+      toast.success("Đã cập nhật sản phẩm và gửi lại cho admin duyệt.");
       navigate("/dashboard/seller/products");
     } catch (submitError) {
       toast.error(submitError.response?.data?.message || "Không cập nhật được sản phẩm.");
@@ -115,7 +115,7 @@ function SellerEditProductPage() {
             <StatusBadge status={product.affiliate_setting_status} />
           </div>
           <p className="mt-4 text-sm leading-7 text-slate-600">
-            Nếu chọn bộ ảnh mới, hệ thống sẽ thay toàn bộ danh sách ảnh cũ bằng danh sách mới.
+            Nếu chọn bộ ảnh mới, hệ thống sẽ thay toàn bộ danh sách ảnh cũ bằng danh sách mới. Sau khi lưu, sản phẩm và cấu hình affiliate sẽ quay lại hàng chờ admin duyệt.
           </p>
         </div>
       </div>

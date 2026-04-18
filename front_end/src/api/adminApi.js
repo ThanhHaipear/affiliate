@@ -7,6 +7,21 @@ async function getAdminOverview() {
   return unwrapResponseData(response);
 }
 
+async function getAdminProducts(params) {
+  const response = await axiosClient.get(ENDPOINTS.admin.products, { params });
+  return unwrapResponseData(response);
+}
+
+async function getAdminProductDetail(productId) {
+  const response = await axiosClient.get(ENDPOINTS.admin.productDetail(productId));
+  return unwrapResponseData(response);
+}
+
+async function setAdminProductVisibility(productId, payload) {
+  const response = await axiosClient.patch(ENDPOINTS.admin.productVisibility(productId), payload);
+  return unwrapResponseData(response);
+}
+
 async function getAdminUsers(params) {
   const response = await axiosClient.get(ENDPOINTS.admin.accounts, { params });
   return unwrapResponseData(response);
@@ -173,6 +188,8 @@ export {
   getAdminFinancialStats,
   getAdminOrders,
   getAdminOverview,
+  getAdminProducts,
+  getAdminProductDetail,
   getAdminSettings,
   getAdminUsers,
   getAdminWithdrawalSummary,
@@ -187,6 +204,7 @@ export {
   rejectSeller,
   reviewRefundRequest,
   reviewWithdrawal,
+  setAdminProductVisibility,
   unlockUser,
   unlockUserByTarget,
   updatePlatformFee,

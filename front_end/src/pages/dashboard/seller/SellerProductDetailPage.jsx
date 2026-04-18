@@ -1,17 +1,20 @@
 ﻿import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { getSellerProductDetail } from "../../../api/productApi";
+import { getSellerProductDetail, setSellerProductVisibility } from "../../../api/productApi";
 import Button from "../../../components/common/Button";
 import EmptyState from "../../../components/common/EmptyState";
 import MoneyText from "../../../components/common/MoneyText";
 import PageHeader from "../../../components/common/PageHeader";
 import StatusBadge from "../../../components/common/StatusBadge";
+import { useToast } from "../../../hooks/useToast";
 import { mapProductDto } from "../../../lib/apiMappers";
 
 function SellerProductDetailPage() {
   const { productId } = useParams();
+  const toast = useToast();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [selectedImage, setSelectedImage] = useState("");
 
@@ -55,6 +58,26 @@ function SellerProductDetailPage() {
 
   const gallery = product.gallery?.length ? product.gallery : [product.image];
 
+  async function handleToggleVisibility() {
+    try {
+      const nextVisible = product.seller_hidden || product.admin_hidden;
+
+      if (product.admin_hidden && nextVisible) {
+        toast.error("Sản phẩm đang bị admin ẩn nên seller không thể tự mở lại.");
+        return;
+      }
+
+      setSubmitting(true);
+      const updated = await setSellerProductVisibility(product.id, { visible: nextVisible });
+      setProduct(mapProductDto(updated));
+      toast.success(nextVisible ? "Đã mở lại sản phẩm." : "Đã ẩn sản phẩm khỏi shop.");
+    } catch (submitError) {
+      toast.error(submitError.response?.data?.message || "Không cập nhật được trạng thái hiển thị.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -66,6 +89,9 @@ function SellerProductDetailPage() {
             <Link to={`/dashboard/seller/products/${product.id}/edit`}>
               <Button>Chỉnh sửa</Button>
             </Link>
+            <Button variant={product.seller_hidden || product.admin_hidden ? "secondary" : "ghost"} loading={submitting} onClick={handleToggleVisibility}>
+              {product.seller_hidden || product.admin_hidden ? "Hiện sản phẩm" : "Ẩn sản phẩm"}
+            </Button>
             <Link to="/dashboard/seller/orders">
               <Button variant="secondary">Xem đơn liên quan</Button>
             </Link>
@@ -103,10 +129,16 @@ function SellerProductDetailPage() {
             <div className="flex flex-wrap gap-3">
               <StatusBadge status={product.approval_status} />
               <StatusBadge status={product.affiliate_setting_status} />
+              <StatusBadge status={product.visibility_status} />
             </div>
             <p className="mt-4 text-sm leading-7 text-slate-600">
               Nếu sản phẩm bật affiliate, cấu hình hoa hồng vẫn cần admin duyệt trước khi affiliate có thể tạo link tiếp thị.
             </p>
+            {product.admin_hidden ? (
+              <p className="mt-3 text-sm leading-7 text-rose-700">
+                Admin đang ẩn sản phẩm này. Seller không thể tự mở lại cho đến khi admin cho phép hiển thị.
+              </p>
+            ) : null}
           </Panel>
           <Panel title="Lịch sử cập nhật">
             <ul className="space-y-3 text-sm text-slate-600">

@@ -153,6 +153,8 @@ exports.upsertProductAffiliateSetting = (sellerId, productId, payload) => prisma
       commissionValue: BigInt(payload.commissionValue),
       isEnabled: payload.isEnabled ?? true,
       approvalStatus: "PENDING",
+      reviewedBy: null,
+      reviewedAt: null,
       rejectReason: null,
       updatedAt: now
     },
@@ -178,4 +180,54 @@ exports.upsertProductAffiliateSetting = (sellerId, productId, payload) => prisma
   });
 
   return setting;
+});
+
+exports.setProductVisibility = (sellerId, productId, visible) => prisma.$transaction(async (tx) => {
+  const product = await tx.product.findFirst({
+    where: { sellerId, id: productId },
+    include: {
+      category: true,
+      images: true,
+      variants: { include: { inventory: true } },
+      affiliateSetting: true,
+      seller: true,
+    },
+  });
+
+  if (!product) {
+    throw new Error("Product not found");
+  }
+
+  if (visible && product.lockedAt) {
+    throw new Error("Product is hidden by admin and cannot be shown by seller");
+  }
+
+  const now = new Date();
+  const updated = await tx.product.update({
+    where: { id: productId },
+    data: {
+      sellerHiddenAt: visible ? null : now,
+      updatedAt: now,
+    },
+    include: {
+      category: true,
+      images: true,
+      variants: { include: { inventory: true } },
+      affiliateSetting: true,
+      seller: true,
+    },
+  });
+
+  await tx.activityLog.create({
+    data: {
+      accountId: product.seller.ownerAccountId,
+      action: visible ? "SELLER_SHOW_PRODUCT" : "SELLER_HIDE_PRODUCT",
+      targetType: "PRODUCT",
+      targetId: BigInt(productId),
+      description: `${visible ? "Seller showed" : "Seller hid"} product ${product.name || `#${productId}`}`,
+      createdAt: now,
+    },
+  });
+
+  return updated;
 });

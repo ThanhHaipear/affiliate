@@ -12,6 +12,11 @@ exports.getAccounts = asyncHandler(async (req, res) => {
   successResponse(res, data, "Admin accounts loaded");
 });
 
+exports.getProducts = asyncHandler(async (req, res) => {
+  const data = await adminService.getProducts(req.validated?.query || req.query || {});
+  successResponse(res, data, "Admin products loaded");
+});
+
 exports.lockAccount = asyncHandler(async (req, res) => {
   const data = await adminService.lockAccount(req.params.accountId, req.user.id, req.validated?.body || req.body || {});
   successResponse(res, data, "Account locked");
@@ -65,6 +70,16 @@ exports.reviewAffiliate = asyncHandler(async (req, res) => {
 exports.reviewProduct = asyncHandler(async (req, res) => {
   const data = await adminService.reviewProduct(req.params.productId, req.user.id, req.validated.body);
   successResponse(res, data, "Product reviewed");
+});
+
+exports.getProduct = asyncHandler(async (req, res) => {
+  const data = await adminService.getProductById(req.params.productId);
+  successResponse(res, data, "Admin product loaded");
+});
+
+exports.setProductVisibility = asyncHandler(async (req, res) => {
+  const data = await adminService.setProductVisibility(req.params.productId, req.user.id, req.validated.body);
+  successResponse(res, data, "Product visibility updated");
 });
 
 exports.reviewProductAffiliate = asyncHandler(async (req, res) => {

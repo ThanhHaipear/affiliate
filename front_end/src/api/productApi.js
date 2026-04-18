@@ -32,6 +32,11 @@ async function getSellerProductDetail(productId) {
   return unwrapResponseData(response);
 }
 
+async function setSellerProductVisibility(productId, payload) {
+  const response = await axiosClient.patch(ENDPOINTS.seller.productVisibility(productId), payload);
+  return unwrapResponseData(response);
+}
+
 async function uploadSellerProductImages(files, scope = "product") {
   const formData = new FormData();
 
@@ -78,6 +83,7 @@ export {
   getSellerAffiliateSettings,
   getSellerProductDetail,
   getSellerProducts,
+  setSellerProductVisibility,
   updateSellerAffiliateSetting,
   updateSellerProduct,
   uploadSellerProductImages,

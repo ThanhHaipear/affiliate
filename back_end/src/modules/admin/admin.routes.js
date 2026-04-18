@@ -8,7 +8,10 @@ const {
   reviewSchema,
   lockAccountSchema,
   accountActionParamsSchema,
+  productActionParamsSchema,
+  productVisibilitySchema,
   accountListQuerySchema,
+  adminProductsQuerySchema,
   adminOrdersQuerySchema,
   fraudAlertsQuerySchema,
   platformFeeSchema,
@@ -21,6 +24,7 @@ const router = express.Router();
 router.use(authenticate, authorize("ADMIN"));
 router.get("/dashboard", controller.getDashboard);
 router.get("/accounts", validate(accountListQuerySchema), controller.getAccounts);
+router.get("/products", validate(adminProductsQuerySchema), controller.getProducts);
 router.patch("/accounts/:accountId/lock", validate(lockAccountSchema), controller.lockAccount);
 router.patch("/accounts/:accountId/unlock", validate(accountActionParamsSchema), controller.unlockAccount);
 router.get("/orders", validate(adminOrdersQuerySchema), controller.getOrders);
@@ -29,6 +33,8 @@ router.get("/fraud-alerts", validate(fraudAlertsQuerySchema), controller.getFrau
 router.get("/settings", controller.getPlatformSettings);
 router.put("/settings/platform-fee", validate(platformFeeSchema), controller.updatePlatformFee);
 router.put("/settings/withdrawal-config", validate(withdrawalConfigSchema), controller.updateWithdrawalConfig);
+router.get("/products/:productId", validate(productActionParamsSchema), controller.getProduct);
+router.patch("/products/:productId/visibility", validate(productVisibilitySchema), controller.setProductVisibility);
 router.patch("/sellers/:sellerId/review", validate(reviewSchema), controller.reviewSeller);
 router.patch("/affiliates/:affiliateId/review", validate(reviewSchema), controller.reviewAffiliate);
 router.patch("/products/:productId/review", validate(reviewSchema), controller.reviewProduct);

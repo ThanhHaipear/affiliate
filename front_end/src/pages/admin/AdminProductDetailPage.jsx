@@ -3,9 +3,10 @@ import { Link, useParams } from "react-router-dom";
 import {
   approveAffiliateSetting,
   approveProduct,
-  getAdminOverview,
+  getAdminProductDetail,
   rejectAffiliateSetting,
   rejectProduct,
+  setAdminProductVisibility,
 } from "../../api/adminApi";
 import DetailPanel from "../../components/admin/DetailPanel";
 import LoadingSkeleton from "../../components/admin/LoadingSkeleton";
@@ -16,8 +17,27 @@ import Input from "../../components/common/Input";
 import PageHeader from "../../components/common/PageHeader";
 import StatusBadge from "../../components/common/StatusBadge";
 import { useToast } from "../../hooks/useToast";
-import { mapAdminOverview, parseAdminProductRouteId } from "../../lib/adminMappers";
+import { mapProductDto } from "../../lib/apiMappers";
 import { formatDateTime } from "../../lib/format";
+
+function buildReviewSummary(product) {
+  const catalogPending = product?.raw?.status === "PENDING";
+  const affiliatePending = product?.raw?.affiliateSetting?.approvalStatus === "PENDING";
+
+  if (catalogPending && affiliatePending) {
+    return "Đang chờ duyệt catalog và affiliate";
+  }
+
+  if (catalogPending) {
+    return "Đang chờ duyệt catalog";
+  }
+
+  if (affiliatePending) {
+    return "Đang chờ duyệt affiliate";
+  }
+
+  return "Không có review pending";
+}
 
 function AdminProductDetailPage() {
   const toast = useToast();
@@ -35,28 +55,16 @@ function AdminProductDetailPage() {
   }, [id]);
 
   async function loadProduct() {
-    const parsed = parseAdminProductRouteId(id);
-
     try {
       setLoading(true);
       setError("");
-      const response = await getAdminOverview();
-      const overview = mapAdminOverview(response);
-      const match = overview.groupedPendingProducts.find((item) => {
-        if (item.productId === parsed.productId) {
-          return true;
-        }
-
-        return (
-          item.catalogReview.reviewEntityId === parsed.reviewEntityId ||
-          item.affiliateReview.reviewEntityId === parsed.reviewEntityId
-        );
-      });
-
-      setProduct(match || null);
-      setSelectedImage(match?.gallery?.[0] || "");
+      const response = await getAdminProductDetail(id);
+      const mapped = mapProductDto(response);
+      setProduct(mapped);
+      setSelectedImage(mapped.gallery?.[0] || mapped.image);
     } catch (loadError) {
       setError(loadError.response?.data?.message || "Không tải được chi tiết sản phẩm.");
+      setProduct(null);
     } finally {
       setLoading(false);
     }
@@ -67,26 +75,43 @@ function AdminProductDetailPage() {
       return;
     }
 
+    const catalogPending = product.raw?.status === "PENDING";
+    const affiliatePending = product.raw?.affiliateSetting?.approvalStatus === "PENDING";
+
     try {
       setSubmitting(true);
-      if (product.catalogReview.available) {
-        await (
-          action === "approve"
-            ? approveProduct(product.catalogReview.reviewEntityId)
-            : rejectProduct(product.catalogReview.reviewEntityId, { rejectReason })
-        );
-      } else if (product.affiliateReview.available) {
-        await (
-          action === "approve"
-            ? approveAffiliateSetting(product.affiliateReview.reviewEntityId)
-            : rejectAffiliateSetting(product.affiliateReview.reviewEntityId, { rejectReason })
-        );
+
+      if (action === "approve") {
+        if (catalogPending) {
+          await approveProduct(product.id);
+        } else if (affiliatePending) {
+          await approveAffiliateSetting(product.raw.affiliateSetting.id);
+        }
+      }
+
+      if (action === "reject") {
+        if (catalogPending) {
+          await rejectProduct(product.id, { rejectReason });
+        } else if (affiliatePending) {
+          await rejectAffiliateSetting(product.raw.affiliateSetting.id, { rejectReason });
+        }
+      }
+
+      if (action === "hide" || action === "show") {
+        await setAdminProductVisibility(product.id, {
+          visible: action === "show",
+          reason: action === "hide" ? rejectReason : undefined,
+        });
       }
 
       toast.success(
         action === "approve"
-          ? "Đã duyệt sản phẩm và các cấu hình liên quan."
-          : "Đã từ chối sản phẩm và các cấu hình liên quan.",
+          ? "Đã duyệt sản phẩm."
+          : action === "reject"
+            ? "Đã từ chối sản phẩm."
+            : action === "hide"
+              ? "Đã ẩn sản phẩm."
+              : "Đã mở hiển thị sản phẩm.",
       );
       setAction(null);
       setRejectReason("");
@@ -106,14 +131,18 @@ function AdminProductDetailPage() {
     return (
       <EmptyState
         title="Không tìm thấy sản phẩm"
-        description={error || "Sản phẩm này không còn nằm trong danh sách chờ duyệt hoặc backend không trả về bản ghi."}
-        actionLabel="Quay lại danh sách sản phẩm chờ duyệt"
+        description={error || "Sản phẩm không tồn tại hoặc backend không trả về bản ghi."}
+        actionLabel="Quay lại"
         onAction={() => window.history.back()}
       />
     );
   }
 
   const gallery = product.gallery?.length ? product.gallery : [];
+  const catalogPending = product.raw?.status === "PENDING";
+  const affiliatePending = product.raw?.affiliateSetting?.approvalStatus === "PENDING";
+  const canReview = catalogPending || affiliatePending;
+  const reviewSummary = buildReviewSummary(product);
 
   return (
     <div className="space-y-6">
@@ -122,39 +151,56 @@ function AdminProductDetailPage() {
         title={product.name}
         description={product.description}
         action={
-          <div className="flex gap-3">
-            <Button variant="danger" onClick={() => setAction("reject")}>
-              Từ chối sản phẩm
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant={product.admin_hidden ? "secondary" : "danger"}
+              onClick={() => setAction(product.admin_hidden ? "show" : "hide")}
+            >
+              {product.admin_hidden ? "Hiện sản phẩm" : "Ẩn sản phẩm"}
             </Button>
-            <Button onClick={() => setAction("approve")}>Duyệt sản phẩm</Button>
+            {canReview ? (
+              <>
+                <Button variant="danger" onClick={() => setAction("reject")}>
+                  Từ chối sản phẩm
+                </Button>
+                <Button onClick={() => setAction("approve")}>Duyệt sản phẩm</Button>
+              </>
+            ) : null}
           </div>
         }
       />
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <DetailPanel eyebrow="Dữ liệu thương mại" title="Giá bán và hoa hồng">
           <div className="grid gap-3 sm:grid-cols-2">
-            <InfoItem label="Seller" value={product.sellerName} />
-            <InfoItem label="Trạng thái review" value={product.reviewSummary} />
-            <InfoItem label="Danh mục sản phẩm" value={product.productCategory} />
+            <InfoItem label="Seller" value={product.seller_name} />
+            <InfoItem label="Trạng thái review" value={reviewSummary} />
+            <InfoItem label="Danh mục sản phẩm" value={product.category} />
             <InfoItem label="Giá" value={product.price ? product.price.toLocaleString("vi-VN") : "--"} />
-            <InfoItem label="Hoa hồng" value={product.commissionRate || "--"} />
+            <InfoItem label="Hoa hồng" value={`${Number(product.commission_value || 0)}%`} />
             <InfoItem label="Tồn kho" value={product.stock === null ? "--" : String(product.stock)} />
-            <InfoItem label="Ngày gửi" value={formatDateTime(product.submittedAt)} />
-            <InfoItem label="Rủi ro" value={product.riskLevel} />
+            <InfoItem label="Ngày cập nhật" value={formatDateTime(product.raw?.updatedAt || product.raw?.createdAt)} />
+            <InfoItem label="Hiển thị" value={product.visibility_status} />
           </div>
         </DetailPanel>
-        <DetailPanel eyebrow="Trạng thái duyệt" title="Một quyết định review">
+        <DetailPanel eyebrow="Trạng thái duyệt" title="Tổng hợp trạng thái">
           <div className="space-y-4">
-            <div className="flex items-center gap-3 rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4">
-              <StatusBadge status={product.reviewStatus} />
-              <p className="text-sm text-slate-300">{product.reviewSummary}</p>
+            <div className="flex flex-wrap gap-3 rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4">
+              <StatusBadge status={product.approval_status} />
+              <StatusBadge status={product.affiliate_setting_status} />
+              <StatusBadge status={product.visibility_status} />
             </div>
             <div className="space-y-3">
               <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">
-                Review catalog: {product.catalogReview.available ? "Đang chờ duyệt" : product.catalogReview.status}
+                Review catalog: {catalogPending ? "Đang chờ duyệt" : product.approval_status}
               </div>
               <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">
-                Review affiliate: {product.affiliateReview.available ? "Đang chờ duyệt" : product.affiliateReview.status}
+                Review affiliate: {affiliatePending ? "Đang chờ duyệt" : product.affiliate_setting_status}
+              </div>
+              <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">
+                Hiển thị seller: {product.seller_hidden ? "Seller đang ẩn" : "Seller đang mở"}
+              </div>
+              <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">
+                Hiển thị admin: {product.admin_hidden ? "Admin đang ẩn" : "Admin đang mở"}
               </div>
             </div>
           </div>
@@ -190,8 +236,7 @@ function AdminProductDetailPage() {
               {product.variants.map((variant) => (
                 <div key={variant.id} className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">
                   <p className="font-semibold text-white">{variant.name}</p>
-                  <p className="mt-2">SKU: {variant.sku}</p>
-                  <p>Giá: {variant.price.toLocaleString("vi-VN")}</p>
+                  <p className="mt-2">Giá: {variant.price.toLocaleString("vi-VN")}</p>
                   <p>Tồn kho: {variant.quantity}</p>
                 </div>
               ))}
@@ -204,8 +249,8 @@ function AdminProductDetailPage() {
         </DetailPanel>
       </div>
       <DetailPanel
-        eyebrow="Ghi chú kiểm duyệt"
-        title="Bối cảnh rủi ro và phê duyệt"
+        eyebrow="Ghi chú quản trị"
+        title="Quyền ưu tiên của admin"
         footer={
           <Link to="/admin/products/pending">
             <Button variant="secondary">Quay lại danh sách sản phẩm chờ duyệt</Button>
@@ -213,14 +258,22 @@ function AdminProductDetailPage() {
         }
       >
         <div className="rounded-[1.5rem] bg-white/[0.04] p-4 text-sm leading-7 text-slate-300">
-          Admin chỉ cần đưa ra một quyết định duy nhất cho sản phẩm này. Nếu sản phẩm đang có catalog pending và affiliate pending, hành động duyệt hoặc từ chối sẽ đồng bộ cả hai phần cùng một lý do review.
+          Admin là quyền cao nhất với sản phẩm. Nếu admin ẩn, seller không thể tự mở lại. Nếu seller đang ẩn sản phẩm, admin vẫn có thể mở hoặc ẩn tiếp sản phẩm đó.
         </div>
       </DetailPanel>
       <ConfirmModal
         open={Boolean(action)}
-        title={action === "approve" ? "Duyệt sản phẩm" : "Từ chối sản phẩm"}
-        description={`Xác nhận ${action === "approve" ? "duyệt" : "từ chối"} cho ${product.name}. Nếu sản phẩm đang có catalog và affiliate pending, hệ thống sẽ cập nhật cả hai cùng một lúc.`}
-        confirmVariant={action === "approve" ? "primary" : "danger"}
+        title={
+          action === "approve"
+            ? "Duyệt sản phẩm"
+            : action === "reject"
+              ? "Từ chối sản phẩm"
+              : action === "hide"
+                ? "Ẩn sản phẩm"
+                : "Hiện sản phẩm"
+        }
+        description={`Xác nhận thao tác cho ${product.name}.`}
+        confirmVariant={action === "approve" || action === "show" ? "primary" : "danger"}
         onClose={() => {
           setAction(null);
           setRejectReason("");
@@ -228,12 +281,12 @@ function AdminProductDetailPage() {
         onConfirm={handleConfirmAction}
         loading={submitting}
       >
-        {action === "reject" ? (
+        {action === "reject" || action === "hide" ? (
           <Input
-            label="Lý do từ chối"
+            label={action === "reject" ? "Lý do từ chối" : "Lý do ẩn"}
             value={rejectReason}
             onChange={(event) => setRejectReason(event.target.value)}
-            placeholder="Nêu rõ vấn đề về chính sách hoặc chất lượng"
+            placeholder={action === "reject" ? "Nêu rõ vấn đề về chính sách hoặc chất lượng" : "Lý do admin ẩn sản phẩm"}
           />
         ) : null}
       </ConfirmModal>

@@ -17,6 +17,9 @@ const ENDPOINTS = {
   },
   admin: {
     dashboard: `${API_PREFIX}/admin/dashboard`,
+    products: `${API_PREFIX}/admin/products`,
+    productDetail: (productId) => `${API_PREFIX}/admin/products/${productId}`,
+    productVisibility: (productId) => `${API_PREFIX}/admin/products/${productId}/visibility`,
     accounts: `${API_PREFIX}/admin/accounts`,
     accountLock: (userId) => `${API_PREFIX}/admin/accounts/${userId}/lock`,
     accountUnlock: (userId) => `${API_PREFIX}/admin/accounts/${userId}/unlock`,
@@ -38,6 +41,7 @@ const ENDPOINTS = {
     orders: `${API_PREFIX}/seller/orders`,
     products: `${API_PREFIX}/seller/products`,
     productDetail: (productId) => `${API_PREFIX}/seller/products/${productId}`,
+    productVisibility: (productId) => `${API_PREFIX}/seller/products/${productId}/visibility`,
     productAffiliateSetting: (productId) => `${API_PREFIX}/seller/products/${productId}/affiliate-setting`,
     affiliateSettings: `${API_PREFIX}/seller/affiliate-settings`,
   },

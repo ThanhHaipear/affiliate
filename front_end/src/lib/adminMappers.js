@@ -152,7 +152,7 @@ function mapPendingCatalogProductDto(product) {
     commissionRate: product.affiliateSetting
       ? `${toNumber(product.affiliateSetting.commissionValue)} ${toText(product.affiliateSetting.commissionType, "")}`.trim()
       : "--",
-    submittedAt: product.createdAt,
+    submittedAt: product.updatedAt || product.createdAt,
     status: toText(product.status, "PENDING"),
     stock,
     description: toText(product.description, "San pham chua co mo ta chi tiet."),
@@ -190,7 +190,7 @@ function mapPendingAffiliateSettingDto(setting) {
     productCategory: toText(setting.product?.category?.name, "General"),
     price: toNumber(setting.product?.variants?.[0]?.price ?? setting.product?.basePrice),
     commissionRate: `${toNumber(setting.commissionValue)} ${toText(setting.commissionType, "")}`.trim(),
-    submittedAt: setting.createdAt,
+    submittedAt: setting.updatedAt || setting.createdAt,
     status: toText(setting.approvalStatus, "PENDING"),
     stock,
     description: toText(setting.product?.description, "Cau hinh hoa hong san pham dang cho admin duyet."),

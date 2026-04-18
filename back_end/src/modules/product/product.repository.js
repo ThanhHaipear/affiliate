@@ -72,6 +72,8 @@ exports.listApprovedProducts = async () => {
   const products = await prisma.product.findMany({
     where: {
       status: "APPROVED",
+      sellerHiddenAt: null,
+      lockedAt: null,
       ...approvedSellerWhere,
       affiliateSetting: {
         approvalStatus: "APPROVED",
@@ -95,6 +97,8 @@ exports.findApprovedProductById = async (id) => {
     where: {
       id,
       status: "APPROVED",
+      sellerHiddenAt: null,
+      lockedAt: null,
       ...approvedSellerWhere,
       affiliateSetting: {
         approvalStatus: "APPROVED",
@@ -335,7 +339,18 @@ exports.updateProduct = (productId, sellerId, payload) => prisma.$transaction(as
   const existingProduct = await tx.product.findFirst({
     where: { id: productId, sellerId },
     include: {
-      variants: true,
+      variants: {
+        include: {
+          inventory: true,
+          _count: {
+            select: {
+              orderItems: true,
+              cartItems: true,
+              inventoryTransactions: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -352,6 +367,9 @@ exports.updateProduct = (productId, sellerId, payload) => prisma.$transaction(as
       description: payload.description,
       basePrice: BigInt(payload.basePrice),
       status: "PENDING",
+      reviewedBy: null,
+      reviewedAt: null,
+      rejectReason: null,
       updatedAt: now,
     },
   });
@@ -369,13 +387,46 @@ exports.updateProduct = (productId, sellerId, payload) => prisma.$transaction(as
     });
   }
 
-  const existingVariantIds = existingProduct.variants.map((variant) => variant.id);
-  if (existingVariantIds.length) {
-    await tx.inventory.deleteMany({ where: { variantId: { in: existingVariantIds } } });
-    await tx.productVariant.deleteMany({ where: { productId } });
-  }
+  const existingVariants = [...existingProduct.variants].sort((left, right) => left.id - right.id);
 
-  for (const variant of payload.variants) {
+  for (let index = 0; index < payload.variants.length; index += 1) {
+    const variant = payload.variants[index];
+    const currentVariant = existingVariants[index];
+
+    if (currentVariant) {
+      await tx.productVariant.update({
+        where: { id: currentVariant.id },
+        data: {
+          sku: variant.sku,
+          variantName: variant.variantName,
+          options: variant.options,
+          price: BigInt(variant.price),
+          status: "ACTIVE",
+          updatedAt: now,
+        },
+      });
+
+      if (currentVariant.inventory) {
+        await tx.inventory.update({
+          where: { variantId: currentVariant.id },
+          data: {
+            quantity: variant.quantity,
+            updatedAt: now,
+          },
+        });
+      } else {
+        await tx.inventory.create({
+          data: {
+            variantId: currentVariant.id,
+            quantity: variant.quantity,
+            updatedAt: now,
+          },
+        });
+      }
+
+      continue;
+    }
+
     const createdVariant = await tx.productVariant.create({
       data: {
         productId,
@@ -383,6 +434,7 @@ exports.updateProduct = (productId, sellerId, payload) => prisma.$transaction(as
         variantName: variant.variantName,
         options: variant.options,
         price: BigInt(variant.price),
+        status: "ACTIVE",
         createdAt: now,
         updatedAt: now,
       },
@@ -394,6 +446,47 @@ exports.updateProduct = (productId, sellerId, payload) => prisma.$transaction(as
         quantity: variant.quantity,
         updatedAt: now,
       },
+    });
+  }
+
+  const surplusVariants = existingVariants.slice(payload.variants.length);
+  for (const variant of surplusVariants) {
+    const hasReferences =
+      variant._count.orderItems > 0 ||
+      variant._count.cartItems > 0 ||
+      variant._count.inventoryTransactions > 0;
+
+    if (hasReferences) {
+      await tx.productVariant.update({
+        where: { id: variant.id },
+        data: {
+          status: "INACTIVE",
+          updatedAt: now,
+        },
+      });
+
+      if (variant.inventory) {
+        await tx.inventory.update({
+          where: { variantId: variant.id },
+          data: {
+            quantity: 0,
+            reservedQuantity: 0,
+            updatedAt: now,
+          },
+        });
+      }
+
+      continue;
+    }
+
+    if (variant.inventory) {
+      await tx.inventory.delete({
+        where: { variantId: variant.id },
+      });
+    }
+
+    await tx.productVariant.delete({
+      where: { id: variant.id },
     });
   }
 
