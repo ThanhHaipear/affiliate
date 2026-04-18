@@ -57,6 +57,11 @@ async function revokeAffiliateLink(linkId) {
   return unwrapResponseData(response);
 }
 
+async function unrevokeAffiliateLink(linkId) {
+  const response = await axiosClient.patch(ENDPOINTS.tracking.linkUnrevoke(linkId));
+  return unwrapResponseData(response);
+}
+
 async function getAffiliateLinks(params) {
   const response = await axiosClient.get(ENDPOINTS.tracking.links, { params });
   return unwrapResponseData(response);
@@ -77,6 +82,7 @@ export {
   getAffiliateOverview,
   getAffiliateProfile,
   revokeAffiliateLink,
+  unrevokeAffiliateLink,
   updateAffiliateProfile,
   uploadAffiliateAvatar,
 };

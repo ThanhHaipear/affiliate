@@ -11,6 +11,36 @@ function toText(value, fallback = "--") {
   return String(value);
 }
 
+function getAccountDisplayName(account = {}) {
+  return (
+    account?.adminProfile?.fullName ||
+    account?.affiliate?.fullName ||
+    account?.customerProfile?.fullName ||
+    account?.sellers?.[0]?.shopName ||
+    account?.email ||
+    account?.phone ||
+    (account?.id ? `Account #${account.id}` : "--")
+  );
+}
+
+function getAccountActorRole(account = {}) {
+  const roles = (account?.accountRoles || []).map((item) => item.role?.code).filter(Boolean);
+
+  if (roles.includes("ADMIN")) return "Admin";
+  if (roles.includes("SELLER")) return "Seller";
+  if (roles.includes("AFFILIATE")) return "Affiliate";
+  if (roles.includes("CUSTOMER")) return "Customer";
+  return "Account";
+}
+
+function buildAccountActorLabel(account = null, fallbackId = null) {
+  if (!account) {
+    return fallbackId ? `Account #${fallbackId}` : "--";
+  }
+
+  return `${getAccountActorRole(account)}: ${getAccountDisplayName(account)}`;
+}
+
 function buildPaymentLabel(paymentAccount) {
   if (!paymentAccount) {
     return "Chua co tai khoan nhan tien";
@@ -476,8 +506,41 @@ function mapFraudAlertDto(alert) {
   };
 }
 
+function mapAdminAffiliateLinkDto(link) {
+  const revokedByRoles = (link?.revokedByAccount?.accountRoles || []).map((item) => item.role?.code).filter(Boolean);
+  const revokedByAdmin = revokedByRoles.includes("ADMIN");
+  const variant = link?.product?.variants?.[0] || {};
+  const inventory = variant?.inventory || {};
+  const availableStock = Math.max(0, toNumber(inventory.quantity) - toNumber(inventory.reservedQuantity));
+
+  return {
+    id: String(link.id),
+    shortCode: toText(link.shortCode),
+    status: toText(link.status, "ACTIVE"),
+    statusDisplay: link.status === "REVOKED" ? (revokedByAdmin ? "REVOKED_BY_ADMIN" : "REVOKED_BY_AFFILIATE") : toText(link.status, "ACTIVE"),
+    affiliateId: String(link.affiliateId),
+    affiliateName: toText(link.affiliate?.fullName || link.affiliate?.account?.email, `Affiliate #${link.affiliateId}`),
+    affiliateEmail: toText(link.affiliate?.account?.email),
+    productId: String(link.productId),
+    productName: toText(link.product?.name, `Product #${link.productId}`),
+    shopName: toText(link.product?.seller?.shopName),
+    category: toText(link.product?.category?.name, "General"),
+    clickCount: toNumber(link.clicks?.length),
+    orderCount: toNumber(link.orderItems?.length),
+    commissionValue: toNumber(link.product?.affiliateSetting?.commissionValue),
+    stock: availableStock,
+    createdAt: link.createdAt,
+    revokedAt: link.revokedAt,
+    revokedByAdmin,
+    revokedByLabel: buildAccountActorLabel(link.revokedByAccount, link.revokedBy),
+    productImage: link.product?.images?.[0]?.url || "https://placehold.co/800x600?text=Product",
+    raw: link,
+  };
+}
+
 export {
   mapAdminAccountDto,
+  mapAdminAffiliateLinkDto,
   mapAdminOrderDto,
   mapAdminOverview,
   mapFraudAlertDto,

@@ -1,6 +1,7 @@
 const asyncHandler = require("../../utils/async-handler");
 const { successResponse } = require("../../utils/api-response");
 const paymentService = require("./payment.service");
+const realtimeService = require("../../realtime/realtime.service");
 
 exports.createVnpayPaymentUrl = asyncHandler(async (req, res) => {
   const data = await paymentService.createVnpayPaymentUrl(req.user.id, req.params.orderId, req.validated.body, req);
@@ -19,6 +20,14 @@ exports.confirmVnpayReturn = asyncHandler(async (req, res) => {
 
 exports.handleVnpayIpn = asyncHandler(async (req, res) => {
   const data = await paymentService.handleVnpayIpn(req.query);
+  if (data?.RspCode === "00" || data?.RspCode === "02") {
+    realtimeService.emitMutation({
+      method: "POST",
+      path: req.originalUrl || req.url || "",
+      statusCode: 200,
+      message: "VNPAY IPN processed",
+    });
+  }
   res.status(200).json(data);
 });
 

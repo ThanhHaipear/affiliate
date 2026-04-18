@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { createAffiliateLink } from "../../api/affiliateApi";
 import { updateCartItem } from "../../api/orderApi";
 import { createProductReview, getProductDetail, getProductReviews } from "../../api/productApi";
-import { trackAffiliateClick } from "../../api/trackingApi";
+import { getAffiliateLinkStatus, trackAffiliateClick } from "../../api/trackingApi";
 import Button from "../../components/common/Button";
 import CopyBox from "../../components/common/CopyBox";
 import EmptyState from "../../components/common/EmptyState";
@@ -12,7 +12,7 @@ import SectionIntro from "../../components/storefront/SectionIntro";
 import { useRole } from "../../hooks/useRole";
 import { useToast } from "../../hooks/useToast";
 import { getDeviceId, getProductAttribution, removeProductAttribution, saveProductAttribution } from "../../lib/affiliateAttribution";
-import { mapProductDto } from "../../lib/apiMappers";
+import { buildAccountActorLabel, mapProductDto } from "../../lib/apiMappers";
 import { isWishlisted, toggleWishlist } from "../../lib/wishlist";
 import { useAuthStore } from "../../store/authStore";
 
@@ -40,6 +40,7 @@ function ProductDetailPage() {
   const [selectedImage, setSelectedImage] = useState("");
   const [wishlisted, setWishlisted] = useState(false);
   const [trackedAffiliateSource, setTrackedAffiliateSource] = useState(null);
+  const [affiliateLinkNotice, setAffiliateLinkNotice] = useState("");
   const [quantity, setQuantity] = useState("1");
 
   useEffect(() => {
@@ -149,8 +150,33 @@ function ProductDetailPage() {
         return;
       }
 
+      try {
+        const linkStatus = await getAffiliateLinkStatus(shortCode);
+
+        if (linkStatus?.status === "REVOKED") {
+          removeProductAttribution(product.id);
+          if (active) {
+            setTrackedAffiliateSource(null);
+            setAffiliateLinkNotice(
+              `Link affiliate nay da bi vo hieu hoa boi ${buildAccountActorLabel(linkStatus.revokedByAccount, linkStatus.revokedBy)}. He thong se khong ghi nhan click hoac don hang tu link nay nua.`,
+            );
+          }
+          navigate(`/products/${product.id}`, { replace: true });
+          return;
+        }
+      } catch (statusError) {
+        removeProductAttribution(product.id);
+        if (active) {
+          setTrackedAffiliateSource(null);
+          setAffiliateLinkNotice(statusError.response?.data?.message || "Link affiliate nay khong con hop le.");
+        }
+        navigate(`/products/${product.id}`, { replace: true });
+        return;
+      }
+
       if (cached?.shortCode === shortCode && active) {
         setTrackedAffiliateSource(cached);
+        setAffiliateLinkNotice("");
         return;
       }
 
@@ -172,11 +198,15 @@ function ProductDetailPage() {
         saveProductAttribution(product.id, attribution);
         if (active) {
           setTrackedAffiliateSource(attribution);
+          setAffiliateLinkNotice("");
         }
-      } catch (_trackError) {
-        if (cached && active) {
-          setTrackedAffiliateSource(cached);
+      } catch (trackError) {
+        removeProductAttribution(product.id);
+        if (active) {
+          setTrackedAffiliateSource(null);
+          setAffiliateLinkNotice(trackError.response?.data?.message || "Link affiliate nay khong con hop le.");
         }
+        navigate(`/products/${product.id}`, { replace: true });
       }
     }
 
@@ -412,6 +442,11 @@ function ProductDetailPage() {
           {trackedAffiliateSource?.token ? (
             <div className="rounded-[1.5rem] bg-emerald-50 p-4 text-sm leading-7 text-emerald-900">
               Sản phẩm này đang được ghi nhận theo link tiếp thị liên kết. Nếu bạn thêm vào giỏ hoặc đặt đơn, hệ thống sẽ giữ attribution cho đơn hàng này.
+            </div>
+          ) : null}
+          {affiliateLinkNotice ? (
+            <div className="rounded-[1.5rem] bg-amber-50 p-4 text-sm leading-7 text-amber-900">
+              {affiliateLinkNotice}
             </div>
           ) : null}
           <p className="text-sm leading-7 text-slate-600">{product.description || "Chưa có mô tả chi tiết."}</p>

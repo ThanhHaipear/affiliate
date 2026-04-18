@@ -6,6 +6,8 @@ const navigationGroups = [
     title: "Tổng quan",
     items: [
       { label: "Bảng điều khiển", to: "/admin/dashboard", hint: "Toàn cảnh hệ thống" },
+      { label: "Quản lý sản phẩm", to: "/admin/products", hint: "Danh sách sản phẩm toàn hệ thống" },
+      { label: "Link của affiliate", to: "/admin/affiliate-links", hint: "Xem và khóa link tiếp thị" },
       { label: "Tài khoản", to: "/admin/accounts", hint: "Người dùng và vai trò" },
       { label: "Thông báo", to: "/admin/notifications", hint: "Hộp thư sự kiện admin" },
     ],

@@ -70,6 +70,20 @@ exports.fraudAlertsQuerySchema = z.object({
   }),
 });
 
+exports.affiliateLinksQuerySchema = z.object({
+  query: z.object({
+    q: z.string().trim().optional(),
+    affiliateId: z.coerce.number().int().positive().optional(),
+    status: z.string().trim().optional(),
+  }),
+});
+
+exports.affiliateLinkActionParamsSchema = z.object({
+  params: z.object({
+    linkId: z.coerce.number().int().positive(),
+  }),
+});
+
 exports.platformFeeSchema = z.object({
   body: z.object({
     feeValue: z.coerce.number().min(0).max(100),

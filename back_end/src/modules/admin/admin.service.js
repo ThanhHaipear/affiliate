@@ -65,6 +65,13 @@ exports.getFraudAlerts = async (query) =>
     severity: query?.severity,
   });
 
+exports.getAffiliateLinks = async (query) =>
+  adminRepository.listAffiliateLinks({
+    q: query?.q,
+    affiliateId: query?.affiliateId,
+    status: query?.status,
+  });
+
 exports.getPlatformSettings = async () => adminRepository.getPlatformSettings();
 
 exports.updatePlatformFee = async (adminId, payload) => {
@@ -141,6 +148,28 @@ exports.setProductVisibility = async (productId, adminId, payload) => {
       adminId,
       visible: payload.visible,
       reason: payload.reason,
+    });
+  } catch (error) {
+    throw new AppError(error.message, 400);
+  }
+};
+
+exports.revokeAffiliateLink = async (linkId, adminId) => {
+  try {
+    return await adminRepository.revokeAffiliateLink({
+      linkId: Number(linkId),
+      adminId,
+    });
+  } catch (error) {
+    throw new AppError(error.message, 400);
+  }
+};
+
+exports.unrevokeAffiliateLink = async (linkId, adminId) => {
+  try {
+    return await adminRepository.unrevokeAffiliateLink({
+      linkId: Number(linkId),
+      adminId,
     });
   } catch (error) {
     throw new AppError(error.message, 400);

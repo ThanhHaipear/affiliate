@@ -27,6 +27,9 @@ const ENDPOINTS = {
     affiliateReview: (affiliateId) => `${API_PREFIX}/admin/affiliates/${affiliateId}/review`,
     productReview: (productId) => `${API_PREFIX}/admin/products/${productId}/review`,
     productAffiliateReview: (settingId) => `${API_PREFIX}/admin/product-affiliate-settings/${settingId}/review`,
+    affiliateLinks: `${API_PREFIX}/admin/affiliate-links`,
+    affiliateLinkRevoke: (linkId) => `${API_PREFIX}/admin/affiliate-links/${linkId}/revoke`,
+    affiliateLinkUnrevoke: (linkId) => `${API_PREFIX}/admin/affiliate-links/${linkId}/unrevoke`,
     orders: `${API_PREFIX}/admin/orders`,
     financialStats: `${API_PREFIX}/admin/financial-stats`,
     settings: `${API_PREFIX}/admin/settings`,
@@ -78,6 +81,7 @@ const ENDPOINTS = {
   tracking: {
     links: `${API_PREFIX}/tracking/links`,
     linkRevoke: (linkId) => `${API_PREFIX}/tracking/links/${linkId}/revoke`,
+    linkUnrevoke: (linkId) => `${API_PREFIX}/tracking/links/${linkId}/unrevoke`,
   },
   commissions: {
     me: `${API_PREFIX}/commissions/me`,

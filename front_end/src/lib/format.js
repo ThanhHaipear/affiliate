@@ -33,6 +33,8 @@ const statusLabelMap = {
   ORDER_PAID: "Đơn đã thanh toán",
   HIDDEN_BY_SELLER: "Seller đang ẩn",
   HIDDEN_BY_ADMIN: "Admin đang ẩn",
+  REVOKED_BY_ADMIN: "Bị admin khóa",
+  REVOKED_BY_AFFILIATE: "Bị affiliate khóa",
 };
 
 function formatCurrency(value = 0) {

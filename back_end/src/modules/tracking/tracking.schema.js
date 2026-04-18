@@ -12,6 +12,12 @@ exports.revokeLinkSchema = z.object({
   }),
 });
 
+exports.linkStatusSchema = z.object({
+  params: z.object({
+    shortCode: z.string().min(4),
+  }),
+});
+
 exports.trackClickSchema = z.object({
   body: z.object({
     shortCode: z.string().min(4),

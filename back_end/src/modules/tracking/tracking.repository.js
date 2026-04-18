@@ -1,13 +1,39 @@
-﻿const prisma = require("../../config/prisma");
+const prisma = require("../../config/prisma");
 const env = require("../../config/env");
+const AppError = require("../../utils/app-error");
 const { generateShortCode, generateAttributionToken } = require("../../utils/code");
+
+const revokedByAccountInclude = {
+  include: {
+    accountRoles: {
+      include: {
+        role: true,
+      },
+    },
+    adminProfile: true,
+    customerProfile: true,
+    affiliate: true,
+    sellers: {
+      orderBy: { createdAt: "desc" },
+      take: 1,
+    },
+  },
+};
 
 exports.createOrGetLink = async (affiliateId, productId) => {
   const existing = await prisma.affiliateLink.findUnique({
     where: { affiliateId_productId: { affiliateId, productId } },
+    include: {
+      revokedByAccount: revokedByAccountInclude,
+    },
   });
 
   if (existing?.status === "REVOKED") {
+    const revokedByAdmin = existing.revokedByAccount?.accountRoles?.some((item) => item.role?.code === "ADMIN");
+    if (revokedByAdmin) {
+      throw new AppError("This affiliate link has been disabled by admin", 403);
+    }
+
     return prisma.affiliateLink.update({
       where: { id: existing.id },
       data: {
@@ -15,6 +41,27 @@ exports.createOrGetLink = async (affiliateId, productId) => {
         revokedAt: null,
         revokedBy: null,
         updatedAt: new Date(),
+      },
+      include: {
+        product: {
+          include: {
+            seller: true,
+            affiliateSetting: true,
+            category: true,
+            images: {
+              orderBy: { sortOrder: "asc" },
+            },
+            variants: {
+              include: {
+                inventory: true,
+              },
+              orderBy: { id: "asc" },
+            },
+          },
+        },
+        revokedByAccount: revokedByAccountInclude,
+        clicks: true,
+        orderItems: true,
       },
     });
   }
@@ -51,6 +98,7 @@ exports.listLinks = (affiliateId) => prisma.affiliateLink.findMany({
         },
       },
     },
+    revokedByAccount: revokedByAccountInclude,
     clicks: true,
     orderItems: true,
   },
@@ -61,6 +109,50 @@ exports.findAffiliateLink = (affiliateId, linkId) => prisma.affiliateLink.findFi
   where: {
     id: linkId,
     affiliateId,
+  },
+  include: {
+    product: {
+      include: {
+        seller: true,
+        affiliateSetting: true,
+        category: true,
+        images: {
+          orderBy: { sortOrder: "asc" },
+        },
+        variants: {
+          include: {
+            inventory: true,
+          },
+          orderBy: { id: "asc" },
+        },
+      },
+    },
+    revokedByAccount: revokedByAccountInclude,
+    clicks: true,
+    orderItems: true,
+  },
+});
+
+exports.findLinkByShortCode = (shortCode) => prisma.affiliateLink.findUnique({
+  where: { shortCode },
+  include: {
+    product: {
+      include: {
+        seller: true,
+        affiliateSetting: true,
+        category: true,
+        images: {
+          orderBy: { sortOrder: "asc" },
+        },
+        variants: {
+          include: {
+            inventory: true,
+          },
+          orderBy: { id: "asc" },
+        },
+      },
+    },
+    revokedByAccount: revokedByAccountInclude,
   },
 });
 
@@ -74,6 +166,20 @@ exports.revokeLink = (affiliateId, linkId, revokedBy) => prisma.affiliateLink.up
     status: "REVOKED",
     revokedAt: new Date(),
     revokedBy,
+    updatedAt: new Date(),
+  },
+});
+
+exports.unrevokeLink = (affiliateId, linkId) => prisma.affiliateLink.updateMany({
+  where: {
+    id: linkId,
+    affiliateId,
+    status: "REVOKED",
+  },
+  data: {
+    status: "ACTIVE",
+    revokedAt: null,
+    revokedBy: null,
     updatedAt: new Date(),
   },
 });

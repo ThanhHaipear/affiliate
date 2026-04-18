@@ -14,6 +14,8 @@ const {
   adminProductsQuerySchema,
   adminOrdersQuerySchema,
   fraudAlertsQuerySchema,
+  affiliateLinksQuerySchema,
+  affiliateLinkActionParamsSchema,
   platformFeeSchema,
   refundReviewSchema,
   withdrawalConfigSchema,
@@ -30,6 +32,7 @@ router.patch("/accounts/:accountId/unlock", validate(accountActionParamsSchema),
 router.get("/orders", validate(adminOrdersQuerySchema), controller.getOrders);
 router.get("/financial-stats", validate(adminOrdersQuerySchema), controller.getFinancialStats);
 router.get("/fraud-alerts", validate(fraudAlertsQuerySchema), controller.getFraudAlerts);
+router.get("/affiliate-links", validate(affiliateLinksQuerySchema), controller.getAffiliateLinks);
 router.get("/settings", controller.getPlatformSettings);
 router.put("/settings/platform-fee", validate(platformFeeSchema), controller.updatePlatformFee);
 router.put("/settings/withdrawal-config", validate(withdrawalConfigSchema), controller.updateWithdrawalConfig);
@@ -40,5 +43,7 @@ router.patch("/affiliates/:affiliateId/review", validate(reviewSchema), controll
 router.patch("/products/:productId/review", validate(reviewSchema), controller.reviewProduct);
 router.patch("/product-affiliate-settings/:settingId/review", validate(reviewSchema), controller.reviewProductAffiliate);
 router.patch("/refunds/:refundId/review", validate(refundReviewSchema), controller.reviewRefund);
+router.patch("/affiliate-links/:linkId/revoke", validate(affiliateLinkActionParamsSchema), controller.revokeAffiliateLink);
+router.patch("/affiliate-links/:linkId/unrevoke", validate(affiliateLinkActionParamsSchema), controller.unrevokeAffiliateLink);
 
 module.exports = router;

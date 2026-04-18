@@ -17,6 +17,7 @@ const payoutRoutes = require("../modules/payout/payout.routes");
 const notificationRoutes = require("../modules/notification/notification.routes");
 const uploadRoutes = require("../modules/upload/upload.routes");
 const customerAddressRoutes = require("../modules/customer-address/customer-address.routes");
+const realtimeRoutes = require("../realtime/realtime.routes");
 
 const router = express.Router();
 
@@ -37,5 +38,6 @@ router.use("/payout-batches", payoutRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/uploads", uploadRoutes);
 router.use("/customer-addresses", customerAddressRoutes);
+router.use("/realtime", realtimeRoutes);
 
 module.exports = router;

@@ -3,6 +3,36 @@ function toNumber(value) {
   return Number.isFinite(normalized) ? normalized : 0;
 }
 
+function getAccountDisplayName(account = {}) {
+  return (
+    account?.adminProfile?.fullName ||
+    account?.affiliate?.fullName ||
+    account?.customerProfile?.fullName ||
+    account?.sellers?.[0]?.shopName ||
+    account?.email ||
+    account?.phone ||
+    (account?.id ? `Account #${account.id}` : "--")
+  );
+}
+
+function getAccountActorRole(account = {}) {
+  const roles = (account?.accountRoles || []).map((item) => item.role?.code).filter(Boolean);
+
+  if (roles.includes("ADMIN")) return "Admin";
+  if (roles.includes("SELLER")) return "Seller";
+  if (roles.includes("AFFILIATE")) return "Affiliate";
+  if (roles.includes("CUSTOMER")) return "Customer";
+  return "Account";
+}
+
+function buildAccountActorLabel(account = null, fallbackId = null) {
+  if (!account) {
+    return fallbackId ? `Account #${fallbackId}` : "--";
+  }
+
+  return `${getAccountActorRole(account)}: ${getAccountDisplayName(account)}`;
+}
+
 function getAvailableInventory(variant = {}) {
   const quantity = toNumber(variant?.inventory?.quantity);
   const reserved = toNumber(variant?.inventory?.reservedQuantity);
@@ -263,18 +293,29 @@ function mapNotificationDto(notification = {}) {
 
 function mapAffiliateLinkDto(link = {}) {
   const mappedProduct = mapProductDto(link.product || {});
+  const revokedByRoles = (link.revokedByAccount?.accountRoles || []).map((item) => item.role?.code).filter(Boolean);
+  const revokedByAdmin = revokedByRoles.includes("ADMIN");
 
   return {
     id: link.id,
     short_code: link.shortCode || "",
     created_at: link.createdAt || null,
     status: link.status || "ACTIVE",
+    status_display: link.status === "REVOKED" ? (revokedByAdmin ? "REVOKED_BY_ADMIN" : "REVOKED_BY_AFFILIATE") : (link.status || "ACTIVE"),
+    revoked_at: link.revokedAt || null,
+    revoked_by: link.revokedBy || null,
+    revoked_by_admin: revokedByAdmin,
+    revoked_by_label: buildAccountActorLabel(link.revokedByAccount, link.revokedBy),
     product_name: mappedProduct.name,
     product_description: mappedProduct.description,
     product_image: mappedProduct.image,
     product_price: mappedProduct.price,
     product_category: mappedProduct.category,
     product_stock: mappedProduct.stock,
+    product_visibility_status: mappedProduct.visibility_status,
+    product_approval_status: mappedProduct.approval_status,
+    affiliate_setting_status: mappedProduct.affiliate_setting_status,
+    affiliate_enabled: mappedProduct.affiliate_enabled,
     commission_value: mappedProduct.commission_value,
     shop_name: mappedProduct.seller_name,
     click_count: (link.clicks || []).length,
@@ -324,6 +365,7 @@ function mapWithdrawalContextDto(context = {}) {
 export {
   mapAffiliateLinkDto,
   aggregateDisplayCartItems,
+  buildAccountActorLabel,
   mapNotificationDto,
   mapCartDto,
   mapCartItemDto,

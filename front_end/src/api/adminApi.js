@@ -177,6 +177,21 @@ async function getFraudAlerts(params) {
   return unwrapResponseData(response);
 }
 
+async function getAdminAffiliateLinks(params) {
+  const response = await axiosClient.get(ENDPOINTS.admin.affiliateLinks, { params });
+  return unwrapResponseData(response);
+}
+
+async function revokeAdminAffiliateLink(linkId) {
+  const response = await axiosClient.patch(ENDPOINTS.admin.affiliateLinkRevoke(linkId), {});
+  return unwrapResponseData(response);
+}
+
+async function unrevokeAdminAffiliateLink(linkId) {
+  const response = await axiosClient.patch(ENDPOINTS.admin.affiliateLinkUnrevoke(linkId), {});
+  return unwrapResponseData(response);
+}
+
 export {
   approveAffiliate,
   approveAffiliateSetting,
@@ -186,6 +201,7 @@ export {
   createPayoutBatch,
   createPayoutBatchVnpayUrl,
   getAdminFinancialStats,
+  getAdminAffiliateLinks,
   getAdminOrders,
   getAdminOverview,
   getAdminProducts,
@@ -203,6 +219,8 @@ export {
   rejectProduct,
   rejectSeller,
   reviewRefundRequest,
+  revokeAdminAffiliateLink,
+  unrevokeAdminAffiliateLink,
   reviewWithdrawal,
   setAdminProductVisibility,
   unlockUser,

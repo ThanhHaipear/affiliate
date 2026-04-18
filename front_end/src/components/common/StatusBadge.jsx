@@ -24,6 +24,8 @@ const statusStyles = {
   LOW: "bg-sky-50 text-sky-800",
   HIDDEN_BY_SELLER: "bg-slate-100 text-slate-700",
   HIDDEN_BY_ADMIN: "bg-rose-50 text-rose-800",
+  REVOKED_BY_ADMIN: "bg-rose-50 text-rose-800",
+  REVOKED_BY_AFFILIATE: "bg-orange-50 text-orange-800",
 };
 
 function StatusBadge({ status, className = "" }) {

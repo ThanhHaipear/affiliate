@@ -68,6 +68,8 @@ import AdminPendingAffiliatesPage from "../pages/admin/AdminPendingAffiliatesPag
 import AdminAffiliateDetailPage from "../pages/admin/AdminAffiliateDetailPage";
 import AdminPendingProductsPage from "../pages/admin/AdminPendingProductsPage";
 import AdminProductDetailPage from "../pages/admin/AdminProductDetailPage";
+import AdminProductsManagementPage from "../pages/admin/AdminProductsManagementPage";
+import AdminAffiliateLinksPage from "../pages/admin/AdminAffiliateLinksPage";
 import AdminOrdersPage from "../pages/admin/AdminOrdersPage";
 import AdminCommissionsPage from "../pages/admin/AdminCommissionsPage";
 import AdminPendingWithdrawalsPage from "../pages/admin/AdminPendingWithdrawalsPage";
@@ -314,6 +316,8 @@ const routes = [
         children: [
           { index: true, element: <Navigate to="/admin/dashboard" replace /> },
           { path: "dashboard", element: <AdminDashboardPage /> },
+          { path: "products", element: <AdminProductsManagementPage /> },
+          { path: "affiliate-links", element: <AdminAffiliateLinksPage /> },
           { path: "accounts", element: <AdminAccountsPage /> },
           { path: "sellers/pending", element: <AdminPendingSellersPage /> },
           { path: "sellers/:id", element: <AdminSellerDetailPage /> },

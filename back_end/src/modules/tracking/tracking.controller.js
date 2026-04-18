@@ -18,6 +18,16 @@ exports.revokeLink = asyncHandler(async (req, res) => {
   successResponse(res, data, "Affiliate link revoked");
 });
 
+exports.unrevokeLink = asyncHandler(async (req, res) => {
+  const data = await trackingService.unrevokeLink(req.user.id, req.validated.params.linkId);
+  successResponse(res, data, "Affiliate link reactivated");
+});
+
+exports.getLinkStatus = asyncHandler(async (req, res) => {
+  const data = await trackingService.getLinkStatus(req.validated.params.shortCode);
+  successResponse(res, data, "Affiliate link status loaded");
+});
+
 exports.trackClick = asyncHandler(async (req, res) => {
   const data = await trackingService.trackClick(req.validated.body, buildAuditData(req));
   successResponse(res, data, "Click tracked", 201);

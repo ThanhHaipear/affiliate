@@ -42,6 +42,11 @@ exports.getFraudAlerts = asyncHandler(async (req, res) => {
   successResponse(res, data, "Fraud alerts loaded");
 });
 
+exports.getAffiliateLinks = asyncHandler(async (req, res) => {
+  const data = await adminService.getAffiliateLinks(req.validated?.query || req.query || {});
+  successResponse(res, data, "Admin affiliate links loaded");
+});
+
 exports.getPlatformSettings = asyncHandler(async (_req, res) => {
   const data = await adminService.getPlatformSettings();
   successResponse(res, data, "Admin settings loaded");
@@ -90,4 +95,14 @@ exports.reviewProductAffiliate = asyncHandler(async (req, res) => {
 exports.reviewRefund = asyncHandler(async (req, res) => {
   const data = await adminService.reviewRefund(req.params.refundId, req.user.id, req.validated.body);
   successResponse(res, data, "Refund request reviewed");
+});
+
+exports.revokeAffiliateLink = asyncHandler(async (req, res) => {
+  const data = await adminService.revokeAffiliateLink(req.params.linkId, req.user.id);
+  successResponse(res, data, "Affiliate link revoked by admin");
+});
+
+exports.unrevokeAffiliateLink = asyncHandler(async (req, res) => {
+  const data = await adminService.unrevokeAffiliateLink(req.params.linkId, req.user.id);
+  successResponse(res, data, "Affiliate link reactivated by admin");
 });

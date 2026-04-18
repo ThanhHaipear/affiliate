@@ -29,7 +29,7 @@ const roleMenus = {
   affiliate: [
     { label: "T\u1ed5ng quan", to: "/dashboard/affiliate" },
     { label: "S\u1ea3n ph\u1ea9m ti\u1ebfp th\u1ecb", to: "/dashboard/affiliate/marketplace" },
-    { label: "Li\u00ean k\u1ebft c\u1ee7a t\u00f4i", to: "/dashboard/affiliate/links" },
+    { label: "Quan ly link cua toi", to: "/dashboard/affiliate/links" },
     { label: "Hoa h\u1ed3ng", to: "/dashboard/affiliate/commissions" },
     { label: "R\u00fat ti\u1ec1n", to: "/dashboard/affiliate/withdrawals" },
     { label: "H\u1ed3 s\u01a1 affiliate", to: "/dashboard/affiliate/profile" },

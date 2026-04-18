@@ -596,6 +596,74 @@ exports.listFraudAlerts = ({ status, severity }) => {
   });
 };
 
+exports.listAffiliateLinks = ({ q, affiliateId, status }) => {
+  const where = {};
+
+  if (affiliateId) {
+    where.affiliateId = Number(affiliateId);
+  }
+
+  if (status) {
+    where.status = status;
+  }
+
+  if (q) {
+    where.OR = [
+      { shortCode: { contains: q } },
+      { affiliate: { is: { fullName: { contains: q } } } },
+      { affiliate: { is: { account: { is: { email: { contains: q } } } } } },
+      { product: { is: { name: { contains: q } } } },
+      { product: { is: { seller: { is: { shopName: { contains: q } } } } } },
+    ];
+  }
+
+  return prisma.affiliateLink.findMany({
+    where,
+    include: {
+      affiliate: {
+        include: {
+          account: true,
+        },
+      },
+      product: {
+        include: {
+          seller: true,
+          affiliateSetting: true,
+          category: true,
+          images: {
+            orderBy: { sortOrder: "asc" },
+          },
+          variants: {
+            include: {
+              inventory: true,
+            },
+            orderBy: { id: "asc" },
+          },
+        },
+      },
+      revokedByAccount: {
+        include: {
+          accountRoles: {
+            include: {
+              role: true,
+            },
+          },
+          adminProfile: true,
+          customerProfile: true,
+          affiliate: true,
+          sellers: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+        },
+      },
+      clicks: true,
+      orderItems: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+};
+
 exports.getPlatformSettings = async () => {
   const [activePlatformFee, latestPlatformFee, withdrawalConfigs, openFraudAlerts] = await Promise.all([
     prisma.platformFeeConfig.findFirst({
@@ -1042,6 +1110,231 @@ exports.setProductVisibility = ({ productId, adminId, visible, reason }) =>
         type: visible ? "PRODUCT_SHOWN_BY_ADMIN" : "PRODUCT_HIDDEN_BY_ADMIN",
         targetType: "PRODUCT",
         targetId: BigInt(productId),
+        createdAt: now,
+      },
+    });
+
+    return updated;
+  });
+
+exports.revokeAffiliateLink = ({ linkId, adminId }) =>
+  prisma.$transaction(async (tx) => {
+    const link = await tx.affiliateLink.findUnique({
+      where: { id: BigInt(linkId) },
+      include: {
+        affiliate: {
+          include: {
+            account: true,
+          },
+        },
+        product: true,
+        revokedByAccount: {
+          include: {
+            accountRoles: {
+              include: {
+                role: true,
+              },
+            },
+            adminProfile: true,
+            customerProfile: true,
+            affiliate: true,
+            sellers: {
+              orderBy: { createdAt: "desc" },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+
+    if (!link) {
+      throw new Error("Affiliate link not found");
+    }
+
+    if (link.status === "REVOKED") {
+      return link;
+    }
+
+    const now = new Date();
+    const updated = await tx.affiliateLink.update({
+      where: { id: BigInt(linkId) },
+      data: {
+        status: "REVOKED",
+        revokedAt: now,
+        revokedBy: adminId,
+        updatedAt: now,
+      },
+      include: {
+        affiliate: {
+          include: {
+            account: true,
+          },
+        },
+        product: {
+          include: {
+            seller: true,
+            affiliateSetting: true,
+            category: true,
+            images: {
+              orderBy: { sortOrder: "asc" },
+            },
+            variants: {
+              include: {
+                inventory: true,
+              },
+              orderBy: { id: "asc" },
+            },
+          },
+        },
+        revokedByAccount: {
+          include: {
+            accountRoles: {
+              include: {
+                role: true,
+              },
+            },
+          },
+        },
+        clicks: true,
+        orderItems: true,
+      },
+    });
+
+    await tx.activityLog.create({
+      data: {
+        accountId: adminId,
+        action: "ADMIN_REVOKE_AFFILIATE_LINK",
+        targetType: "AFFILIATE_LINK",
+        targetId: BigInt(linkId),
+        description: `Admin revoked affiliate link ${link.shortCode}`,
+        createdAt: now,
+      },
+    });
+
+    await tx.notification.create({
+      data: {
+        accountId: link.affiliateId,
+        title: "Affiliate link disabled by admin",
+        content: `Your affiliate link ${link.shortCode} for product ${link.product?.name || `#${link.productId}`} has been disabled by admin.`,
+        type: "AFFILIATE_LINK_REVOKED_BY_ADMIN",
+        targetType: "AFFILIATE_LINK",
+        targetId: BigInt(linkId),
+        createdAt: now,
+      },
+    });
+
+    return updated;
+  });
+
+exports.unrevokeAffiliateLink = ({ linkId, adminId }) =>
+  prisma.$transaction(async (tx) => {
+    const link = await tx.affiliateLink.findUnique({
+      where: { id: BigInt(linkId) },
+      include: {
+        affiliate: {
+          include: {
+            account: true,
+          },
+        },
+        product: true,
+        revokedByAccount: {
+          include: {
+            accountRoles: {
+              include: {
+                role: true,
+              },
+            },
+            adminProfile: true,
+            customerProfile: true,
+            affiliate: true,
+            sellers: {
+              orderBy: { createdAt: "desc" },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+
+    if (!link) {
+      throw new Error("Affiliate link not found");
+    }
+
+    if (link.status !== "REVOKED") {
+      return link;
+    }
+
+    const now = new Date();
+    const updated = await tx.affiliateLink.update({
+      where: { id: BigInt(linkId) },
+      data: {
+        status: "ACTIVE",
+        revokedAt: null,
+        revokedBy: null,
+        updatedAt: now,
+      },
+      include: {
+        affiliate: {
+          include: {
+            account: true,
+          },
+        },
+        product: {
+          include: {
+            seller: true,
+            affiliateSetting: true,
+            category: true,
+            images: {
+              orderBy: { sortOrder: "asc" },
+            },
+            variants: {
+              include: {
+                inventory: true,
+              },
+              orderBy: { id: "asc" },
+            },
+          },
+        },
+        revokedByAccount: {
+          include: {
+            accountRoles: {
+              include: {
+                role: true,
+              },
+            },
+            adminProfile: true,
+            customerProfile: true,
+            affiliate: true,
+            sellers: {
+              orderBy: { createdAt: "desc" },
+              take: 1,
+            },
+          },
+        },
+        clicks: true,
+        orderItems: true,
+      },
+    });
+
+    await tx.activityLog.create({
+      data: {
+        accountId: adminId,
+        action: "ADMIN_UNREVOKE_AFFILIATE_LINK",
+        targetType: "AFFILIATE_LINK",
+        targetId: BigInt(linkId),
+        description: `Admin reactivated affiliate link ${link.shortCode}`,
+        createdAt: now,
+      },
+    });
+
+    await tx.notification.create({
+      data: {
+        accountId: link.affiliateId,
+        title: "Affiliate link reactivated by admin",
+        content: `Your affiliate link ${link.shortCode} for product ${link.product?.name || `#${link.productId}`} has been reactivated by admin.`,
+        type: "AFFILIATE_LINK_UNREVOKED_BY_ADMIN",
+        targetType: "AFFILIATE_LINK",
+        targetId: BigInt(linkId),
         createdAt: now,
       },
     });
