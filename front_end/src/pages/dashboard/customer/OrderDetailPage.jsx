@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { cancelCustomerOrder, changeOrderPaymentMethod, createVnpayPaymentUrl, getCustomerOrderDetail } from "../../../api/orderApi";
+import { createProductReview } from "../../../api/productApi";
 import Button from "../../../components/common/Button";
 import ConfirmModal from "../../../components/common/ConfirmModal";
 import EmptyState from "../../../components/common/EmptyState";
@@ -8,7 +9,6 @@ import Modal from "../../../components/common/Modal";
 import MoneyText from "../../../components/common/MoneyText";
 import PageHeader from "../../../components/common/PageHeader";
 import StatusBadge from "../../../components/common/StatusBadge";
-import { createProductReview, getProductReviews } from "../../../api/productApi";
 import OrderStatusTimeline from "../../../components/order/OrderStatusTimeline";
 import { useToast } from "../../../hooks/useToast";
 import { formatDateTime } from "../../../lib/format";
@@ -27,7 +27,6 @@ function OrderDetailPage() {
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [reviewItem, setReviewItem] = useState(null);
   const [reviewEligibility, setReviewEligibility] = useState(null);
-  const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewRating, setReviewRating] = useState("5");
   const [reviewComment, setReviewComment] = useState("");
@@ -125,28 +124,25 @@ function OrderDetailPage() {
       setChangingToCod(true);
       await changeOrderPaymentMethod(orderId, { paymentMethod: "COD" });
       await reloadOrder();
-      toast.success("Đã chuyển phương thức thanh toán sang COD.");
+      toast.success("Da chuyen phuong thuc thanh toan sang COD.");
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Không đổi được phương thức thanh toán.");
+      toast.error(submitError.response?.data?.message || "Khong doi duoc phuong thuc thanh toan.");
     } finally {
       setChangingToCod(false);
     }
   }
 
-  async function openReviewModal(item) {
-    try {
-      setReviewItem(item);
-      setReviewModalOpen(true);
-      setReviewComment("");
-      setReviewRating("5");
-      setReviewLoading(true);
-      const response = await getProductReviews(item.productId);
-      setReviewEligibility(response?.viewer || null);
-    } catch (_error) {
-      setReviewEligibility(null);
-    } finally {
-      setReviewLoading(false);
-    }
+  function openReviewModal(item) {
+    setReviewItem(item);
+    setReviewModalOpen(true);
+    setReviewComment("");
+    setReviewRating("5");
+    setReviewEligibility({
+      hasPurchased: true,
+      hasReviewed: Boolean(item?.productReview),
+      canReview: !item?.productReview,
+      reason: item?.productReview ? "Lan mua nay da duoc danh gia roi." : null,
+    });
   }
 
   function closeReviewModal() {
@@ -167,18 +163,30 @@ function OrderDetailPage() {
       await createProductReview(reviewItem.productId, {
         rating: Number(reviewRating),
         comment: reviewComment.trim(),
+        orderItemId: reviewItem.id,
       });
+      setOrder((current) => ({
+        ...current,
+        raw: {
+          ...current.raw,
+          items: (current.raw?.items || []).map((item) =>
+            String(item.id) === String(reviewItem.id)
+              ? { ...item, productReview: { id: `temp-${reviewItem.id}` } }
+              : item,
+          ),
+        },
+      }));
       setReviewEligibility({
         hasPurchased: true,
         hasReviewed: true,
         canReview: false,
-        reason: "Bạn đã đánh giá sản phẩm này rồi.",
+        reason: "Lan mua nay da duoc danh gia roi.",
       });
       setReviewComment("");
       setReviewRating("5");
-      toast.success("Đã gửi đánh giá sản phẩm.");
+      toast.success("Da gui danh gia san pham.");
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Không gửi được đánh giá.");
+      toast.error(submitError.response?.data?.message || "Khong gui duoc danh gia.");
     } finally {
       setReviewSubmitting(false);
     }
@@ -194,12 +202,12 @@ function OrderDetailPage() {
           <div className="flex gap-3">
             {canPayWithVnpay ? (
               <Button loading={creatingPayment} onClick={handlePayWithVnpay}>
-                Thanh toán VNPAY
+                Thanh toan VNPAY
               </Button>
             ) : null}
             {canSwitchToCod ? (
               <Button variant="secondary" loading={changingToCod} onClick={handleSwitchToCod}>
-                Chuyển sang COD
+                Chuyen sang COD
               </Button>
             ) : null}
             {canCancelOrder ? (
@@ -268,7 +276,7 @@ function OrderDetailPage() {
                       <MoneyText value={item.lineTotal || item.unitPrice || 0} className="font-semibold text-slate-900" />
                       {order.order_status === "COMPLETED" ? (
                         <Button size="sm" onClick={() => openReviewModal(item)}>
-                          Đánh giá
+                          Danh gia
                         </Button>
                       ) : null}
                     </div>
@@ -309,22 +317,20 @@ function OrderDetailPage() {
       />
       <Modal
         open={reviewModalOpen}
-        title={reviewItem ? `Đánh giá ${reviewItem.productNameSnapshot || `Sản phẩm #${reviewItem.productId}`}` : "Đánh giá sản phẩm"}
-        description="Chỉ sản phẩm trong đơn đã giao thành công và chưa được bạn đánh giá mới cho phép gửi review."
+        title={reviewItem ? `Danh gia ${reviewItem.productNameSnapshot || `San pham #${reviewItem.productId}`}` : "Danh gia san pham"}
+        description="Moi lan mua hop le trong don hoan tat duoc danh gia mot lan."
         onClose={closeReviewModal}
         footer={
           reviewEligibility?.canReview ? (
             <div className="flex justify-end">
               <Button onClick={handleSubmitReview} loading={reviewSubmitting}>
-                Gửi đánh giá
+                Gui danh gia
               </Button>
             </div>
           ) : null
         }
       >
-        {reviewLoading ? (
-          <p className="text-sm leading-7 text-slate-300">Đang kiểm tra điều kiện đánh giá.</p>
-        ) : reviewEligibility?.canReview ? (
+        {reviewEligibility?.canReview ? (
           <div className="space-y-3">
             <select
               value={reviewRating}
@@ -342,12 +348,12 @@ function OrderDetailPage() {
               onChange={(event) => setReviewComment(event.target.value)}
               rows={4}
               className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none"
-              placeholder="Chia sẻ cảm nhận của bạn về sản phẩm"
+              placeholder="Chia se cam nhan cua ban ve san pham"
             />
           </div>
         ) : (
           <div className="rounded-[1.5rem] bg-slate-800/80 p-4 text-sm leading-7 text-slate-300">
-            {reviewEligibility?.reason || "Sản phẩm này hiện chưa thể đánh giá."}
+            {reviewEligibility?.reason || "San pham nay hien chua the danh gia."}
           </div>
         )}
       </Modal>

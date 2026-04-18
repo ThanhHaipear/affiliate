@@ -336,6 +336,9 @@ function ProductDetailPage() {
         const nextReviewCount = nextItems.length;
         const nextRatingAverage =
           nextItems.reduce((sum, item) => sum + Number(item.rating || 0), 0) / Math.max(1, nextReviewCount);
+        const currentViewer = current.viewer || {};
+        const nextRemainingReviewCount = Math.max(0, Number(currentViewer.remainingReviewCount || 0) - 1);
+        const nextReviewedPurchaseCount = Number(currentViewer.reviewedPurchaseCount || 0) + 1;
 
         return {
           summary: {
@@ -346,8 +349,11 @@ function ProductDetailPage() {
           viewer: {
             hasPurchased: true,
             hasReviewed: true,
-            canReview: false,
-            reason: "Bạn đã đánh giá sản phẩm này rồi.",
+            completedPurchaseCount: Number(currentViewer.completedPurchaseCount || nextReviewedPurchaseCount),
+            reviewedPurchaseCount: nextReviewedPurchaseCount,
+            remainingReviewCount: nextRemainingReviewCount,
+            canReview: nextRemainingReviewCount > 0,
+            reason: nextRemainingReviewCount > 0 ? null : "Bạn đã đánh giá hết các lần mua hợp lệ của sản phẩm này rồi.",
           },
         };
       });
@@ -637,7 +643,7 @@ function ReviewPanel({
             Gửi đánh giá
           </Button>
           <p className="text-xs leading-6 text-slate-500">
-            Chỉ khách hàng đã mua và có đơn hoàn tất mới gửi được đánh giá.
+            Chỉ khách hàng đã mua và có đơn hoàn tất mới gửi được đánh giá. Mỗi lần mua hợp lệ được đánh giá một lần.
           </p>
         </div>
       ) : null}

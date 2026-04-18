@@ -124,7 +124,7 @@ exports.findApprovedProductById = async (id) => {
 };
 
 exports.listProductReviews = async (productId, viewer = null) => {
-  const [reviews, summary, hasCompletedPurchase, hasReviewed] = await Promise.all([
+  const [reviews, summary, completedPurchaseCount, remainingReviewCount] = await Promise.all([
     prisma.productReview.findMany({
       where: { productId },
       include: {
@@ -147,7 +147,7 @@ exports.listProductReviews = async (productId, viewer = null) => {
       _avg: { rating: true },
     }),
     viewer?.id && viewer?.roles?.includes("CUSTOMER")
-      ? prisma.orderItem.findFirst({
+      ? prisma.orderItem.count({
           where: {
             productId,
             order: {
@@ -155,31 +155,41 @@ exports.listProductReviews = async (productId, viewer = null) => {
               status: "COMPLETED",
             },
           },
-          select: { id: true },
         })
       : Promise.resolve(null),
     viewer?.id && viewer?.roles?.includes("CUSTOMER")
-      ? prisma.productReview.findFirst({
+      ? prisma.orderItem.count({
           where: {
             productId,
-            accountId: viewer.id,
+            productReview: null,
+            order: {
+              buyerId: viewer.id,
+              status: "COMPLETED",
+            },
           },
-          select: { id: true },
         })
       : Promise.resolve(null),
   ]);
 
   const canCheckReviewEligibility = Boolean(viewer?.id && viewer?.roles?.includes("CUSTOMER"));
+  const normalizedCompletedPurchaseCount = Number(completedPurchaseCount || 0);
+  const normalizedRemainingReviewCount = Number(remainingReviewCount || 0);
+  const reviewedPurchaseCount = Math.max(0, normalizedCompletedPurchaseCount - normalizedRemainingReviewCount);
+
   const viewerReview = canCheckReviewEligibility
     ? {
-        hasPurchased: Boolean(hasCompletedPurchase),
-        hasReviewed: Boolean(hasReviewed),
-        canReview: Boolean(hasCompletedPurchase) && !Boolean(hasReviewed),
-        reason: Boolean(hasReviewed)
-          ? "Bạn đã đánh giá sản phẩm này rồi."
-          : Boolean(hasCompletedPurchase)
+        hasPurchased: normalizedCompletedPurchaseCount > 0,
+        hasReviewed: reviewedPurchaseCount > 0,
+        completedPurchaseCount: normalizedCompletedPurchaseCount,
+        reviewedPurchaseCount,
+        remainingReviewCount: normalizedRemainingReviewCount,
+        canReview: normalizedRemainingReviewCount > 0,
+        reason:
+          normalizedRemainingReviewCount > 0
             ? null
-            : "Chỉ customer đã mua và hoàn tất đơn mới được đánh giá.",
+            : normalizedCompletedPurchaseCount > 0
+              ? "Ban da danh gia het cac lan mua hop le cua san pham nay roi."
+              : "Chi customer da mua va hoan tat don moi duoc danh gia.",
       }
     : null;
 
@@ -204,44 +214,43 @@ exports.listProductReviews = async (productId, viewer = null) => {
 };
 
 exports.createProductReview = async (accountId, productId, payload) => {
-  const existingReview = await prisma.productReview.findFirst({
-    where: {
-      accountId,
-      productId,
-      orderItem: {
-        order: {
-          buyerId: accountId,
-          status: "COMPLETED",
-        },
-      },
-    },
-  });
-
-  if (existingReview) {
-    throw new AppError("You have already reviewed this product", 409);
-  }
-
   const eligibleOrderItem = await prisma.orderItem.findFirst({
-    where: {
-      productId,
-      productReview: null,
-      order: {
-        buyerId: accountId,
-        status: "COMPLETED",
-      },
-    },
+    where: payload.orderItemId
+      ? {
+          id: BigInt(payload.orderItemId),
+          productId,
+          order: {
+            buyerId: accountId,
+            status: "COMPLETED",
+          },
+        }
+      : {
+          productId,
+          productReview: null,
+          order: {
+            buyerId: accountId,
+            status: "COMPLETED",
+          },
+        },
     include: {
       order: true,
+      productReview: true,
     },
-    orderBy: {
-      order: {
-        createdAt: "desc",
-      },
-    },
+    orderBy: payload.orderItemId
+      ? undefined
+      : {
+          order: {
+            createdAt: "desc",
+          },
+        },
   });
 
   if (!eligibleOrderItem) {
     throw new AppError("You can only review products from completed purchases", 403);
+  }
+
+  if (eligibleOrderItem.productReview) {
+    throw new AppError("This purchase has already been reviewed", 409);
   }
 
   const now = new Date();

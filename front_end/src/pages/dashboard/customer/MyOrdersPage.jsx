@@ -1,7 +1,7 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { getCustomerOrders } from "../../../api/orderApi";
-import { createProductReview, getProductReviews } from "../../../api/productApi";
+import { createProductReview } from "../../../api/productApi";
 import Button from "../../../components/common/Button";
 import DataTable from "../../../components/common/DataTable";
 import EmptyState from "../../../components/common/EmptyState";
@@ -35,10 +35,8 @@ function MyOrdersPage() {
   const [error, setError] = useState("");
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [reviewOrder, setReviewOrder] = useState(null);
-  const [reviewEligibility, setReviewEligibility] = useState({});
-  const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
-  const [selectedProductId, setSelectedProductId] = useState("");
+  const [selectedOrderItemId, setSelectedOrderItemId] = useState("");
   const [reviewRating, setReviewRating] = useState("5");
   const [reviewComment, setReviewComment] = useState("");
 
@@ -86,86 +84,60 @@ function MyOrdersPage() {
     [orders],
   );
 
-  const reviewItems = useMemo(() => {
-    const items = reviewOrder?.raw?.items || [];
-    const seen = new Set();
+  const reviewItems = useMemo(
+    () => (reviewOrder?.raw?.items || []).filter((item) => item.productId),
+    [reviewOrder],
+  );
 
-    return items.filter((item) => {
-      const key = String(item.productId);
-      if (!item.productId || seen.has(key)) {
-        return false;
+  const selectedItem = reviewItems.find((item) => String(item.id) === String(selectedOrderItemId));
+  const selectedEligibility = selectedItem
+    ? {
+        hasPurchased: true,
+        hasReviewed: Boolean(selectedItem.productReview),
+        canReview: !selectedItem.productReview,
+        reason: selectedItem.productReview ? "Lần mua này đã được đánh giá rồi." : null,
       }
-      seen.add(key);
-      return true;
-    });
-  }, [reviewOrder]);
+    : null;
 
-  const selectedEligibility = selectedProductId ? reviewEligibility[selectedProductId] || null : null;
-
-  async function openReviewModal(order) {
-    const items = order?.raw?.items || [];
-    const uniqueProductIds = [...new Set(items.map((item) => String(item.productId)).filter(Boolean))];
-
+  function openReviewModal(order) {
+    const orderItems = (order?.raw?.items || []).filter((item) => item.productId);
     setReviewOrder(order);
     setReviewModalOpen(true);
-    setReviewEligibility({});
-    setSelectedProductId("");
+    setSelectedOrderItemId(String(orderItems.find((item) => !item.productReview)?.id || orderItems[0]?.id || ""));
     setReviewComment("");
     setReviewRating("5");
-
-    if (!uniqueProductIds.length) {
-      return;
-    }
-
-    try {
-      setReviewLoading(true);
-      const results = await Promise.all(
-        uniqueProductIds.map(async (productId) => {
-          const response = await getProductReviews(productId);
-          return [productId, response?.viewer || null];
-        }),
-      );
-
-      const nextEligibility = Object.fromEntries(results);
-      setReviewEligibility(nextEligibility);
-      setSelectedProductId(
-        uniqueProductIds.find((productId) => nextEligibility[productId]?.canReview) || uniqueProductIds[0],
-      );
-    } catch (_error) {
-      setSelectedProductId(uniqueProductIds[0] || "");
-    } finally {
-      setReviewLoading(false);
-    }
   }
 
   function closeReviewModal() {
     setReviewModalOpen(false);
     setReviewOrder(null);
-    setReviewEligibility({});
-    setSelectedProductId("");
+    setSelectedOrderItemId("");
     setReviewComment("");
     setReviewRating("5");
   }
 
   async function handleSubmitReview() {
-    if (!selectedProductId) {
+    if (!selectedItem?.productId) {
       return;
     }
 
     try {
       setReviewSubmitting(true);
-      await createProductReview(selectedProductId, {
+      await createProductReview(selectedItem.productId, {
         rating: Number(reviewRating),
         comment: reviewComment.trim(),
+        orderItemId: selectedItem.id,
       });
 
-      setReviewEligibility((current) => ({
+      setReviewOrder((current) => ({
         ...current,
-        [selectedProductId]: {
-          hasPurchased: true,
-          hasReviewed: true,
-          canReview: false,
-          reason: "Bạn đã đánh giá sản phẩm này rồi.",
+        raw: {
+          ...current.raw,
+          items: (current.raw?.items || []).map((item) =>
+            String(item.id) === String(selectedItem.id)
+              ? { ...item, productReview: { id: `temp-${selectedItem.id}` } }
+              : item,
+          ),
         },
       }));
       setReviewComment("");
@@ -229,15 +201,14 @@ function MyOrdersPage() {
             open={reviewModalOpen}
             order={reviewOrder}
             items={reviewItems}
-            eligibility={reviewEligibility}
-            loading={reviewLoading}
-            selectedProductId={selectedProductId}
+            loading={false}
+            selectedOrderItemId={selectedOrderItemId}
             reviewRating={reviewRating}
             reviewComment={reviewComment}
             reviewSubmitting={reviewSubmitting}
             selectedEligibility={selectedEligibility}
             onClose={closeReviewModal}
-            onProductChange={setSelectedProductId}
+            onOrderItemChange={setSelectedOrderItemId}
             onRatingChange={setReviewRating}
             onCommentChange={setReviewComment}
             onSubmit={handleSubmitReview}
@@ -252,26 +223,25 @@ function ReviewOrderModal({
   open,
   order,
   items,
-  eligibility,
   loading,
-  selectedProductId,
+  selectedOrderItemId,
   reviewRating,
   reviewComment,
   reviewSubmitting,
   selectedEligibility,
   onClose,
-  onProductChange,
+  onOrderItemChange,
   onRatingChange,
   onCommentChange,
   onSubmit,
 }) {
-  const selectedItem = items.find((item) => String(item.productId) === String(selectedProductId));
+  const selectedItem = items.find((item) => String(item.id) === String(selectedOrderItemId));
 
   return (
     <Modal
       open={open}
       title={order ? `Đánh giá đơn ${order.code}` : "Đánh giá sản phẩm"}
-      description="Chỉ sản phẩm trong đơn đã giao thành công và chưa được bạn đánh giá mới cho phép gửi review."
+      description="Mỗi lần mua hợp lệ trong đơn hoàn tất được đánh giá một lần."
       onClose={onClose}
       footer={
         selectedEligibility?.canReview ? (
@@ -288,26 +258,17 @@ function ReviewOrderModal({
       ) : items.length ? (
         <div className="space-y-4">
           <div className="space-y-2">
-            <p className="text-sm font-medium text-white">Chọn sản phẩm</p>
+            <p className="text-sm font-medium text-white">Chọn lần mua</p>
             <select
-              value={selectedProductId}
-              onChange={(event) => onProductChange(event.target.value)}
+              value={selectedOrderItemId}
+              onChange={(event) => onOrderItemChange(event.target.value)}
               className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none"
             >
-              {items.map((item) => {
-                const itemEligibility = eligibility[String(item.productId)];
-                const suffix = itemEligibility?.canReview
-                  ? "Có thể đánh giá"
-                  : itemEligibility?.hasReviewed
-                    ? "Đã đánh giá"
-                    : "Chưa đủ điều kiện";
-
-                return (
-                  <option key={item.id} value={item.productId}>
-                    {(item.productNameSnapshot || `Sản phẩm #${item.productId}`)} - {suffix}
-                  </option>
-                );
-              })}
+              {items.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {(item.productNameSnapshot || `Sản phẩm #${item.productId}`)} - lần mua #{item.id} - {item.productReview ? "Đã đánh giá" : "Có thể đánh giá"}
+                </option>
+              ))}
             </select>
           </div>
           {selectedItem ? (

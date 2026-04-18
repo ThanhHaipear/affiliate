@@ -31,14 +31,14 @@ exports.listOrders = (accountId, roles) => {
   if (roles.includes("SELLER")) {
     return prisma.order.findMany({
       where: { seller: { ownerAccountId: accountId } },
-      include: { items: true, payments: true, refunds: { orderBy: { createdAt: "desc" } } },
+      include: { items: { include: { productReview: true } }, payments: true, refunds: { orderBy: { createdAt: "desc" } } },
       orderBy: { createdAt: "desc" }
     });
   }
 
   return prisma.order.findMany({
     where: { buyerId: accountId },
-    include: { items: true, payments: true, refunds: { orderBy: { createdAt: "desc" } } },
+    include: { items: { include: { productReview: true } }, payments: true, refunds: { orderBy: { createdAt: "desc" } } },
     orderBy: { createdAt: "desc" }
   });
 };
@@ -62,7 +62,7 @@ exports.getOrder = async (accountId, roles, orderId) => {
   const order = await prisma.order.findFirst({
     where,
     include: {
-      items: true,
+      items: { include: { productReview: true } },
       payments: true,
       histories: true,
       refunds: { orderBy: { createdAt: "desc" } },
