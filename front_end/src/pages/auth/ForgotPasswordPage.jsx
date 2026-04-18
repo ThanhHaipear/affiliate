@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { forgotPassword } from "../../api/authApi";
 import Button from "../../components/common/Button";
 import Input from "../../components/common/Input";
@@ -11,16 +11,23 @@ import { forgotPasswordSchema } from "../../schemas/authSchemas";
 function ForgotPasswordPage() {
   const toast = useToast();
   const [submitError, setSubmitError] = useState("");
+  const [searchParams] = useSearchParams();
+  const prefilledEmail = searchParams.get("email") || "";
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors, isSubmitSuccessful, isSubmitting },
   } = useForm({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
-      email: "",
+      email: prefilledEmail,
     },
   });
+
+  useEffect(() => {
+    reset({ email: prefilledEmail });
+  }, [prefilledEmail, reset]);
 
   const onSubmit = async (values) => {
     try {

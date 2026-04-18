@@ -22,6 +22,6 @@ router.patch("/:orderId/payment-method", authenticate, authorize("CUSTOMER"), va
 router.post("/:orderId/cancel", authenticate, authorize("CUSTOMER"), validate(cancelOrderSchema), controller.cancelOrder);
 router.post("/:orderId/seller-cancel", authenticate, authorize("SELLER"), validate(cancelOrderSchema), controller.cancelOrderBySeller);
 router.post("/:orderId/seller-confirm", authenticate, authorize("SELLER"), validate(confirmReceiptSchema), controller.confirmSellerReceivedMoney);
-router.post("/:orderId/refund", authenticate, authorize("CUSTOMER"), validate(refundOrderSchema), controller.refundOrder);
+router.post("/:orderId/refund", authenticate, authorize("CUSTOMER", "SELLER"), validate(refundOrderSchema), controller.refundOrder);
 
 module.exports = router;

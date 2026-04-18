@@ -14,6 +14,7 @@ function LoginPage() {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(loginSchema),
@@ -22,6 +23,10 @@ function LoginPage() {
       password: "",
     },
   });
+  const emailValue = watch("email");
+  const forgotPasswordTarget = emailValue?.trim()
+    ? `/auth/forgot-password?email=${encodeURIComponent(emailValue.trim())}`
+    : "/auth/forgot-password";
 
   const onSubmit = async (values) => {
     try {
@@ -89,7 +94,7 @@ function LoginPage() {
         </Button>
       </form>
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
-        <Link to="/auth/forgot-password" className="font-medium text-sky-700 hover:text-sky-900">
+        <Link to={forgotPasswordTarget} className="font-medium text-sky-700 hover:text-sky-900">
           Quên mật khẩu
         </Link>
         <Link to="/auth/register" className="font-medium text-sky-700 hover:text-sky-900">
