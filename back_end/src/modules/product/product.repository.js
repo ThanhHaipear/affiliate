@@ -5,6 +5,7 @@ const { notifyAdmins } = require("../../utils/admin-notifications");
 const approvedSellerWhere = {
   seller: {
     approvalStatus: "APPROVED",
+    lockedAt: null,
   },
 };
 
