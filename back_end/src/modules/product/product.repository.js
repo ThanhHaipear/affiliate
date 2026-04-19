@@ -124,7 +124,7 @@ exports.findApprovedProductById = async (id) => {
 };
 
 exports.listProductReviews = async (productId, viewer = null) => {
-  const [reviews, summary, completedPurchaseCount, remainingReviewCount] = await Promise.all([
+  const [reviews, summary, viewerOrders] = await Promise.all([
     prisma.productReview.findMany({
       where: { productId },
       include: {
@@ -147,24 +147,30 @@ exports.listProductReviews = async (productId, viewer = null) => {
       _avg: { rating: true },
     }),
     viewer?.id && viewer?.roles?.includes("CUSTOMER")
-      ? prisma.orderItem.count({
+      ? prisma.order.findMany({
           where: {
-            productId,
-            order: {
-              buyerId: viewer.id,
-              status: "COMPLETED",
+            buyerId: viewer.id,
+            status: "COMPLETED",
+            items: {
+              some: {
+                productId,
+              },
             },
           },
-        })
-      : Promise.resolve(null),
-    viewer?.id && viewer?.roles?.includes("CUSTOMER")
-      ? prisma.orderItem.count({
-          where: {
-            productId,
-            productReview: null,
-            order: {
-              buyerId: viewer.id,
-              status: "COMPLETED",
+          select: {
+            id: true,
+            items: {
+              where: {
+                productId,
+              },
+              select: {
+                id: true,
+                productReview: {
+                  select: {
+                    id: true,
+                  },
+                },
+              },
             },
           },
         })
@@ -172,9 +178,14 @@ exports.listProductReviews = async (productId, viewer = null) => {
   ]);
 
   const canCheckReviewEligibility = Boolean(viewer?.id && viewer?.roles?.includes("CUSTOMER"));
-  const normalizedCompletedPurchaseCount = Number(completedPurchaseCount || 0);
-  const normalizedRemainingReviewCount = Number(remainingReviewCount || 0);
-  const reviewedPurchaseCount = Math.max(0, normalizedCompletedPurchaseCount - normalizedRemainingReviewCount);
+  const normalizedCompletedPurchaseCount = canCheckReviewEligibility ? Number(viewerOrders?.length || 0) : 0;
+  const reviewedPurchaseCount = canCheckReviewEligibility
+    ? viewerOrders.reduce(
+        (sum, order) => sum + (order.items.some((item) => item.productReview) ? 1 : 0),
+        0,
+      )
+    : 0;
+  const normalizedRemainingReviewCount = Math.max(0, normalizedCompletedPurchaseCount - reviewedPurchaseCount);
 
   const viewerReview = canCheckReviewEligibility
     ? {
@@ -214,43 +225,73 @@ exports.listProductReviews = async (productId, viewer = null) => {
 };
 
 exports.createProductReview = async (accountId, productId, payload) => {
-  const eligibleOrderItem = await prisma.orderItem.findFirst({
-    where: payload.orderItemId
-      ? {
-          id: BigInt(payload.orderItemId),
-          productId,
-          order: {
-            buyerId: accountId,
-            status: "COMPLETED",
-          },
-        }
-      : {
-          productId,
-          productReview: null,
-          order: {
-            buyerId: accountId,
-            status: "COMPLETED",
-          },
+  let eligibleOrderItem = null;
+
+  if (payload.orderItemId) {
+    eligibleOrderItem = await prisma.orderItem.findFirst({
+      where: {
+        id: BigInt(payload.orderItemId),
+        productId,
+        order: {
+          buyerId: accountId,
+          status: "COMPLETED",
         },
-    include: {
-      order: true,
-      productReview: true,
-    },
-    orderBy: payload.orderItemId
-      ? undefined
-      : {
+      },
+      include: {
+        order: true,
+        productReview: true,
+      },
+    });
+  } else {
+    const eligibleOrderItems = await prisma.orderItem.findMany({
+      where: {
+        productId,
+        order: {
+          buyerId: accountId,
+          status: "COMPLETED",
+        },
+      },
+      include: {
+        order: true,
+        productReview: true,
+      },
+      orderBy: [
+        {
           order: {
             createdAt: "desc",
           },
         },
-  });
+        { id: "desc" },
+      ],
+    });
+
+    const reviewedOrderIds = new Set(
+      eligibleOrderItems
+        .filter((item) => item.productReview)
+        .map((item) => String(item.orderId)),
+    );
+
+    eligibleOrderItem =
+      eligibleOrderItems.find((item) => !reviewedOrderIds.has(String(item.orderId))) || null;
+  }
 
   if (!eligibleOrderItem) {
     throw new AppError("You can only review products from completed purchases", 403);
   }
 
-  if (eligibleOrderItem.productReview) {
-    throw new AppError("This purchase has already been reviewed", 409);
+  const existingReviewForOrder = await prisma.productReview.findFirst({
+    where: {
+      productId,
+      accountId,
+      orderItem: {
+        orderId: eligibleOrderItem.orderId,
+      },
+    },
+    select: { id: true },
+  });
+
+  if (existingReviewForOrder || eligibleOrderItem.productReview) {
+    throw new AppError("This product has already been reviewed for this order", 409);
   }
 
   const now = new Date();

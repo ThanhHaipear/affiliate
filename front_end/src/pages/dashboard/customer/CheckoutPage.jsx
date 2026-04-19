@@ -75,15 +75,25 @@ function CheckoutPage() {
   }, [cart.items, selectedItemIds]);
 
   const groupedCheckoutItems = useMemo(() => aggregateDisplayCartItems(checkoutItems), [checkoutItems]);
+  const shopCount = useMemo(
+    () => new Set(checkoutItems.map((item) => String(item.product?.seller_id || item.product?.seller_name || ""))).size,
+    [checkoutItems],
+  );
 
   const subtotal = useMemo(
     () => checkoutItems.reduce((sum, item) => sum + (item.product.salePrice || item.product.price) * item.quantity, 0),
     [checkoutItems],
   );
 
+  const shippingTotal = useMemo(
+    () => Number(form.shippingFee || 0) * Math.max(1, shopCount || 0),
+    [form.shippingFee, shopCount],
+  );
+  const multiShopCheckout = shopCount > 1;
+
   const total = useMemo(
-    () => subtotal + Number(form.shippingFee || 0) - Number(form.discountAmount || 0),
-    [subtotal, form.discountAmount, form.shippingFee],
+    () => subtotal + shippingTotal - Number(form.discountAmount || 0),
+    [subtotal, form.discountAmount, shippingTotal],
   );
 
   function handleChange(event) {
@@ -117,18 +127,23 @@ function CheckoutPage() {
           buyerPhone: selectedAddress.phone,
         }),
       );
-      const order = mapOrderDto(response);
+      const createdOrders = (response?.orders || []).map(mapOrderDto);
+      const primaryOrder = createdOrders[0] || null;
 
-      if (["VNPAY", "CARD"].includes(form.paymentMethod)) {
-        const vnpay = await createVnpayPaymentUrl(order.id, {});
+      if (["VNPAY", "CARD"].includes(form.paymentMethod) && primaryOrder) {
+        const vnpay = await createVnpayPaymentUrl(primaryOrder.id, {});
         window.location.href = vnpay.paymentUrl;
         return;
       }
 
-      toast.success("Da tao don hang tu gio hang.");
-      navigate(`/dashboard/customer/orders/${order.id}`);
+      toast.success(createdOrders.length > 1 ? "Da tao don hang cho tung shop." : "Da tao don hang tu gio hang.");
+      if (primaryOrder) {
+        navigate(`/dashboard/customer/orders/${primaryOrder.id}`);
+      } else {
+        navigate("/dashboard/customer/orders");
+      }
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong tao duoc don hang.");
+      toast.error(submitError.response?.data?.message || submitError.message || "Khong tao duoc don hang.");
     } finally {
       setSubmitting(false);
     }
@@ -248,6 +263,11 @@ function CheckoutPage() {
                   ]}
                 />
               </div>
+              {multiShopCheckout ? (
+                <div className="mt-4 rounded-[1.5rem] border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-900">
+                  Don nay dang gom san pham tu {shopCount} shop. Phi ship duoc tinh theo tung shop. Neu ban chon VNPAY, he thong se thanh toan mot lan cho toan bo nhom don hang cung ma checkout.
+                </div>
+              ) : null}
             </StepSection>
 
             <StepSection
@@ -264,6 +284,9 @@ function CheckoutPage() {
                         <p className="font-medium text-slate-900">{group.product.name}</p>
                         <p className="mt-1 text-sm text-slate-500">
                           {group.variant} | Tong x{group.quantity}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          Shop: {group.product.seller_name}
                         </p>
                         <p className={`mt-1 text-sm ${group.hasAffiliateAttributed ? "text-emerald-700" : "text-slate-500"}`}>
                           {group.hasAffiliateAttributed
@@ -307,8 +330,12 @@ function CheckoutPage() {
                 <MoneyText value={subtotal} />
               </div>
               <div className="flex justify-between">
+                <span>So shop trong don</span>
+                <span>{Math.max(1, shopCount || 0)}</span>
+              </div>
+              <div className="flex justify-between">
                 <span>Phi giao hang</span>
-                <MoneyText value={form.shippingFee} />
+                <MoneyText value={shippingTotal} />
               </div>
               <div className="flex justify-between">
                 <span>Giam gia</span>

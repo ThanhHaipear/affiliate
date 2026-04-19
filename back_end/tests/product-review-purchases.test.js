@@ -8,21 +8,34 @@ const productRepositoryPath = path.resolve(__dirname, "../src/modules/product/pr
 test("listProductReviews keeps review available when customer has another completed purchase left", async () => {
   require.cache[prismaPath] = {
     exports: {
+      order: {
+        findMany: async () => ([
+          {
+            id: BigInt(101),
+            items: [
+              {
+                id: BigInt(201),
+                productReview: { id: BigInt(1) },
+              },
+            ],
+          },
+          {
+            id: BigInt(102),
+            items: [
+              {
+                id: BigInt(202),
+                productReview: null,
+              },
+            ],
+          },
+        ]),
+      },
       productReview: {
         findMany: async () => [],
         aggregate: async () => ({
           _count: { _all: 1 },
           _avg: { rating: 5 },
         }),
-      },
-      orderItem: {
-        count: async ({ where }) => {
-          if (where.productReview === null) {
-            return 1;
-          }
-
-          return 2;
-        },
       },
     },
   };
@@ -49,6 +62,7 @@ test("listProductReviews keeps review available when customer has another comple
 test("createProductReview binds review to the requested completed order item", async () => {
   let capturedWhere = null;
   let createdPayload = null;
+  let findExistingReviewWhere = null;
 
   require.cache[prismaPath] = {
     exports: {
@@ -57,6 +71,7 @@ test("createProductReview binds review to the requested completed order item", a
           capturedWhere = where;
           return {
             id: BigInt(321),
+            orderId: BigInt(1001),
             order: {
               id: BigInt(1001),
               orderCode: "ORD-1001",
@@ -66,6 +81,10 @@ test("createProductReview binds review to the requested completed order item", a
         },
       },
       productReview: {
+        findFirst: async ({ where }) => {
+          findExistingReviewWhere = where;
+          return null;
+        },
         create: async ({ data }) => {
           createdPayload = data;
           return {
@@ -104,6 +123,9 @@ test("createProductReview binds review to the requested completed order item", a
   assert.equal(capturedWhere.productId, 5);
   assert.equal(capturedWhere.order.buyerId, 9);
   assert.equal(capturedWhere.order.status, "COMPLETED");
+  assert.equal(findExistingReviewWhere.productId, 5);
+  assert.equal(findExistingReviewWhere.accountId, 9);
+  assert.equal(String(findExistingReviewWhere.orderItem.orderId), "1001");
   assert.equal(String(createdPayload.orderItemId), "321");
   assert.equal(response.orderItem.order.orderCode, "ORD-1001");
 
@@ -117,12 +139,16 @@ test("createProductReview rejects when the requested purchase was already review
       orderItem: {
         findFirst: async () => ({
           id: BigInt(321),
+          orderId: BigInt(1001),
           order: {
             id: BigInt(1001),
           },
-          productReview: {
-            id: BigInt(999),
-          },
+          productReview: null,
+        }),
+      },
+      productReview: {
+        findFirst: async () => ({
+          id: BigInt(999),
         }),
       },
     },
@@ -139,7 +165,7 @@ test("createProductReview rejects when the requested purchase was already review
         orderItemId: 321,
       }),
     (error) => {
-      assert.equal(error.message, "This purchase has already been reviewed");
+      assert.equal(error.message, "This product has already been reviewed for this order");
       assert.equal(error.statusCode, 409);
       return true;
     },

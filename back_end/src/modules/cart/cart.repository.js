@@ -70,6 +70,38 @@ function normalizeSelectedItemIds(selectedItemIds = []) {
   return [...new Set((selectedItemIds || []).map((itemId) => BigInt(itemId)))];
 }
 
+function allocateDiscountsBySeller(groups = [], totalDiscount = 0) {
+  const normalizedDiscount = Math.max(0, Number(totalDiscount || 0));
+  if (!normalizedDiscount || !groups.length) {
+    return new Map(groups.map((group) => [group.sellerId, 0]));
+  }
+
+  const totalSubtotal = groups.reduce((sum, group) => sum + group.subtotal, 0);
+  const allocations = new Map();
+
+  if (!totalSubtotal) {
+    const evenShare = Math.floor(normalizedDiscount / groups.length);
+    let assigned = 0;
+    groups.forEach((group, index) => {
+      const amount = index === groups.length - 1 ? normalizedDiscount - assigned : evenShare;
+      allocations.set(group.sellerId, amount);
+      assigned += amount;
+    });
+    return allocations;
+  }
+
+  let assigned = 0;
+  groups.forEach((group, index) => {
+    const amount = index === groups.length - 1
+      ? normalizedDiscount - assigned
+      : Math.floor((normalizedDiscount * group.subtotal) / totalSubtotal);
+    allocations.set(group.sellerId, amount);
+    assigned += amount;
+  });
+
+  return allocations;
+}
+
 function buildCartItemIdentityWhere(cartId, variantId, attribution) {
   return {
     cartId,
@@ -232,17 +264,14 @@ exports.checkout = async (accountId, payload) =>
       throw new Error("No cart items selected for checkout");
     }
 
-    const sellerIds = [...new Set(checkoutItems.map((item) => item.product.sellerId))];
-    if (sellerIds.length !== 1) throw new Error("Checkout currently supports one seller per order");
-
     const shippingAddress = await getShippingAddress(tx, accountId, payload.addressId);
     const feeConfig = await getCurrentPlatformFee(tx);
     if (!feeConfig) throw new Error("Missing active platform fee config");
 
     const platformFeeType = "PERCENT";
     const platformFeeValue = Number(feeConfig.feeValue);
-
-    let subtotal = 0;
+    const orderCode = generateOrderCode();
+    const perShopShippingFee = Number(payload.shippingFee || 0);
     const snapshots = [];
 
     for (const item of checkoutItems) {
@@ -261,7 +290,6 @@ exports.checkout = async (accountId, payload) =>
       const platformFeeAmount = Math.floor((lineTotal * platformFeeValue) / 100);
       const sellerNetAmount = lineTotal - commissionAmount - platformFeeAmount;
 
-      subtotal += lineTotal;
       snapshots.push({
         item,
         inventory,
@@ -273,143 +301,166 @@ exports.checkout = async (accountId, payload) =>
         sellerNetAmount,
       });
     }
-
-    const totalAmount = subtotal + payload.shippingFee - payload.discountAmount;
-    const order = await tx.order.create({
-      data: {
-        orderCode: generateOrderCode(),
-        buyerId: accountId,
-        buyerName: payload.buyerName || shippingAddress.recipientName,
-        buyerEmail: payload.buyerEmail,
-        buyerPhone: payload.buyerPhone || shippingAddress.phone,
-        sellerId: sellerIds[0],
-        status: "PENDING_PAYMENT",
-        subtotal: BigInt(subtotal),
-        shippingFee: BigInt(payload.shippingFee),
-        discountAmount: BigInt(payload.discountAmount),
-        totalAmount: BigInt(totalAmount),
-        sellerConfirmedReceivedMoney: false,
-        platformFeeType,
-        platformFeeValue: BigInt(platformFeeValue),
-        platformFeeAmount: BigInt(snapshots.reduce((sum, entry) => sum + entry.platformFeeAmount, 0)),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
+    const groupedBySeller = new Map();
+    snapshots.forEach((snapshot) => {
+      const sellerId = snapshot.item.product.sellerId;
+      const current = groupedBySeller.get(sellerId) || {
+        sellerId,
+        snapshots: [],
+        subtotal: 0,
+        platformFeeAmount: 0,
+      };
+      current.snapshots.push(snapshot);
+      current.subtotal += snapshot.lineTotal;
+      current.platformFeeAmount += snapshot.platformFeeAmount;
+      groupedBySeller.set(sellerId, current);
     });
 
-    await tx.$executeRaw`
-      UPDATE orders
-      SET
-        shipping_address_id = ${BigInt(payload.addressId)},
-        shipping_recipient_name = ${shippingAddress.recipientName},
-        shipping_phone = ${shippingAddress.phone},
-        shipping_province = ${shippingAddress.province},
-        shipping_district = ${shippingAddress.district},
-        shipping_ward = ${shippingAddress.ward},
-        shipping_detail = ${shippingAddress.detail},
-        shipping_method = ${payload.shippingMethod}
-      WHERE id = ${order.id}
-    `;
+    const sellerGroups = Array.from(groupedBySeller.values());
+    const discountAllocations = allocateDiscountsBySeller(sellerGroups, payload.discountAmount);
+    const createdOrders = [];
 
-    const commissionSnapshotsByAffiliate = new Map();
-
-    for (const snapshot of snapshots) {
-      await createInventoryReservation(tx, {
-        variantId: snapshot.item.variantId,
-        quantity: snapshot.item.quantity,
-        referenceId: order.id,
-        referenceType: "ORDER",
-        note: "Reserve stock when customer checkout creates order",
-      });
-
-      const orderItem = await tx.orderItem.create({
+    for (const group of sellerGroups) {
+      const groupDiscountAmount = discountAllocations.get(group.sellerId) || 0;
+      const totalAmount = group.subtotal + perShopShippingFee - groupDiscountAmount;
+      const order = await tx.order.create({
         data: {
-          orderId: order.id,
-          productId: snapshot.item.productId,
-          variantId: snapshot.item.variantId,
-          productNameSnapshot: snapshot.item.product.name,
-          variantNameSnapshot: snapshot.item.variant.variantName,
-          skuSnapshot: snapshot.item.variant.sku,
-          quantity: snapshot.item.quantity,
-          price: snapshot.item.variant.price,
-          lineTotal: BigInt(snapshot.lineTotal),
-          affiliateId: snapshot.item.affiliateId,
-          attributionSessionId: snapshot.item.attributionSessionId,
-          affiliateLinkId: snapshot.item.affiliateLinkId,
-          commissionTypeSnapshot: snapshot.commissionType,
-          commissionValueSnapshot: snapshot.commissionType ? BigInt(snapshot.commissionValue) : null,
-          commissionAmount: BigInt(snapshot.commissionAmount),
-          platformFeeTypeSnapshot: platformFeeType,
-          platformFeeValueSnapshot: BigInt(platformFeeValue),
-          platformFeeAmount: BigInt(snapshot.platformFeeAmount),
-          sellerNetAmount: BigInt(snapshot.sellerNetAmount),
+          orderCode,
+          buyerId: accountId,
+          buyerName: payload.buyerName || shippingAddress.recipientName,
+          buyerEmail: payload.buyerEmail,
+          buyerPhone: payload.buyerPhone || shippingAddress.phone,
+          sellerId: group.sellerId,
+          status: "PENDING_PAYMENT",
+          subtotal: BigInt(group.subtotal),
+          shippingFee: BigInt(perShopShippingFee),
+          discountAmount: BigInt(groupDiscountAmount),
+          totalAmount: BigInt(totalAmount),
+          sellerConfirmedReceivedMoney: false,
+          platformFeeType,
+          platformFeeValue: BigInt(platformFeeValue),
+          platformFeeAmount: BigInt(group.platformFeeAmount),
           createdAt: new Date(),
           updatedAt: new Date(),
         },
       });
 
-      if (snapshot.item.affiliateId && snapshot.commissionAmount > 0) {
-        const current = commissionSnapshotsByAffiliate.get(snapshot.item.affiliateId) || {
-          total: 0,
-          items: [],
-        };
+      await tx.$executeRaw`
+        UPDATE orders
+        SET
+          shipping_address_id = ${BigInt(payload.addressId)},
+          shipping_recipient_name = ${shippingAddress.recipientName},
+          shipping_phone = ${shippingAddress.phone},
+          shipping_province = ${shippingAddress.province},
+          shipping_district = ${shippingAddress.district},
+          shipping_ward = ${shippingAddress.ward},
+          shipping_detail = ${shippingAddress.detail},
+          shipping_method = ${payload.shippingMethod}
+        WHERE id = ${order.id}
+      `;
 
-        current.total += snapshot.commissionAmount;
-        current.items.push({
-          orderItemId: orderItem.id,
-          productId: snapshot.item.productId,
-          amount: snapshot.commissionAmount,
+      const commissionSnapshotsByAffiliate = new Map();
+
+      for (const snapshot of group.snapshots) {
+        await createInventoryReservation(tx, {
+          variantId: snapshot.item.variantId,
+          quantity: snapshot.item.quantity,
+          referenceId: order.id,
+          referenceType: "ORDER",
+          note: "Reserve stock when customer checkout creates order",
         });
 
-        commissionSnapshotsByAffiliate.set(snapshot.item.affiliateId, current);
-      }
-    }
+        const orderItem = await tx.orderItem.create({
+          data: {
+            orderId: order.id,
+            productId: snapshot.item.productId,
+            variantId: snapshot.item.variantId,
+            productNameSnapshot: snapshot.item.product.name,
+            variantNameSnapshot: snapshot.item.variant.variantName,
+            skuSnapshot: snapshot.item.variant.sku,
+            quantity: snapshot.item.quantity,
+            price: snapshot.item.variant.price,
+            lineTotal: BigInt(snapshot.lineTotal),
+            affiliateId: snapshot.item.affiliateId,
+            attributionSessionId: snapshot.item.attributionSessionId,
+            affiliateLinkId: snapshot.item.affiliateLinkId,
+            commissionTypeSnapshot: snapshot.commissionType,
+            commissionValueSnapshot: snapshot.commissionType ? BigInt(snapshot.commissionValue) : null,
+            commissionAmount: BigInt(snapshot.commissionAmount),
+            platformFeeTypeSnapshot: platformFeeType,
+            platformFeeValueSnapshot: BigInt(platformFeeValue),
+            platformFeeAmount: BigInt(snapshot.platformFeeAmount),
+            sellerNetAmount: BigInt(snapshot.sellerNetAmount),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        });
 
-    for (const [affiliateId, aggregate] of commissionSnapshotsByAffiliate.entries()) {
-      const commission = await tx.affiliateCommission.create({
+        if (snapshot.item.affiliateId && snapshot.commissionAmount > 0) {
+          const current = commissionSnapshotsByAffiliate.get(snapshot.item.affiliateId) || {
+            total: 0,
+            items: [],
+          };
+
+          current.total += snapshot.commissionAmount;
+          current.items.push({
+            orderItemId: orderItem.id,
+            productId: snapshot.item.productId,
+            amount: snapshot.commissionAmount,
+          });
+
+          commissionSnapshotsByAffiliate.set(snapshot.item.affiliateId, current);
+        }
+      }
+
+      for (const [affiliateId, aggregate] of commissionSnapshotsByAffiliate.entries()) {
+        const commission = await tx.affiliateCommission.create({
+          data: {
+            orderId: order.id,
+            affiliateId,
+            sellerId: group.sellerId,
+            totalCommission: BigInt(aggregate.total),
+            status: "PENDING",
+            fraudCheckStatus: "PENDING",
+            note: "Pending commission recorded at checkout",
+            createdAt: new Date(),
+          },
+        });
+
+        if (aggregate.items.length) {
+          await tx.affiliateCommissionItem.createMany({
+            data: aggregate.items.map((item) => ({
+              commissionId: commission.id,
+              orderItemId: item.orderItemId,
+              productId: item.productId,
+              amount: BigInt(item.amount),
+            })),
+          });
+        }
+      }
+
+      await tx.payment.create({
         data: {
           orderId: order.id,
-          affiliateId,
-          sellerId: sellerIds[0],
-          totalCommission: BigInt(aggregate.total),
+          method: payload.paymentMethod,
           status: "PENDING",
-          fraudCheckStatus: "PENDING",
-          note: "Pending commission recorded at checkout",
+          amount: BigInt(totalAmount),
           createdAt: new Date(),
         },
       });
 
-      if (aggregate.items.length) {
-        await tx.affiliateCommissionItem.createMany({
-          data: aggregate.items.map((item) => ({
-            commissionId: commission.id,
-            orderItemId: item.orderItemId,
-            productId: item.productId,
-            amount: BigInt(item.amount),
-          })),
-        });
-      }
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: order.id,
+          oldStatus: null,
+          newStatus: "PENDING_PAYMENT",
+          note: "Order created",
+          changedAt: new Date(),
+        },
+      });
+
+      createdOrders.push(order.id);
     }
-
-    await tx.payment.create({
-      data: {
-        orderId: order.id,
-        method: payload.paymentMethod,
-        status: "PENDING",
-        amount: BigInt(totalAmount),
-        createdAt: new Date(),
-      },
-    });
-
-    await tx.orderStatusHistory.create({
-      data: {
-        orderId: order.id,
-        oldStatus: null,
-        newStatus: "PENDING_PAYMENT",
-        note: "Order created",
-        changedAt: new Date(),
-      },
-    });
 
     await tx.cartItem.deleteMany({
       where: {
@@ -418,9 +469,21 @@ exports.checkout = async (accountId, payload) =>
       },
     });
 
-    return tx.order.findUnique({ where: { id: order.id }, include: { items: true, payments: true } });
+    const orders = await tx.order.findMany({
+      where: { id: { in: createdOrders } },
+      include: { items: true, payments: true },
+      orderBy: { id: "asc" },
+    });
+
+    return {
+      orderCode,
+      orders,
+      totalOrders: orders.length,
+      totalShippingFee: perShopShippingFee * sellerGroups.length,
+    };
   });
 
 exports.__private = {
+  allocateDiscountsBySeller,
   buildCartItemIdentityWhere,
 };

@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import Button from "../../../components/common/Button";
 import ConfirmModal from "../../../components/common/ConfirmModal";
 import DataTable from "../../../components/common/DataTable";
 import EmptyState from "../../../components/common/EmptyState";
 import MoneyText from "../../../components/common/MoneyText";
 import PageHeader from "../../../components/common/PageHeader";
+import Pagination from "../../../components/common/Pagination";
+import SearchBar from "../../../components/common/SearchBar";
 import StatusBadge from "../../../components/common/StatusBadge";
 import { useToast } from "../../../hooks/useToast";
 import { formatDateTime } from "../../../lib/format";
@@ -17,6 +20,7 @@ import {
 } from "../../../api/sellerApi";
 
 const completedOrderStatusClassName = "bg-sky-50 text-sky-800";
+const ORDERS_PER_PAGE = 8;
 
 function getSellerOrderActions(order) {
   const isTerminal = ["CANCELLED", "REFUNDED", "COMPLETED"].includes(order.order_status);
@@ -45,6 +49,8 @@ function SellerOrdersPage({ orders: initialOrders, onConfirmReceivedMoney }) {
   const [refundReasonError, setRefundReasonError] = useState("");
   const [cancelReason, setCancelReason] = useState("");
   const [cancelReasonError, setCancelReasonError] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     if (initialOrders) {
@@ -99,6 +105,30 @@ function SellerOrdersPage({ orders: initialOrders, onConfirmReceivedMoney }) {
       };
     });
   }, [orders]);
+
+  const filteredRows = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return rows;
+    }
+
+    return rows.filter((row) => String(row.code || "").toLowerCase().includes(normalizedQuery));
+  }, [rows, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / ORDERS_PER_PAGE));
+
+  const paginatedRows = useMemo(() => {
+    const startIndex = (page - 1) * ORDERS_PER_PAGE;
+    return filteredRows.slice(startIndex, startIndex + ORDERS_PER_PAGE);
+  }, [filteredRows, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, Math.max(1, Math.ceil(filteredRows.length / ORDERS_PER_PAGE))));
+  }, [filteredRows]);
 
   async function handleConfirmReceivedMoney() {
     if (!selectedOrder) {
@@ -210,89 +240,112 @@ function SellerOrdersPage({ orders: initialOrders, onConfirmReceivedMoney }) {
         eyebrow="Seller"
         title="Don hang cua shop"
         description="Don da thanh toan se cho phep hoan tien hoac xac nhan hoan tat. Don chua thanh toan se cho phep xac nhan hoan tat hoac huy don."
+        action={
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Tim theo ma don hang..."
+          />
+        }
       />
       {loading ? <EmptyState title="Dang tai don hang cua shop" description="He thong dang lay danh sach don hang tu backend." /> : null}
       {!loading && error ? <EmptyState title="Khong tai duoc don hang" description={error} /> : null}
       {!loading && !error ? (
-        <DataTable
-          columns={[
-            { key: "code", title: "Don hang" },
-            { key: "product_name", title: "San pham" },
-            { key: "affiliate_name", title: "Nguon don" },
-            {
-              key: "affiliate_attribution_label",
-              title: "Affiliate",
-              render: (row) => (
-                <span
-                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                    row.has_affiliate_attribution ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
-                  }`}
-                >
-                  {row.has_affiliate_attribution ? "Co" : "Khong"}
-                </span>
-              ),
-            },
-            { key: "amount", title: "Gia tri", render: (row) => <MoneyText value={row.amount} /> },
-            {
-              key: "order_status",
-              title: "Trang thai don",
-              render: (row) => (
-                <StatusBadge
-                  status={row.order_status}
-                  className={row.order_status === "COMPLETED" ? completedOrderStatusClassName : ""}
-                />
-              ),
-            },
-            { key: "payment_status", title: "Thanh toan", render: (row) => <StatusBadge status={row.payment_status} /> },
-            { key: "created_at", title: "Ngay tao", render: (row) => formatDateTime(row.created_at) },
-            {
-              key: "actions",
-              title: "Tac vu",
-              render: (row) => {
-                if (row.seller_confirmed_received_money) {
-                  return <StatusBadge status="COMPLETED" className={completedOrderStatusClassName} />;
-                }
-
-                if (row.order_status === "REFUNDED") {
-                  return <StatusBadge status="REFUNDED" />;
-                }
-
-                if (row.order_status === "CANCELLED") {
-                  return <StatusBadge status="CANCELLED" />;
-                }
-
-                if (row.hasPendingRefundRequest) {
-                  return <StatusBadge status="PENDING" />;
-                }
-
-                if (!row.canConfirmComplete && !row.canRefund && !row.canCancel) {
-                  return <span className="text-sm text-slate-500">Khong con thao tac</span>;
-                }
-
-                return (
-                  <div className="flex flex-wrap gap-2">
-                    {row.canConfirmComplete ? (
-                      <Button size="sm" onClick={() => setSelectedOrder(row)}>
-                        Xac nhan hoan tat don
-                      </Button>
-                    ) : null}
-                    {row.canRefund ? (
-                      <Button size="sm" variant="danger" onClick={() => openRefundModal(row)}>
-                        Hoan tien
-                      </Button>
-                    ) : null}
-                    {row.canCancel ? (
-                      <Button size="sm" variant="danger" onClick={() => openCancelModal(row)}>
-                        Huy don
-                      </Button>
-                    ) : null}
-                  </div>
-                );
+        <>
+          <DataTable
+            columns={[
+              {
+                key: "code",
+                title: "Don hang",
+                render: (row) => (
+                  <Link
+                    to={`/dashboard/seller/orders/${row.id}`}
+                    className="font-medium text-sky-700 transition hover:text-sky-800 hover:underline"
+                  >
+                    {row.code}
+                  </Link>
+                ),
               },
-            },
-          ]}
-          rows={rows}
-        />
+              { key: "product_name", title: "San pham" },
+              { key: "affiliate_name", title: "Nguon don" },
+              {
+                key: "affiliate_attribution_label",
+                title: "Affiliate",
+                render: (row) => (
+                  <span
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                      row.has_affiliate_attribution ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {row.has_affiliate_attribution ? "Co" : "Khong"}
+                  </span>
+                ),
+              },
+              { key: "amount", title: "Gia tri", render: (row) => <MoneyText value={row.amount} /> },
+              {
+                key: "order_status",
+                title: "Trang thai don",
+                render: (row) => (
+                  <StatusBadge
+                    status={row.order_status}
+                    className={row.order_status === "COMPLETED" ? completedOrderStatusClassName : ""}
+                  />
+                ),
+              },
+              { key: "payment_status", title: "Thanh toan", render: (row) => <StatusBadge status={row.payment_status} /> },
+              { key: "created_at", title: "Ngay tao", render: (row) => formatDateTime(row.created_at) },
+              {
+                key: "actions",
+                title: "Tac vu",
+                render: (row) => {
+                  if (row.seller_confirmed_received_money) {
+                    return <StatusBadge status="COMPLETED" className={completedOrderStatusClassName} />;
+                  }
+
+                  if (row.order_status === "REFUNDED") {
+                    return <StatusBadge status="REFUNDED" />;
+                  }
+
+                  if (row.order_status === "CANCELLED") {
+                    return <StatusBadge status="CANCELLED" />;
+                  }
+
+                  if (row.hasPendingRefundRequest) {
+                    return <StatusBadge status="PENDING" />;
+                  }
+
+                  if (!row.canConfirmComplete && !row.canRefund && !row.canCancel) {
+                    return <span className="text-sm text-slate-500">Khong con thao tac</span>;
+                  }
+
+                  return (
+                    <div className="flex flex-wrap gap-2">
+                      {row.canConfirmComplete ? (
+                        <Button size="sm" onClick={() => setSelectedOrder(row)}>
+                          Xac nhan hoan tat don
+                        </Button>
+                      ) : null}
+                      {row.canRefund ? (
+                        <Button size="sm" variant="danger" onClick={() => openRefundModal(row)}>
+                          Hoan tien
+                        </Button>
+                      ) : null}
+                      {row.canCancel ? (
+                        <Button size="sm" variant="danger" onClick={() => openCancelModal(row)}>
+                          Huy don
+                        </Button>
+                      ) : null}
+                    </div>
+                  );
+                },
+              },
+            ]}
+            rows={paginatedRows}
+          />
+          {filteredRows.length > ORDERS_PER_PAGE ? (
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+          ) : null}
+        </>
       ) : null}
       <ConfirmModal
         open={Boolean(selectedOrder)}

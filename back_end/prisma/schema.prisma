@@ -614,7 +614,7 @@ model PlatformFeeConfig {
 
 model Order {
   id                           BigInt                @id @default(autoincrement())
-  orderCode                    String                @unique @map("order_code") @db.VarChar(255)
+  orderCode                    String                @map("order_code") @db.VarChar(255)
   buyerId                      Int                   @map("buyer_id")
   buyerName                    String?               @map("buyer_name") @db.VarChar(255)
   buyerEmail                   String?               @map("buyer_email") @db.VarChar(255)
@@ -653,6 +653,7 @@ model Order {
   commissions                  AffiliateCommission[]
 
   @@index([buyerId])
+  @@index([orderCode])
   @@index([shippingAddressId])
   @@index([sellerId])
   @@index([sellerConfirmedBy])

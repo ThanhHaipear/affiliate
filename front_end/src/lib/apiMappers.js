@@ -98,6 +98,8 @@ function mapOrderDto(order = {}) {
   return {
     id: order.id,
     code: order.orderCode || `#${order.id ?? ""}`,
+    seller_id: order.sellerId ?? order.seller?.id ?? null,
+    seller_name: order.seller?.shopName || (order.sellerId ? `Shop #${order.sellerId}` : "Shop"),
     product_name: order.items?.[0]?.productNameSnapshot || `Order ${order.orderCode || order.id || ""}`,
     amount: toNumber(order.totalAmount),
     order_status: order.status || "CREATED",
@@ -212,8 +214,8 @@ function aggregateDisplayCartItems(items = []) {
       createdAt: item.raw?.createdAt || null,
       updatedAt: item.raw?.updatedAt || null,
       label: item.isAffiliateAttributed
-        ? `Qua affiliate${item.affiliateId ? ` #${item.affiliateId}` : ""}`
-        : "Đơn trực tiếp",
+        ? `Qua affiliate${item.affiliateName ? ` ${item.affiliateName}` : item.affiliateId ? ` #${item.affiliateId}` : ""}`
+        : "Don truc tiep",
       raw: item,
     };
 
@@ -264,6 +266,71 @@ function aggregateDisplayCartItems(items = []) {
       const rightTime = new Date(right.latestActivityAt || 0).getTime();
       return rightTime - leftTime;
     });
+}
+
+function summarizeCartAttributions(group = {}) {
+  const buckets = new Map();
+
+  (group.allocations || []).forEach((allocation) => {
+    const key = allocation.isAffiliateAttributed
+      ? `affiliate:${allocation.affiliateId || allocation.affiliateLinkId || allocation.attributionSessionId || allocation.label}`
+      : "direct";
+    const existing = buckets.get(key) || {
+      key,
+      label: allocation.label,
+      quantity: 0,
+      isAffiliateAttributed: allocation.isAffiliateAttributed,
+    };
+
+    existing.quantity += toNumber(allocation.quantity);
+    buckets.set(key, existing);
+  });
+
+  return Array.from(buckets.values()).sort((left, right) => {
+    if (left.isAffiliateAttributed === right.isAffiliateAttributed) {
+      return right.quantity - left.quantity;
+    }
+
+    return left.isAffiliateAttributed ? -1 : 1;
+  });
+}
+
+function aggregateOrderItemsForDisplay(items = []) {
+  const groups = new Map();
+
+  items.forEach((item) => {
+    const key = String(item.productId);
+    const existing = groups.get(key);
+    const lineTotal = toNumber(item.lineTotal || item.price);
+
+    if (!existing) {
+      groups.set(key, {
+        groupKey: key,
+        productId: item.productId,
+        productName: item.productNameSnapshot || `San pham #${item.productId}`,
+        variantNames: new Set(item.variantNameSnapshot ? [item.variantNameSnapshot] : []),
+        quantity: toNumber(item.quantity),
+        lineTotal,
+        reviewOrderItemId: item.id,
+        hasReviewed: Boolean(item.productReview),
+        rawItems: [item],
+      });
+      return;
+    }
+
+    existing.quantity += toNumber(item.quantity);
+    existing.lineTotal += lineTotal;
+    if (item.variantNameSnapshot) {
+      existing.variantNames.add(item.variantNameSnapshot);
+    }
+    existing.hasReviewed = existing.hasReviewed || Boolean(item.productReview);
+    existing.rawItems.push(item);
+  });
+
+  return Array.from(groups.values()).map((group) => ({
+    ...group,
+    variantLabel: Array.from(group.variantNames).join(", "),
+  }));
 }
 
 function mapWalletDto(wallet = {}) {
@@ -365,6 +432,7 @@ function mapWithdrawalContextDto(context = {}) {
 export {
   mapAffiliateLinkDto,
   aggregateDisplayCartItems,
+  aggregateOrderItemsForDisplay,
   buildAccountActorLabel,
   mapNotificationDto,
   mapCartDto,
@@ -372,6 +440,7 @@ export {
   mapCommissionDto,
   mapOrderDto,
   mapProductDto,
+  summarizeCartAttributions,
   mapWalletDto,
   mapWithdrawalContextDto,
   mapWithdrawalDto,

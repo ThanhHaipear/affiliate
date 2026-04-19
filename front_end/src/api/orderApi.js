@@ -17,6 +17,11 @@ async function cancelCustomerOrder(orderId, payload) {
   return unwrapResponseData(response);
 }
 
+async function refundCustomerOrder(orderId, payload) {
+  const response = await axiosClient.post(ENDPOINTS.payments.refund(orderId), payload || {});
+  return unwrapResponseData(response);
+}
+
 async function getCart() {
   const response = await axiosClient.get(ENDPOINTS.cart.root);
   return unwrapResponseData(response);
@@ -70,6 +75,7 @@ export {
   getCart,
   getCustomerOrderDetail,
   getCustomerOrders,
+  refundCustomerOrder,
   removeCartItem,
   setCartItemQuantity,
   updateCartItem,

@@ -1,11 +1,15 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { getSellerOrders, getSellerStats } from "../../../api/sellerApi";
 import DataTable from "../../../components/common/DataTable";
 import EmptyState from "../../../components/common/EmptyState";
 import MoneyText from "../../../components/common/MoneyText";
 import PageHeader from "../../../components/common/PageHeader";
+import Pagination from "../../../components/common/Pagination";
 import StatCard from "../../../components/common/StatCard";
 import { formatCompactCurrency, formatCurrency, formatDateTime } from "../../../lib/format";
+
+const ORDERS_PER_PAGE = 8;
 
 function isOrderActive(order = {}) {
   return !["CANCELLED", "REFUNDED"].includes(order.status);
@@ -36,6 +40,7 @@ function SellerRevenuePage() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let active = true;
@@ -97,11 +102,13 @@ function SellerRevenuePage() {
         const key = item.productId || item.productNameSnapshot;
         const current = grouped.get(key) || {
           product: item.productNameSnapshot || `Product #${item.productId}`,
+          quantity: 0,
           revenue: 0,
           affiliateOrders: 0,
         };
 
-        current.revenue += Number(item.totalPrice || item.subtotalAmount || 0);
+        current.quantity += Number(item.quantity || 0);
+        current.revenue += Number(item.totalPrice || item.subtotalAmount || item.lineTotal || 0);
         if (item.affiliateId) {
           current.affiliateOrders += 1;
         }
@@ -110,7 +117,26 @@ function SellerRevenuePage() {
       });
     });
 
-    return [...grouped.values()].sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+    return [...grouped.values()]
+      .sort((a, b) => {
+        if (b.quantity === a.quantity) {
+          return b.revenue - a.revenue;
+        }
+
+        return b.quantity - a.quantity;
+      })
+      .slice(0, 2);
+  }, [orders]);
+
+  const totalPages = Math.max(1, Math.ceil(orders.length / ORDERS_PER_PAGE));
+
+  const paginatedOrders = useMemo(() => {
+    const startIndex = (page - 1) * ORDERS_PER_PAGE;
+    return orders.slice(startIndex, startIndex + ORDERS_PER_PAGE);
+  }, [orders, page]);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, Math.max(1, Math.ceil(orders.length / ORDERS_PER_PAGE))));
   }, [orders]);
 
   return (
@@ -145,7 +171,8 @@ function SellerRevenuePage() {
             <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
               <h3 className="text-xl font-semibold text-slate-900">Công thức thực nhận</h3>
               <p className="mt-3 text-sm leading-7 text-slate-600">
-                Doanh thu thực nhận = giá trị đơn hợp lệ đã xác nhận tiền - phí nền tảng - hoa hồng affiliate.
+                Bảng bên dưới tách riêng tổng tiền đơn, phí ship, phí nền tảng, hoa hồng affiliate và phần seller thực nhận
+                để seller theo dõi từng khoản rõ ràng hơn.
               </p>
             </div>
             <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
@@ -155,6 +182,7 @@ function SellerRevenuePage() {
                   <div key={item.product} className="rounded-[1.5rem] bg-slate-50 p-4">
                     <p className="font-semibold text-slate-900">{item.product}</p>
                     <p className="mt-2 text-sm text-slate-600">
+                      {Number(item.quantity || 0).toLocaleString("vi-VN")} sản phẩm đã bán |{" "}
                       {Number(item.affiliateOrders || 0).toLocaleString("vi-VN")} đơn affiliate | <MoneyText value={item.revenue} />
                     </p>
                   </div>
@@ -164,16 +192,31 @@ function SellerRevenuePage() {
           </div>
           <DataTable
             columns={[
-              { key: "orderCode", title: "Đơn hàng" },
+              {
+                key: "orderCode",
+                title: "Đơn hàng",
+                render: (row) => (
+                  <Link
+                    to={`/dashboard/seller/orders/${row.id}`}
+                    className="font-medium text-sky-700 transition hover:text-sky-800 hover:underline"
+                  >
+                    {row.orderCode}
+                  </Link>
+                ),
+              },
               { key: "createdAt", title: "Ngày tạo", render: (row) => formatDateTime(row.createdAt) },
               { key: "totalAmount", title: "Tổng tiền", render: (row) => <MoneyText value={isOrderActive(row) ? row.totalAmount : 0} /> },
+              { key: "shippingFee", title: "Phí ship", render: (row) => <MoneyText value={isOrderActive(row) ? row.shippingFee : 0} /> },
               { key: "platformFeeAmount", title: "Phí nền tảng", render: (row) => <MoneyText value={isOrderSettled(row) ? sumPlatformFee(row.items || []) : 0} /> },
               { key: "affiliateCommissionAmount", title: "Hoa hồng affiliate", render: (row) => <MoneyText value={isOrderSettled(row) ? sumAffiliateCommission(row.items || []) : 0} /> },
               { key: "netAmount", title: "Seller net", render: (row) => <MoneyText value={isOrderSettled(row) ? sumSellerNet(row.items || []) : 0} /> },
             ]}
-            rows={orders}
+            rows={paginatedOrders}
             keyField="id"
           />
+          {orders.length > ORDERS_PER_PAGE ? (
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+          ) : null}
         </>
       ) : null}
     </div>

@@ -148,8 +148,13 @@ function VnpayReturnPage() {
         <div className="space-y-3 text-sm text-slate-600">
           <p>
             {isPayoutFlow ? "Mã batch" : "Mã đơn"}:{" "}
-            <span className="font-semibold text-slate-900">{result?.batchId || result?.orderId}</span>
+            <span className="font-semibold text-slate-900">{result?.batchId || result?.orderCode || result?.orderId}</span>
           </p>
+          {!isPayoutFlow && result?.totalOrders > 1 ? (
+            <p>
+              Số order trong checkout: <span className="font-semibold text-slate-900">{result.totalOrders}</span>
+            </p>
+          ) : null}
           <p>
             Mã phản hồi VNPAY: <span className="font-semibold text-slate-900">{result?.responseCode || "--"}</span>
           </p>

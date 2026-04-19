@@ -1,12 +1,12 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { getCart, removeCartItem, setCartItemQuantity } from "../../../api/orderApi";
+import { getCart, removeCartItem, setCartItemQuantity, updateCartItem } from "../../../api/orderApi";
 import Button from "../../../components/common/Button";
 import EmptyState from "../../../components/common/EmptyState";
 import MoneyText from "../../../components/common/MoneyText";
 import PageHeader from "../../../components/common/PageHeader";
 import { useToast } from "../../../hooks/useToast";
-import { aggregateDisplayCartItems, mapCartDto } from "../../../lib/apiMappers";
+import { aggregateDisplayCartItems, mapCartDto, summarizeCartAttributions } from "../../../lib/apiMappers";
 
 function CartPage() {
   const toast = useToast();
@@ -14,7 +14,7 @@ function CartPage() {
   const [cart, setCart] = useState({ items: [], subtotal: 0 });
   const [selectedGroupKeys, setSelectedGroupKeys] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [updatingItemId, setUpdatingItemId] = useState(null);
+  const [updatingGroupKey, setUpdatingGroupKey] = useState(null);
   const [error, setError] = useState("");
   const [quantityDrafts, setQuantityDrafts] = useState({});
 
@@ -36,16 +36,13 @@ function CartPage() {
       setQuantityDrafts(() => {
         const next = {};
         groups.forEach((group) => {
-          group.allocations.forEach((allocation) => {
-            next[allocation.id] = String(allocation.quantity);
-          });
+          next[group.groupKey] = String(group.quantity);
         });
         return next;
       });
       setSelectedGroupKeys((current) => {
         const validKeys = groups.map((item) => item.groupKey);
-        const nextSelected = current.filter((groupKey) => validKeys.includes(groupKey));
-        return nextSelected.length ? nextSelected : validKeys;
+        return current.filter((groupKey) => validKeys.includes(groupKey));
       });
     } catch (loadError) {
       setError(loadError.response?.data?.message || "Khong tai duoc gio hang.");
@@ -54,24 +51,68 @@ function CartPage() {
     }
   }
 
-  async function handleSetQuantity(allocation, nextQuantity) {
+  async function handleSetGroupQuantity(group, nextQuantity) {
     if (nextQuantity < 1) {
-      return handleRemove(allocation);
+      return handleRemoveGroup(group);
+    }
+
+    const currentQuantity = Number(group.quantity || 0);
+    const quantityDelta = nextQuantity - currentQuantity;
+
+    if (quantityDelta === 0) {
+      return;
     }
 
     try {
-      setUpdatingItemId(allocation.id);
-      await setCartItemQuantity(allocation.id, { quantity: nextQuantity });
+      setUpdatingGroupKey(group.groupKey);
+
+      if (quantityDelta > 0) {
+        await updateCartItem({
+          productId: Number(group.product.id),
+          variantId: Number(group.variantId),
+          quantity: quantityDelta,
+        });
+      } else {
+        let remainingToReduce = Math.abs(quantityDelta);
+        const reductionPlan = [...group.allocations].sort((left, right) => {
+          if (left.isAffiliateAttributed !== right.isAffiliateAttributed) {
+            return left.isAffiliateAttributed ? 1 : -1;
+          }
+
+          const leftTime = new Date(left.updatedAt || left.createdAt || 0).getTime();
+          const rightTime = new Date(right.updatedAt || right.createdAt || 0).getTime();
+          return rightTime - leftTime;
+        });
+
+        for (const allocation of reductionPlan) {
+          if (remainingToReduce <= 0) {
+            break;
+          }
+
+          const removableQuantity = Math.min(remainingToReduce, allocation.quantity);
+
+          if (removableQuantity === allocation.quantity) {
+            await removeCartItem(allocation.id);
+          } else {
+            await setCartItemQuantity(allocation.id, {
+              quantity: allocation.quantity - removableQuantity,
+            });
+          }
+
+          remainingToReduce -= removableQuantity;
+        }
+      }
+
       await loadCart();
       toast.success("Da cap nhat gio hang.");
     } catch (submitError) {
       toast.error(submitError.response?.data?.message || "Khong cap nhat duoc gio hang.");
     } finally {
-      setUpdatingItemId(null);
+      setUpdatingGroupKey(null);
     }
   }
 
-  function handleDraftQuantityChange(allocation, rawValue) {
+  function handleGroupDraftQuantityChange(group, rawValue) {
     const nextValue = String(rawValue ?? "");
     if (nextValue !== "" && !/^\d+$/.test(nextValue)) {
       return;
@@ -79,34 +120,34 @@ function CartPage() {
 
     setQuantityDrafts((current) => ({
       ...current,
-      [allocation.id]: nextValue,
+      [group.groupKey]: nextValue,
     }));
   }
 
-  async function handleDraftQuantityBlur(allocation) {
-    const rawValue = quantityDrafts[allocation.id];
+  async function handleGroupDraftQuantityBlur(group) {
+    const rawValue = quantityDrafts[group.groupKey];
     const nextQuantity = Math.max(1, Number.parseInt(rawValue, 10) || 1);
 
     setQuantityDrafts((current) => ({
       ...current,
-      [allocation.id]: String(nextQuantity),
+      [group.groupKey]: String(nextQuantity),
     }));
 
-    if (nextQuantity !== allocation.quantity) {
-      await handleSetQuantity(allocation, nextQuantity);
+    if (nextQuantity !== group.quantity) {
+      await handleSetGroupQuantity(group, nextQuantity);
     }
   }
 
-  async function handleRemove(allocation) {
+  async function handleRemoveGroup(group) {
     try {
-      setUpdatingItemId(allocation.id);
-      await removeCartItem(allocation.id);
+      setUpdatingGroupKey(group.groupKey);
+      await Promise.all(group.allocations.map((allocation) => removeCartItem(allocation.id)));
       await loadCart();
       toast.success("Da xoa san pham khoi gio hang.");
     } catch (submitError) {
       toast.error(submitError.response?.data?.message || "Khong xoa duoc san pham khoi gio hang.");
     } finally {
-      setUpdatingItemId(null);
+      setUpdatingGroupKey(null);
     }
   }
 
@@ -129,6 +170,13 @@ function CartPage() {
   );
 
   const hasSelectedStockConflict = selectedCartGroups.some((item) => item.hasStockConflict);
+  const selectedShopCount = useMemo(
+    () =>
+      new Set(
+        selectedCartGroups.map((item) => String(item.product?.seller_id || item.product?.seller_name || item.groupKey)),
+      ).size,
+    [selectedCartGroups],
+  );
 
   function handleCheckout() {
     if (!selectedCartGroups.length) {
@@ -146,7 +194,7 @@ function CartPage() {
     navigate(`/dashboard/customer/checkout?${params.toString()}`);
   }
 
-  const shippingFee = selectedCartGroups.length ? 30000 : 0;
+  const shippingFee = selectedShopCount ? 30000 * selectedShopCount : 0;
   const selectedSubtotal = selectedCartGroups.reduce((sum, item) => sum + item.lineTotal, 0);
   const total = selectedSubtotal + shippingFee;
   const allSelected = groupedCartItems.length > 0 && selectedGroupKeys.length === groupedCartItems.length;
@@ -189,6 +237,7 @@ function CartPage() {
             {groupedCartItems.length ? (
               groupedCartItems.map((group) => {
                 const checked = selectedGroupKeys.includes(group.groupKey);
+                const attributionSummary = summarizeCartAttributions(group);
                 return (
                   <div
                     key={group.groupKey}
@@ -234,6 +283,21 @@ function CartPage() {
                           )}
                         </div>
 
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {attributionSummary.map((entry) => (
+                            <span
+                              key={entry.key}
+                              className={`rounded-full px-3 py-1 text-xs font-medium ${
+                                entry.isAffiliateAttributed
+                                  ? "bg-emerald-50 text-emerald-800"
+                                  : "bg-slate-100 text-slate-700"
+                              }`}
+                            >
+                              {entry.label}: x{Number(entry.quantity || 0).toLocaleString("vi-VN")}
+                            </span>
+                          ))}
+                        </div>
+
                         {group.hasStockConflict ? (
                           <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
                             So luong ton con {Number(group.currentAvailableStock || 0).toLocaleString("vi-VN")} san
@@ -255,72 +319,57 @@ function CartPage() {
                     </div>
 
                     <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
-                      <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Phan bo trong cung item</p>
-                      <div className="mt-4 space-y-3">
-                        {group.allocations.map((allocation) => (
-                          <div key={allocation.id} className="rounded-[1.25rem] border border-slate-200 bg-white p-4">
-                            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                              <div>
-                                <p
-                                  className={`text-sm font-medium ${allocation.isAffiliateAttributed ? "text-emerald-700" : "text-slate-700"}`}
-                                >
-                                  {allocation.label}
-                                </p>
-                                <p className="mt-1 text-sm text-slate-500">
-                                  {allocation.isAffiliateAttributed
-                                    ? "Chi phan nay moi tinh commission affiliate."
-                                    : "Phan nay khong tinh commission affiliate."}
-                                </p>
-                                {allocation.hasStockConflict ? (
-                                  <p className="mt-2 text-sm font-medium text-amber-700">
-                                    Ton hien tai con {Number(allocation.currentAvailableStock || 0).toLocaleString("vi-VN")} san
-                                    pham.
-                                  </p>
-                                ) : null}
-                              </div>
+                      <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Dieu chinh tren mot card</p>
+                      <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">Tong so luong cua san pham nay</p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            He thong van giu attribution direct va affiliate o ben duoi de tinh hoa hong chinh xac khi checkout.
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            Tang them so luong trong gio se them vao phan mua truc tiep. Khi giam so luong, he thong uu tien giam phan truc tiep truoc.
+                          </p>
+                        </div>
 
-                              <div className="flex flex-wrap items-center gap-3">
-                                <div className="inline-flex items-center overflow-hidden rounded-full border border-slate-200 bg-slate-50">
-                                  <button
-                                    type="button"
-                                    className="px-4 py-2 text-sm font-semibold text-slate-700"
-                                    onClick={() => handleSetQuantity(allocation, allocation.quantity - 1)}
-                                    disabled={updatingItemId === allocation.id}
-                                  >
-                                    -
-                                  </button>
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    pattern="[0-9]*"
-                                    min="1"
-                                    value={quantityDrafts[allocation.id] ?? String(allocation.quantity)}
-                                    onChange={(event) => handleDraftQuantityChange(allocation, event.target.value)}
-                                    onBlur={() => handleDraftQuantityBlur(allocation)}
-                                    className="w-16 border-x border-slate-200 bg-white px-2 py-2 text-center text-sm text-slate-900 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                                  />
-                                  <button
-                                    type="button"
-                                    className="px-4 py-2 text-sm font-semibold text-slate-700"
-                                    onClick={() => handleSetQuantity(allocation, allocation.quantity + 1)}
-                                    disabled={updatingItemId === allocation.id}
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                                <MoneyText value={allocation.lineTotal} className="font-semibold text-slate-900" />
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  loading={updatingItemId === allocation.id}
-                                  onClick={() => handleRemove(allocation)}
-                                >
-                                  Xoa phan nay
-                                </Button>
-                              </div>
-                            </div>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <div className="inline-flex items-center overflow-hidden rounded-full border border-slate-200 bg-slate-50">
+                            <button
+                              type="button"
+                              className="px-4 py-2 text-sm font-semibold text-slate-700"
+                              onClick={() => handleSetGroupQuantity(group, group.quantity - 1)}
+                              disabled={updatingGroupKey === group.groupKey}
+                            >
+                              -
+                            </button>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              min="1"
+                              value={quantityDrafts[group.groupKey] ?? String(group.quantity)}
+                              onChange={(event) => handleGroupDraftQuantityChange(group, event.target.value)}
+                              onBlur={() => handleGroupDraftQuantityBlur(group)}
+                              className="w-16 border-x border-slate-200 bg-white px-2 py-2 text-center text-sm text-slate-900 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            />
+                            <button
+                              type="button"
+                              className="px-4 py-2 text-sm font-semibold text-slate-700"
+                              onClick={() => handleSetGroupQuantity(group, group.quantity + 1)}
+                              disabled={updatingGroupKey === group.groupKey || group.hasStockConflict}
+                            >
+                              +
+                            </button>
                           </div>
-                        ))}
+                          <MoneyText value={group.lineTotal} className="font-semibold text-slate-900" />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            loading={updatingGroupKey === group.groupKey}
+                            onClick={() => handleRemoveGroup(group)}
+                          >
+                            Xoa san pham
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -353,6 +402,10 @@ function CartPage() {
               <div className="flex items-center justify-between">
                 <span>Tong so luong</span>
                 <span>{Number(selectedUnits || 0).toLocaleString("vi-VN")}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>So shop da chon</span>
+                <span>{selectedShopCount}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span>Tam tinh</span>

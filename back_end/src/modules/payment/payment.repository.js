@@ -65,6 +65,11 @@ const appendReason = (base, reason) => {
   return `${base}. Reason: ${reason}`;
 };
 
+const buildUniquePaymentTransactionCode = (baseCode, orderId) => {
+  const normalizedBaseCode = String(baseCode || generateTxnCode()).slice(0, 220);
+  return `${normalizedBaseCode}-${orderId}`;
+};
+
 const reverseSettledOrder = async (tx, order, actorId, reason) => {
   const reversedAt = new Date();
   const platformWallet = await ensureWallet(tx, "PLATFORM", { platformKey: env.defaultPlatformKey });
@@ -362,44 +367,400 @@ const applyRefundOrder = async (tx, { orderId, actorId, reason, refundId, reques
 exports.markPaid = (orderId, transactionCode) => prisma.$transaction(async (tx) => {
   const order = await tx.order.findUnique({
     where: { id: BigInt(orderId) },
-    include: { seller: { select: { ownerAccountId: true, shopName: true } } }
-  });
-  const payment = await tx.payment.findFirst({ where: { orderId: BigInt(orderId) } });
-
-  await tx.payment.update({
-    where: { id: payment.id },
-    data: { status: "PAID", transactionCode: transactionCode || generateTxnCode(), paidAt: new Date() }
+    include: { seller: { select: { ownerAccountId: true, shopName: true } }, payments: true }
   });
 
-  await tx.order.update({ where: { id: BigInt(orderId) }, data: { status: "PAID", updatedAt: new Date() } });
-  await tx.orderStatusHistory.create({
-    data: { orderId: BigInt(orderId), oldStatus: order.status, newStatus: "PAID", changedAt: new Date() }
-  });
+  if (!order) {
+    throw new Error("Order not found");
+  }
 
-  await tx.activityLog.create({
-    data: {
-      accountId: order.buyerId,
-      action: "ORDER_PAID",
-      targetType: "ORDER",
-      targetId: order.id,
-      description: `Buyer paid order ${order.orderCode}`,
-      createdAt: new Date()
-    }
-  });
+  const payment = order.payments?.[0] || null;
+  if (!payment) {
+    throw new Error("Payment not found");
+  }
 
-  await tx.notification.create({
-    data: {
-      accountId: order.seller.ownerAccountId,
-      title: "Order paid",
-      content: `Order ${order.orderCode} has been marked as paid and is waiting for seller confirmation.`,
-      type: "ORDER_PAID",
-      targetType: "ORDER",
-      targetId: order.id,
-      createdAt: new Date()
-    }
-  });
+  const paidAt = new Date();
+  const nextTransactionCode = transactionCode || generateTxnCode();
+
+  if (payment.status !== "PAID") {
+    await tx.payment.update({
+      where: { id: payment.id },
+      data: { status: "PAID", transactionCode: nextTransactionCode, paidAt }
+    });
+  }
+
+  if (!["PAID", "COMPLETED"].includes(order.status)) {
+    await tx.order.update({ where: { id: BigInt(orderId) }, data: { status: "PAID", updatedAt: paidAt } });
+    await tx.orderStatusHistory.create({
+      data: { orderId: BigInt(orderId), oldStatus: order.status, newStatus: "PAID", changedAt: paidAt }
+    });
+
+    await tx.activityLog.create({
+      data: {
+        accountId: order.buyerId,
+        action: "ORDER_PAID",
+        targetType: "ORDER",
+        targetId: order.id,
+        description: `Buyer paid order ${order.orderCode}`,
+        createdAt: paidAt
+      }
+    });
+
+    await tx.notification.create({
+      data: {
+        accountId: order.seller.ownerAccountId,
+        title: "Order paid",
+        content: `Order ${order.orderCode} has been marked as paid and is waiting for seller confirmation.`,
+        type: "ORDER_PAID",
+        targetType: "ORDER",
+        targetId: order.id,
+        createdAt: paidAt
+      }
+    });
+  }
 
   return tx.order.findUnique({ where: { id: BigInt(orderId) }, include: { items: true, payments: true } });
+});
+
+exports.markPaidBatch = (orderIds, transactionCode) => prisma.$transaction(async (tx) => {
+  const normalizedOrderIds = [...new Set((orderIds || []).map((orderId) => BigInt(orderId)))];
+  const orders = await tx.order.findMany({
+    where: { id: { in: normalizedOrderIds } },
+    include: {
+      seller: { select: { ownerAccountId: true, shopName: true } },
+      payments: true,
+    },
+    orderBy: { id: "asc" },
+  });
+
+  if (orders.length !== normalizedOrderIds.length) {
+    throw new Error("One or more orders were not found");
+  }
+
+  const paidAt = new Date();
+  const nextTransactionCode = transactionCode || generateTxnCode();
+
+  for (const order of orders) {
+    const payment = order.payments?.[0] || null;
+    if (!payment) {
+      throw new Error("Payment not found");
+    }
+
+    if (payment.status !== "PAID") {
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: "PAID",
+          transactionCode: buildUniquePaymentTransactionCode(nextTransactionCode, order.id),
+          paidAt,
+        }
+      });
+    }
+
+    if (["PAID", "COMPLETED"].includes(order.status)) {
+      continue;
+    }
+
+    await tx.order.update({
+      where: { id: order.id },
+      data: { status: "PAID", updatedAt: paidAt }
+    });
+
+    await tx.orderStatusHistory.create({
+      data: { orderId: order.id, oldStatus: order.status, newStatus: "PAID", changedAt: paidAt }
+    });
+
+    await tx.activityLog.create({
+      data: {
+        accountId: order.buyerId,
+        action: "ORDER_PAID",
+        targetType: "ORDER",
+        targetId: order.id,
+        description: `Buyer paid order ${order.orderCode}`,
+        createdAt: paidAt
+      }
+    });
+
+    await tx.notification.create({
+      data: {
+        accountId: order.seller.ownerAccountId,
+        title: "Order paid",
+        content: `Order ${order.orderCode} has been marked as paid and is waiting for seller confirmation.`,
+        type: "ORDER_PAID",
+        targetType: "ORDER",
+        targetId: order.id,
+        createdAt: paidAt
+      }
+    });
+  }
+
+  return tx.order.findMany({
+    where: { id: { in: normalizedOrderIds } },
+    include: { items: true, payments: true },
+    orderBy: { id: "asc" },
+  });
+});
+
+exports.cancelPendingPaymentOrders = (orderIds, actorId, reason) => prisma.$transaction(async (tx) => {
+  const normalizedOrderIds = [...new Set((orderIds || []).map((orderId) => BigInt(orderId)))];
+  const orders = await tx.order.findMany({
+    where: { id: { in: normalizedOrderIds } },
+    include: {
+      items: true,
+      payments: true,
+      seller: { select: { ownerAccountId: true } },
+      commissions: true,
+    },
+    orderBy: { id: "asc" },
+  });
+
+  const cancelledAt = new Date();
+
+  for (const order of orders) {
+    for (const item of order.items) {
+      const inventory = await tx.inventory.findUnique({ where: { variantId: item.variantId } });
+      const nextReserved = Math.max(0, inventory.reservedQuantity - item.quantity);
+
+      await tx.inventory.update({
+        where: { variantId: item.variantId },
+        data: { reservedQuantity: nextReserved, updatedAt: cancelledAt }
+      });
+
+      await tx.inventoryTransaction.create({
+        data: {
+          variantId: item.variantId,
+          type: "RESERVE_RELEASE",
+          quantity: item.quantity,
+          stockAfter: inventory.quantity,
+          reservedAfter: nextReserved,
+          referenceType: "ORDER",
+          referenceId: order.id,
+          idempotencyKey: `ORDER_CANCEL_RELEASE_${order.id}_${item.id}`,
+          note: appendReason("Release reserved stock due to customer order cancellation", reason),
+          createdAt: cancelledAt
+        }
+      });
+    }
+
+    await tx.affiliateCommission.updateMany({
+      where: { orderId: order.id, status: "PENDING" },
+      data: {
+        status: "REJECTED",
+        fraudCheckStatus: "CANCELLED",
+        rejectReason: reason || "Order cancelled before payment",
+        note: appendReason("Pending commission cancelled because customer cancelled the order", reason),
+      }
+    });
+
+    for (const commission of order.commissions) {
+      await createNotifications(tx, [{
+        accountId: commission.affiliateId,
+        title: "Commission cancelled",
+        content: `Pending commission for order ${order.orderCode} has been cancelled because the customer cancelled the order.`,
+        type: "COMMISSION_REVERSED",
+        targetType: "ORDER",
+        targetId: order.id,
+        createdAt: cancelledAt,
+      }]);
+    }
+
+    await tx.payment.updateMany({
+      where: { orderId: order.id, status: "PENDING" },
+      data: { status: "FAILED" }
+    });
+
+    await tx.order.update({
+      where: { id: order.id },
+      data: {
+        status: "CANCELLED",
+        updatedAt: cancelledAt
+      }
+    });
+
+    await tx.orderStatusHistory.create({
+      data: {
+        orderId: order.id,
+        oldStatus: order.status,
+        newStatus: "CANCELLED",
+        note: reason || "Customer cancelled unpaid order",
+        changedBy: actorId,
+        changedAt: cancelledAt
+      }
+    });
+
+    await tx.activityLog.create({
+      data: {
+        accountId: actorId,
+        action: "ORDER_CANCELLED",
+        targetType: "ORDER",
+        targetId: order.id,
+        description: appendReason(`Customer cancelled unpaid order ${order.orderCode}`, reason),
+        createdAt: cancelledAt
+      }
+    });
+
+    await createNotifications(tx, [
+      {
+        accountId: order.buyerId,
+        title: "Order cancelled",
+        content: `Order ${order.orderCode} has been cancelled successfully.`,
+        type: "ORDER_CANCELLED",
+        targetType: "ORDER",
+        targetId: order.id,
+        createdAt: cancelledAt,
+      },
+      {
+        accountId: order.seller.ownerAccountId,
+        title: "Order cancelled",
+        content: `Customer cancelled order ${order.orderCode} before payment was completed.`,
+        type: "ORDER_CANCELLED",
+        targetType: "ORDER",
+        targetId: order.id,
+        createdAt: cancelledAt,
+      },
+    ]);
+  }
+
+  return tx.order.findMany({
+    where: { id: { in: normalizedOrderIds } },
+    include: { items: true, payments: true },
+    orderBy: { id: "asc" },
+  });
+});
+
+exports.changePendingPaymentMethodForOrders = (orderIds, actorId, paymentMethod) => prisma.$transaction(async (tx) => {
+  const normalizedOrderIds = [...new Set((orderIds || []).map((orderId) => BigInt(orderId)))];
+  const orders = await tx.order.findMany({
+    where: { id: { in: normalizedOrderIds } },
+    include: {
+      payments: true,
+    },
+    orderBy: { id: "asc" },
+  });
+
+  const changedAt = new Date();
+
+  for (const order of orders) {
+    const payment = order?.payments?.[0] || null;
+    if (!payment) {
+      throw new Error("Payment not found");
+    }
+
+    await tx.payment.update({
+      where: { id: payment.id },
+      data: {
+        method: paymentMethod,
+      },
+    });
+
+    await tx.activityLog.create({
+      data: {
+        accountId: actorId,
+        action: "ORDER_PAYMENT_METHOD_CHANGED",
+        targetType: "ORDER",
+        targetId: order.id,
+        description: `Customer changed payment method for order ${order.orderCode} from ${payment.method} to ${paymentMethod}`,
+        createdAt: changedAt,
+      },
+    });
+
+    await tx.notification.create({
+      data: {
+        accountId: order.buyerId,
+        title: "Payment method updated",
+        content: `Payment method for order ${order.orderCode} has been changed to ${paymentMethod}.`,
+        type: "ORDER_PAYMENT_METHOD_CHANGED",
+        targetType: "ORDER",
+        targetId: order.id,
+        createdAt: changedAt,
+      },
+    });
+  }
+
+  return tx.order.findMany({
+    where: { id: { in: normalizedOrderIds } },
+    include: { items: true, payments: true },
+    orderBy: { id: "asc" },
+  });
+});
+
+exports.createRefundRequestsForOrders = ({ orderIds, actorId, reason }) => prisma.$transaction(async (tx) => {
+  const normalizedOrderIds = [...new Set((orderIds || []).map((orderId) => BigInt(orderId)))];
+  const now = new Date();
+  const orders = await tx.order.findMany({
+    where: { id: { in: normalizedOrderIds } },
+    include: {
+      seller: { select: { ownerAccountId: true } },
+      refunds: { where: { status: "PENDING" } },
+    },
+    orderBy: { id: "asc" },
+  });
+
+  const createdRefunds = [];
+
+  for (const order of orders) {
+    if (order.refunds.length) {
+      throw new Error("A refund request is already pending review for this order");
+    }
+
+    const refund = await tx.refund.create({
+      data: {
+        orderId: order.id,
+        reason,
+        status: "PENDING",
+        amount: order.totalAmount,
+        requestedBy: actorId,
+        createdAt: now,
+        updatedAt: now
+      }
+    });
+
+    createdRefunds.push(refund);
+
+    await tx.activityLog.create({
+      data: {
+        accountId: actorId,
+        action: "ORDER_REFUND_REQUESTED",
+        targetType: "ORDER",
+        targetId: order.id,
+        description: `Refund request submitted for order ${order.orderCode}`,
+        createdAt: now
+      }
+    });
+
+    await notifyAdmins(tx, (accountId) => ({
+      accountId,
+      title: "Refund request waiting for review",
+      content: `Order ${order.orderCode} has a VNPAY cancel/refund request waiting for admin review.`,
+      type: "ORDER_REFUND_REQUESTED",
+      targetType: "ORDER",
+      targetId: order.id,
+      createdAt: now,
+    }));
+
+    await createNotifications(tx, dedupeNotificationsByAccount([
+      {
+        accountId: order.buyerId,
+        title: "Cancellation request submitted",
+        content: `Your request for order ${order.orderCode} has been sent to admin for review.`,
+        type: "ORDER_REFUND_REQUESTED",
+        targetType: "ORDER",
+        targetId: order.id,
+        createdAt: now,
+      },
+      {
+        accountId: order.seller.ownerAccountId,
+        title: "Refund request submitted",
+        content: `Order ${order.orderCode} has a refund request waiting for admin review.`,
+        type: "ORDER_REFUND_REQUESTED",
+        targetType: "ORDER",
+        targetId: order.id,
+        createdAt: now,
+      },
+    ]));
+  }
+
+  return createdRefunds;
 });
 
 exports.confirmSellerReceivedMoney = (orderId, actorId, note) => prisma.$transaction(async (tx) => {
