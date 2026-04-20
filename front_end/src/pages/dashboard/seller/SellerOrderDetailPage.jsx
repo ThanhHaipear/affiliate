@@ -22,7 +22,10 @@ const completedOrderStatusClassName = "bg-sky-50 text-sky-800";
 function getSellerOrderActions(order) {
   const isTerminal = ["CANCELLED", "REFUNDED", "COMPLETED"].includes(order?.order_status);
   const hasPendingRefundRequest = order?.raw?.refunds?.some((refund) => refund.status === "PENDING");
-  const isPaidOrder = order?.order_status === "PAID" && order?.payment_status === "PAID" && !order?.seller_confirmed_received_money;
+  const isPaidOrder =
+    order?.order_status === "PAID" &&
+    order?.payment_status === "PAID" &&
+    !order?.seller_confirmed_received_money;
   const isUnpaidOrder = order?.order_status === "PENDING_PAYMENT" && order?.payment_status === "PENDING";
 
   return {
@@ -63,7 +66,7 @@ function SellerOrderDetailPage() {
         setOrder(found ? { ...mapOrderDto(found), raw: found } : null);
       } catch (loadError) {
         if (active) {
-          setError(loadError.response?.data?.message || "Khong tai duoc chi tiet don hang.");
+          setError(loadError.response?.data?.message || "Không tải được chi tiết đơn hàng.");
         }
       } finally {
         if (active) {
@@ -100,10 +103,10 @@ function SellerOrderDetailPage() {
       setSubmitting(true);
       const updated = await confirmSellerReceivedMoney(order.id);
       setOrder({ ...mapOrderDto(updated), raw: updated });
-      toast.success("Da xac nhan hoan tat don hang.");
+      toast.success("Đã xác nhận hoàn tất đơn hàng.");
       setOpenConfirm(false);
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong xac nhan duoc don hang.");
+      toast.error(submitError.response?.data?.message || "Không xác nhận được đơn hàng.");
     } finally {
       setSubmitting(false);
     }
@@ -116,7 +119,7 @@ function SellerOrderDetailPage() {
 
     const normalizedReason = refundReason.trim();
     if (normalizedReason.length < 3) {
-      setRefundReasonError("Ly do hoan tien phai tu 3 ky tu tro len.");
+      setRefundReasonError("Lý do hoàn tiền phải từ 3 ký tự trở lên.");
       return;
     }
 
@@ -125,11 +128,11 @@ function SellerOrderDetailPage() {
       setRefundReasonError("");
       await refundSellerOrder(order.id, { reason: normalizedReason });
       await refreshOrder();
-      toast.success("Da gui yeu cau hoan tien cho admin duyet.");
+      toast.success("Đã gửi yêu cầu hoàn tiền cho admin duyệt.");
       setOpenRefund(false);
       setRefundReason("");
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong hoan tien duoc don hang.");
+      toast.error(submitError.response?.data?.message || "Không hoàn tiền được đơn hàng.");
     } finally {
       setSubmitting(false);
     }
@@ -142,7 +145,7 @@ function SellerOrderDetailPage() {
 
     const normalizedReason = cancelReason.trim();
     if (normalizedReason.length < 3) {
-      setCancelReasonError("Ly do huy don phai tu 3 ky tu tro len.");
+      setCancelReasonError("Lý do hủy đơn phải từ 3 ký tự trở lên.");
       return;
     }
 
@@ -151,59 +154,65 @@ function SellerOrderDetailPage() {
       setCancelReasonError("");
       await cancelSellerOrder(order.id, { reason: normalizedReason });
       await refreshOrder();
-      toast.success("Da huy don hang.");
+      toast.success("Đã hủy đơn hàng.");
       setOpenCancel(false);
       setCancelReason("");
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong huy duoc don hang.");
+      toast.error(submitError.response?.data?.message || "Không hủy được đơn hàng.");
     } finally {
       setSubmitting(false);
     }
   }
 
   if (loading) {
-    return <EmptyState title="Dang tai chi tiet don hang" description="He thong dang dong bo chi tiet don hang." />;
+    return (
+      <EmptyState
+        title="Đang tải chi tiết đơn hàng"
+        description="Hệ thống đang đồng bộ chi tiết đơn hàng."
+      />
+    );
   }
 
   if (error || !order) {
-    return <EmptyState title="Khong tai duoc don hang" description={error || "Don hang khong ton tai."} />;
+    return <EmptyState title="Không tải được đơn hàng" description={error || "Đơn hàng không tồn tại."} />;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Seller"
-        title={`Chi tiet ${order.code}`}
-        description="Don da thanh toan se cho phep hoan tien hoac xac nhan hoan tat. Don chua thanh toan se cho phep xac nhan hoan tat hoac huy don."
+        title={`Chi tiết ${order.code}`}
+
         action={
           actions.canConfirmComplete || actions.canRefund || actions.canCancel ? (
             <div className="flex flex-wrap gap-3">
               {actions.canConfirmComplete ? (
-                <Button onClick={() => setOpenConfirm(true)}>Xac nhan hoan tat don</Button>
+                <Button onClick={() => setOpenConfirm(true)}>Xác nhận hoàn tất đơn</Button>
               ) : null}
               {actions.canRefund ? (
                 <Button variant="danger" onClick={() => setOpenRefund(true)}>
-                  Hoan tien
+                  Hoàn tiền
                 </Button>
               ) : null}
               {actions.canCancel ? (
                 <Button variant="danger" onClick={() => setOpenCancel(true)}>
-                  Huy don
+                  Hủy đơn
                 </Button>
               ) : null}
             </div>
           ) : null
         }
       />
+
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-6">
-          <Panel title="Tong quan don hang">
+          <Panel title="Tổng quan đơn hàng">
             <div className="grid gap-4 md:grid-cols-2">
-              <Metric label="Ngay dat" value={formatDateTime(order.raw.createdAt)} />
-              <Metric label="Tong tien" value={<MoneyText value={order.amount} />} />
-              <Metric label="Thanh toan" value={<StatusBadge status={order.payment_status} />} />
+              <Metric label="Ngày đặt" value={formatDateTime(order.raw.createdAt)} />
+              <Metric label="Tổng tiền" value={<MoneyText value={order.amount} />} />
+              <Metric label="Thanh toán" value={<StatusBadge status={order.payment_status} />} />
               <Metric
-                label="Trang thai don"
+                label="Trạng thái đơn"
                 value={
                   <StatusBadge
                     status={order.order_status}
@@ -215,27 +224,29 @@ function SellerOrderDetailPage() {
                 label="Affiliate"
                 value={
                   <span
-                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                      affiliateOrder ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
-                    }`}
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${affiliateOrder ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
+                      }`}
                   >
-                    {affiliateOrder ? "Co" : "Khong"}
+                    {affiliateOrder ? "Có" : "Không"}
                   </span>
                 }
               />
-              <Metric label="Nguon don" value={affiliateOrder ? "Don qua affiliate" : "Don truc tiep"} />
+              <Metric label="Nguồn đơn" value={affiliateOrder ? "Đơn qua affiliate" : "Đơn trực tiếp"} />
             </div>
           </Panel>
-          <Panel title="San pham trong don">
+
+          <Panel title="Sản phẩm trong đơn">
             <div className="space-y-4">
               {orderItems.map((item, index) => (
                 <div key={`${item.id || index}`} className="rounded-[1.5rem] bg-slate-50 p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="font-semibold text-slate-900">{item.productNameSnapshot || `San pham #${item.productId}`}</p>
-                      <p className="mt-2 text-sm text-slate-600">So luong: {item.quantity || 1}</p>
+                      <p className="font-semibold text-slate-900">
+                        {item.productNameSnapshot || `Sản phẩm #${item.productId}`}
+                      </p>
+                      <p className="mt-2 text-sm text-slate-600">Số lượng: {item.quantity || 1}</p>
                       <p className={`mt-2 text-sm ${item.affiliateId ? "text-emerald-700" : "text-slate-500"}`}>
-                        Affiliate: {item.affiliateId ? "Co" : "Khong"}
+                        Affiliate: {item.affiliateId ? "Có" : "Không"}
                       </p>
                     </div>
                     <MoneyText value={item.totalPrice || item.subtotalAmount || item.lineTotal || 0} />
@@ -245,52 +256,55 @@ function SellerOrderDetailPage() {
             </div>
           </Panel>
         </div>
+
         <div className="space-y-6">
-          <Panel title="Affiliate va doi soat">
+          <Panel title="Affiliate và đối soát">
             <div className="space-y-4 text-sm text-slate-600">
               <div className="flex items-center justify-between">
-                <span>Nguon don</span>
-                <span className="font-medium text-slate-900">{affiliateOrder ? "Don qua affiliate" : "Don truc tiep"}</span>
+                <span>Nguồn đơn</span>
+                <span className="font-medium text-slate-900">{affiliateOrder ? "Đơn qua affiliate" : "Đơn trực tiếp"}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span>Affiliate</span>
                 <span
-                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                    affiliateOrder ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
-                  }`}
+                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${affiliateOrder ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
+                    }`}
                 >
-                  {affiliateOrder ? "Co" : "Khong"}
+                  {affiliateOrder ? "Có" : "Không"}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span>Hoa hong tiep thi</span>
+                <span>Hoa hồng tiếp thị</span>
                 <MoneyText value={commission} />
               </div>
               <div className="flex items-center justify-between">
-                <span>Phi san</span>
+                <span>Phí sàn</span>
                 <MoneyText value={platformFee} />
               </div>
               <div className="flex items-center justify-between">
-                <span>Shop da xac nhan hoan tat</span>
+                <span>Shop đã xác nhận hoàn tất</span>
                 <StatusBadge status={order.seller_confirmed_received_money ? "APPROVED" : "PENDING"} />
               </div>
               {order.raw?.refunds?.[0] ? (
                 <div className="flex items-center justify-between">
-                  <span>Yeu cau huy/hoan tien</span>
+                  <span>Yêu cầu hủy/hoàn tiền</span>
                   <StatusBadge status={order.raw.refunds[0].status} />
                 </div>
               ) : null}
             </div>
             <div className="mt-4 rounded-[1.5rem] bg-amber-50 p-4 text-sm leading-7 text-amber-800">
-              Don da thanh toan cho phep hoan tien hoac xac nhan hoan tat. Don chua thanh toan cho phep xac nhan hoan tat hoac huy don.
+              Đơn đã thanh toán cho phép hoàn tiền hoặc xác nhận hoàn tất. Đơn chưa thanh toán cho phép hủy đơn.
             </div>
           </Panel>
-          <Panel title="Tien trinh">
+
+          <Panel title="Tiến trình">
             <div className="space-y-4">
               {timeline.map((event) => (
                 <div key={event.id} className="rounded-[1.5rem] border border-slate-200 p-4">
                   <p className="text-sm font-semibold text-slate-900">{event.label}</p>
-                  <p className="mt-1 text-xs uppercase tracking-[0.24em] text-slate-400">{formatDateTime(event.time)}</p>
+                  <p className="mt-1 text-xs uppercase tracking-[0.24em] text-slate-400">
+                    {formatDateTime(event.time)}
+                  </p>
                   <p className="mt-2 text-sm leading-7 text-slate-600">{event.description}</p>
                 </div>
               ))}
@@ -298,19 +312,21 @@ function SellerOrderDetailPage() {
           </Panel>
         </div>
       </div>
+
       <ConfirmModal
         open={openConfirm}
-        title="Xac nhan hoan tat don"
-        description={`Neu xac nhan ${order.code}, he thong se chot don sang trang thai hoan tat va thuc hien doi soat cho don nay.`}
+        title="Xác nhận hoàn tất đơn"
+        description={`Nếu xác nhận ${order.code}, hệ thống sẽ chốt đơn sang trạng thái hoàn tất và thực hiện đối soát cho đơn này.`}
         onClose={() => setOpenConfirm(false)}
         onConfirm={handleConfirmReceivedMoney}
         loading={submitting}
       />
+
       <ConfirmModal
         open={openRefund}
-        title="Hoan tien don hang"
-        description={`Neu hoan tien ${order.code}, he thong se dao trang thai thanh toan va khong cong tien cho shop.`}
-        confirmLabel="Hoan tien"
+        title="Hoàn tiền đơn hàng"
+        description={`Nếu hoàn tiền ${order.code}, hệ thống sẽ đảo trạng thái thanh toán và không cộng tiền cho shop.`}
+        confirmLabel="Hoàn tiền"
         confirmVariant="danger"
         onClose={() => {
           setOpenRefund(false);
@@ -321,7 +337,7 @@ function SellerOrderDetailPage() {
         loading={submitting}
       >
         <label className="block text-sm font-medium text-slate-200" htmlFor="seller-order-detail-refund-reason">
-          Ly do hoan tien
+          Lý do hoàn tiền
         </label>
         <textarea
           id="seller-order-detail-refund-reason"
@@ -334,15 +350,16 @@ function SellerOrderDetailPage() {
           }}
           rows={4}
           className="mt-2 w-full rounded-2xl border border-slate-600 bg-slate-900/70 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400"
-          placeholder="Nhap ly do hoan tien"
+          placeholder="Nhập lý do hoàn tiền"
         />
         {refundReasonError ? <p className="mt-2 text-sm text-rose-300">{refundReasonError}</p> : null}
       </ConfirmModal>
+
       <ConfirmModal
         open={openCancel}
-        title="Huy don hang"
-        description={`Neu huy ${order.code}, he thong se huy don chua thanh toan va giai phong ton kho dang giu cho don nay.`}
-        confirmLabel="Huy don"
+        title="Hủy đơn hàng"
+        description={`Nếu hủy ${order.code}, hệ thống sẽ hủy đơn chưa thanh toán và giải phóng tồn kho đang giữ cho đơn này.`}
+        confirmLabel="Hủy đơn"
         confirmVariant="danger"
         onClose={() => {
           setOpenCancel(false);
@@ -353,7 +370,7 @@ function SellerOrderDetailPage() {
         loading={submitting}
       >
         <label className="block text-sm font-medium text-slate-200" htmlFor="seller-order-detail-cancel-reason">
-          Ly do huy don
+          Lý do hủy đơn
         </label>
         <textarea
           id="seller-order-detail-cancel-reason"
@@ -366,7 +383,7 @@ function SellerOrderDetailPage() {
           }}
           rows={4}
           className="mt-2 w-full rounded-2xl border border-slate-600 bg-slate-900/70 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400"
-          placeholder="Nhap ly do huy don"
+          placeholder="Nhập lý do hủy đơn"
         />
         {cancelReasonError ? <p className="mt-2 text-sm text-rose-300">{cancelReasonError}</p> : null}
       </ConfirmModal>

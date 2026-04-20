@@ -7,6 +7,11 @@ exports.listProducts = asyncHandler(async (_req, res) => {
   successResponse(res, data, "Products loaded");
 });
 
+exports.listCategories = asyncHandler(async (_req, res) => {
+  const data = await productService.listCategories();
+  successResponse(res, data, "Categories loaded");
+});
+
 exports.getProduct = asyncHandler(async (req, res) => {
   const data = await productService.getProduct(req.params.productId);
   successResponse(res, data, "Product loaded");

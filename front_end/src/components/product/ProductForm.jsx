@@ -1,47 +1,48 @@
 import { useEffect, useMemo, useState } from "react";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
 import Button from "../common/Button";
 import FileUploadField from "../common/FileUploadField";
 import Input from "../common/Input";
+import Select from "../common/Select";
 import { productSchema } from "../../schemas/productSchemas";
+
+function normalizeInitialValues(defaultValues, stockMin) {
+  return (
+    defaultValues || {
+      name: "",
+      description: "",
+      price: "",
+      category: "",
+      categoryId: "",
+      stock: stockMin > 0 ? stockMin : 0,
+      commission_type: "PERCENT",
+      commission_value: 10,
+      imageUrls: [],
+    }
+  );
+}
 
 function ProductForm({
   defaultValues,
   onSubmit,
+  onInvalidSubmit,
   loading = false,
   submitLabel = "Lưu sản phẩm",
-  successMessage = "Sản phẩm đã được lưu và sẵn sàng cho bước phê duyệt.",
   stockMin = 0,
+  categoryOptions = [],
 }) {
   const initialValues = useMemo(
-    () =>
-      defaultValues || {
-        name: "",
-        description: "",
-        price: "",
-        category: "Digital Product",
-        stock: stockMin > 0 ? stockMin : 0,
-        commission_type: "PERCENT",
-        commission_value: 10,
-        imageUrls: [],
-      },
+    () => normalizeInitialValues(defaultValues, stockMin),
     [defaultValues, stockMin],
   );
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitSuccessful, isSubmitting },
-  } = useForm({
-    resolver: zodResolver(productSchema),
-    defaultValues: initialValues,
-  });
-
+  const [values, setValues] = useState(initialValues);
+  const [errors, setErrors] = useState({});
   const [imageFiles, setImageFiles] = useState([]);
   const [imagePreviews, setImagePreviews] = useState(initialValues.imageUrls || []);
 
   useEffect(() => {
+    setValues(initialValues);
+    setErrors({});
     setImageFiles([]);
     setImagePreviews(initialValues.imageUrls || []);
   }, [initialValues]);
@@ -59,54 +60,154 @@ function ProductForm({
     };
   }, [imageFiles]);
 
-  const stockRegister = register(
-    "stock",
-    stockMin > 0
-      ? {
-          validate: (value) =>
-            Number(value) >= stockMin || `Tồn kho phải lớn hơn hoặc bằng ${stockMin}.`,
-        }
-      : undefined,
-  );
+  function updateField(name, nextValue) {
+    setValues((currentValues) => ({
+      ...currentValues,
+      [name]: nextValue,
+    }));
+
+    setErrors((currentErrors) => {
+      if (!currentErrors[name]) {
+        return currentErrors;
+      }
+
+      const nextErrors = { ...currentErrors };
+      delete nextErrors[name];
+      return nextErrors;
+    });
+  }
+
+  function handleCategoryChange(event) {
+    const nextCategory = event.target.value;
+    const matchedOption = categoryOptions.find((option) => option.value === nextCategory);
+
+    setValues((currentValues) => ({
+      ...currentValues,
+      category: nextCategory,
+      categoryId: matchedOption?.id ? String(matchedOption.id) : "",
+    }));
+
+    setErrors((currentErrors) => {
+      const nextErrors = { ...currentErrors };
+      delete nextErrors.category;
+      return nextErrors;
+    });
+  }
+
+  async function handleFormSubmit(event) {
+    event.preventDefault();
+
+    const payload = {
+      ...values,
+      commission_type: "PERCENT",
+      imageUrls: initialValues.imageUrls || [],
+      imageFiles,
+    };
+
+    const validationResult = productSchema.safeParse(payload);
+
+    if (!validationResult.success) {
+      const fieldErrors = validationResult.error.flatten().fieldErrors;
+      const normalizedErrors = Object.fromEntries(
+        Object.entries(fieldErrors).map(([field, messages]) => [field, messages?.[0] || "Dữ liệu không hợp lệ."]),
+      );
+
+      setErrors(normalizedErrors);
+      onInvalidSubmit?.(normalizedErrors);
+      return;
+    }
+
+    setErrors({});
+    await onSubmit?.(payload);
+  }
+
+  const validationMessages = Object.values(errors).filter(Boolean);
 
   return (
     <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6">
-      <form
-        className="grid gap-4 md:grid-cols-2"
-        onSubmit={handleSubmit((values) =>
-          onSubmit?.({
-            ...values,
-            commission_type: "PERCENT",
-            imageUrls: initialValues.imageUrls || [],
-            imageFiles,
-          }),
+      <form className="grid gap-4 md:grid-cols-2" onSubmit={handleFormSubmit} noValidate>
+        {validationMessages.length ? (
+          <div className="md:col-span-2 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+            <p className="font-semibold">Biểu mẫu chưa hợp lệ.</p>
+            <div className="mt-2 space-y-1">
+              {validationMessages.map((message) => (
+                <p key={message}>{message}</p>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <Input
+          label="Tên sản phẩm"
+          value={values.name ?? ""}
+          error={errors.name}
+          onChange={(event) => updateField("name", event.target.value)}
+        />
+
+        {categoryOptions.length ? (
+          <Select
+            label="Danh mục"
+            error={errors.category}
+            value={values.category ?? ""}
+            onChange={handleCategoryChange}
+            options={[
+              { label: "Chọn danh mục", value: "" },
+              ...categoryOptions.map((option) => ({
+                label: option.label,
+                value: option.value,
+              })),
+            ]}
+          />
+        ) : (
+          <Input
+            label="Danh mục"
+            value={values.category ?? ""}
+            error={errors.category}
+            onChange={(event) => updateField("category", event.target.value)}
+          />
         )}
-      >
-        <Input label="Tên sản phẩm" error={errors.name?.message} {...register("name")} />
-        <Input label="Danh mục" error={errors.category?.message} {...register("category")} />
-        <Input label="Giá bán (VND)" error={errors.price?.message} {...register("price")} />
+
+        <Input
+          label="Giá bán (VND)"
+          type="number"
+          min="1"
+          step="1"
+          value={values.price ?? ""}
+          error={errors.price}
+          onChange={(event) => updateField("price", event.target.value)}
+        />
+
         <Input
           label="Tồn kho"
           type="number"
           min={String(stockMin)}
           step="1"
-          error={errors.stock?.message}
-          {...stockRegister}
+          value={values.stock ?? ""}
+          error={errors.stock}
+          onChange={(event) => updateField("stock", event.target.value)}
         />
-        <input type="hidden" value="PERCENT" {...register("commission_type")} />
+
         <Input
           label="Hoa hồng affiliate (%)"
           type="number"
           min="0"
           max="100"
           step="1"
-          error={errors.commission_value?.message}
+          value={values.commission_value ?? ""}
+          error={errors.commission_value}
           hint="Nhập phần trăm hoa hồng áp dụng cho affiliate của sản phẩm này."
-          {...register("commission_value")}
+          onChange={(event) => updateField("commission_value", event.target.value)}
         />
+
         <div className="md:col-span-2">
-          <Input label="Mô tả" error={errors.description?.message} {...register("description")} />
+          <Input
+            label="Mô tả"
+            value={values.description ?? ""}
+            error={errors.description}
+            onChange={(event) => updateField("description", event.target.value)}
+          />
         </div>
+
         <div className="md:col-span-2 space-y-3">
           <FileUploadField
             label="Ảnh sản phẩm"
@@ -114,11 +215,19 @@ function ProductForm({
             multiple
             onChange={(event) => setImageFiles(Array.from(event.target.files || []))}
           />
+
           {imagePreviews.length ? (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {imagePreviews.map((imagePreview, index) => (
-                <div key={`${imagePreview}-${index}`} className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white">
-                  <img src={imagePreview} alt={`Ảnh sản phẩm ${index + 1}`} className="h-40 w-full object-cover" />
+                <div
+                  key={`${imagePreview}-${index}`}
+                  className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white"
+                >
+                  <img
+                    src={imagePreview}
+                    alt={`Ảnh sản phẩm ${index + 1}`}
+                    className="h-40 w-full object-cover"
+                  />
                 </div>
               ))}
             </div>
@@ -126,17 +235,13 @@ function ProductForm({
             <p className="text-sm text-slate-500">Chưa có ảnh sản phẩm.</p>
           )}
         </div>
+
         <div className="md:col-span-2">
-          <Button type="submit" loading={loading || isSubmitting}>
+          <Button type="submit" loading={loading}>
             {submitLabel}
           </Button>
         </div>
       </form>
-      {isSubmitSuccessful ? (
-        <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm text-emerald-100">
-          {successMessage}
-        </div>
-      ) : null}
     </div>
   );
 }

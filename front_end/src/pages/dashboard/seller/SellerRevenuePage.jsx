@@ -144,7 +144,7 @@ function SellerRevenuePage() {
       <PageHeader
         eyebrow="Seller"
         title="Doanh thu và báo cáo"
-        description="Báo cáo đã được tách rõ doanh thu affiliate, doanh thu trực tiếp, phí nền tảng, hoa hồng và phần seller thực nhận."
+
       />
       {loading ? <EmptyState title="Đang tải báo cáo" description="Hệ thống đang tổng hợp doanh thu seller." /> : null}
       {!loading && error ? <EmptyState title="Không tải được báo cáo" description={error} /> : null}
@@ -162,7 +162,7 @@ function SellerRevenuePage() {
             <StatCard
               label="Doanh thu thực nhận"
               value={<CompactRevenueValue value={summary.settledSellerNet} />}
-              hint="Chỉ tính các đơn hợp lệ đã xác nhận nhận tiền"
+
               tone="emerald"
               strong
             />

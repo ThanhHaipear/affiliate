@@ -3,7 +3,6 @@ import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
 import Button from "../common/Button";
 import Input from "../common/Input";
-import MoneyText from "../common/MoneyText";
 import { withdrawalRequestSchema } from "../../schemas/payoutSchemas";
 
 const numberFormatter = new Intl.NumberFormat("vi-VN");
@@ -75,13 +74,6 @@ function WithdrawalForm({
           {paymentAccountLinkLabel}
         </Link>
       </div>
-
-      <div className="mt-5 grid gap-4 md:grid-cols-3">
-        <InfoCard label="Số dư trong ví" value={<MoneyText value={availableBalance} className="text-slate-900" />} />
-        <InfoCard label="Mức rút tối thiểu" value={<MoneyText value={minAmount} className="text-slate-900" />} />
-        <InfoCard label="Mức rút tối đa hiện tại" value={<MoneyText value={maxRequestableAmount || maxAmount} className="text-slate-900" />} />
-      </div>
-
       <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
         <p className="text-xs uppercase tracking-[0.24em] text-sky-700">Tài khoản nhận tiền</p>
         {paymentAccount?.id ? (
@@ -119,15 +111,6 @@ function WithdrawalForm({
           {successMessage}
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function InfoCard({ label, value }) {
-  return (
-    <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
-      <p className="text-xs uppercase tracking-[0.22em] text-slate-500">{label}</p>
-      <div className="mt-3 text-lg font-semibold">{value}</div>
     </div>
   );
 }

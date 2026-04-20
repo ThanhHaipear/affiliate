@@ -93,6 +93,17 @@ exports.listApprovedProducts = async () => {
   return attachCommerceStats(products);
 };
 
+exports.listCategories = () =>
+  prisma.category.findMany({
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      parentId: true,
+    },
+    orderBy: [{ name: "asc" }],
+  });
+
 exports.findApprovedProductById = async (id) => {
   const product = await prisma.product.findFirst({
     where: {

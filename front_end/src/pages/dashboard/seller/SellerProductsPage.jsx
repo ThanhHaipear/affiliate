@@ -1,14 +1,18 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { getSellerProducts, setSellerProductVisibility } from "../../../api/productApi";
+import FilterBar from "../../../components/admin/FilterBar";
 import Button from "../../../components/common/Button";
 import DataTable from "../../../components/common/DataTable";
 import EmptyState from "../../../components/common/EmptyState";
 import MoneyText from "../../../components/common/MoneyText";
 import PageHeader from "../../../components/common/PageHeader";
+import Pagination from "../../../components/common/Pagination";
 import StatusBadge from "../../../components/common/StatusBadge";
 import { useToast } from "../../../hooks/useToast";
 import { mapProductDto } from "../../../lib/apiMappers";
+
+const PRODUCTS_PER_PAGE = 8;
 
 function SellerProductsPage() {
   const toast = useToast();
@@ -16,6 +20,10 @@ function SellerProductsPage() {
   const [loading, setLoading] = useState(true);
   const [submittingId, setSubmittingId] = useState("");
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
+  const [visibilityFilter, setVisibilityFilter] = useState("ALL");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let active = true;
@@ -30,7 +38,7 @@ function SellerProductsPage() {
         }
       } catch (loadError) {
         if (active) {
-          setError(loadError.response?.data?.message || "Kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c s\u1ea3n ph\u1ea9m c\u1ee7a seller.");
+          setError(loadError.response?.data?.message || "Không tải được sản phẩm của seller.");
         }
       } finally {
         if (active) {
@@ -45,13 +53,53 @@ function SellerProductsPage() {
     };
   }, []);
 
-  const rows = useMemo(
-    () => products.map((product) => ({
-      ...product,
-      price_label: product.price,
-    })),
-    [products],
-  );
+  useEffect(() => {
+    setPage(1);
+  }, [search, categoryFilter, visibilityFilter]);
+
+  const categoryOptions = useMemo(() => {
+    const categories = Array.from(new Set(products.map((product) => product.category).filter(Boolean))).sort();
+    return [
+      { label: "Tất cả danh mục", value: "ALL" },
+      ...categories.map((category) => ({
+        label: category,
+        value: category,
+      })),
+    ];
+  }, [products]);
+
+  const filteredProducts = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+
+    return products
+      .filter((product) => {
+        const matchesSearch = !normalizedSearch || String(product.name || "").toLowerCase().includes(normalizedSearch);
+        const matchesCategory = categoryFilter === "ALL" || product.category === categoryFilter;
+        const matchesVisibility =
+          visibilityFilter === "ALL" || product.visibility_status === visibilityFilter;
+
+        return matchesSearch && matchesCategory && matchesVisibility;
+      })
+      .sort((left, right) => {
+        const leftPendingWeight = left.approval_status === "PENDING" ? 1 : 0;
+        const rightPendingWeight = right.approval_status === "PENDING" ? 1 : 0;
+
+        if (leftPendingWeight !== rightPendingWeight) {
+          return rightPendingWeight - leftPendingWeight;
+        }
+
+        const leftTime = new Date(left.raw?.updatedAt || left.raw?.createdAt || 0).getTime();
+        const rightTime = new Date(right.raw?.updatedAt || right.raw?.createdAt || 0).getTime();
+        return rightTime - leftTime;
+      });
+  }, [products, search, categoryFilter, visibilityFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * PRODUCTS_PER_PAGE;
+    return filteredProducts.slice(startIndex, startIndex + PRODUCTS_PER_PAGE);
+  }, [currentPage, filteredProducts]);
 
   async function handleToggleVisibility(product) {
     try {
@@ -82,48 +130,104 @@ function SellerProductsPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Seller"
-        title={"Qu\u1ea3n l\u00fd s\u1ea3n ph\u1ea9m"}
-        description={"Danh s\u00e1ch s\u1ea3n ph\u1ea9m c\u1ee7a shop \u0111ang \u0111\u1ecdc tr\u1ef1c ti\u1ebfp t\u1eeb database seller products endpoint."}
+        title="Quản lý sản phẩm"
+        description="Danh sách sản phẩm của shop được đọc trực tiếp từ hệ thống. Bạn có thể lọc, tìm kiếm, xem chi tiết và ẩn hoặc hiện từng sản phẩm."
         action={
           <Link to="/dashboard/seller/products/create">
-            <Button>{"Th\u00eam s\u1ea3n ph\u1ea9m"}</Button>
+            <Button>Thêm sản phẩm</Button>
           </Link>
         }
       />
-      {loading ? <EmptyState title={"\u0110ang t\u1ea3i s\u1ea3n ph\u1ea9m"} description={"H\u1ec7 th\u1ed1ng \u0111ang \u0111\u1ecdc danh s\u00e1ch s\u1ea3n ph\u1ea9m c\u1ee7a shop."} /> : null}
-      {!loading && error ? <EmptyState title={"Kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c s\u1ea3n ph\u1ea9m"} description={error} /> : null}
-      {!loading && !error ? (
-        <DataTable
-          columns={[
-            { key: "name", title: "S\u1ea3n ph\u1ea9m" },
-            { key: "category", title: "Danh m\u1ee5c" },
-            { key: "price_label", title: "Gi\u00e1", render: (row) => <MoneyText value={row.price} /> },
-            { key: "stock", title: "T\u1ed3n kho" },
-            { key: "approval_status", title: "Tr\u1ea1ng th\u00e1i", render: (row) => <StatusBadge status={row.approval_status} /> },
-            { key: "visibility_status", title: "Hi\u1ec3n th\u1ecb", render: (row) => <StatusBadge status={row.visibility_status} /> },
-            {
-              key: "actions",
-              title: "Thao t\u00e1c",
-              render: (row) => (
-                <div className="flex gap-2">
-                  <Link to={`/dashboard/seller/products/${row.id}`} className="text-sm font-medium text-sky-700">{"Chi ti\u1ebft"}</Link>
-                  <Link to={`/dashboard/seller/products/${row.id}/edit`} className="text-sm font-medium text-emerald-700">{"Ch\u1ec9nh s\u1eeda"}</Link>
-                  <Button
-                    size="sm"
-                    variant={row.seller_hidden || row.admin_hidden ? "secondary" : "ghost"}
-                    loading={submittingId === String(row.id)}
-                    onClick={() => handleToggleVisibility(row)}
-                  >
-                    {row.seller_hidden || row.admin_hidden ? "Hiện" : "Ẩn"}
-                  </Button>
-                </div>
-              ),
-            },
-          ]}
-          rows={rows}
-          emptyTitle={"Ch\u01b0a c\u00f3 s\u1ea3n ph\u1ea9m"}
-          emptyDescription={"T\u1ea1o s\u1ea3n ph\u1ea9m \u0111\u1ea7u ti\u00ean \u0111\u1ec3 shop b\u1eaft \u0111\u1ea7u v\u1eadn h\u00e0nh."}
+
+      {loading ? (
+        <EmptyState
+          title="Đang tải sản phẩm"
+          description="Hệ thống đang đọc danh sách sản phẩm của shop."
         />
+      ) : null}
+
+      {!loading && error ? <EmptyState title="Không tải được sản phẩm" description={error} /> : null}
+
+      {!loading && !error ? (
+        <>
+          <FilterBar
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Tìm theo tên sản phẩm"
+            filters={[
+              {
+                key: "category",
+                label: "Danh mục",
+                value: categoryFilter,
+                onChange: setCategoryFilter,
+                options: categoryOptions,
+              },
+              {
+                key: "visibility",
+                label: "Hiển thị",
+                value: visibilityFilter,
+                onChange: setVisibilityFilter,
+                options: [
+                  { label: "Tất cả trạng thái", value: "ALL" },
+                  { label: "Đang hiển thị", value: "ACTIVE" },
+                  { label: "Bị người bán ẩn", value: "HIDDEN_BY_SELLER" },
+                  { label: "Bị admin ẩn", value: "HIDDEN_BY_ADMIN" },
+                ],
+              },
+            ]}
+          />
+
+          <DataTable
+            columns={[
+              { key: "name", title: "Sản phẩm" },
+              { key: "category", title: "Danh mục" },
+              { key: "price_label", title: "Giá", render: (row) => <MoneyText value={row.price} /> },
+              { key: "stock", title: "Tồn kho" },
+              {
+                key: "approval_status",
+                title: "Trạng thái duyệt",
+                render: (row) => <StatusBadge status={row.approval_status} />,
+              },
+              {
+                key: "visibility_status",
+                title: "Hiển thị",
+                render: (row) => <StatusBadge status={row.visibility_status} />,
+              },
+              {
+                key: "actions",
+                title: "Thao tác",
+                render: (row) => (
+                  <div className="flex gap-2">
+                    <Link to={`/dashboard/seller/products/${row.id}`} className="text-sm font-medium text-sky-700">
+                      Chi tiết
+                    </Link>
+                    <Link
+                      to={`/dashboard/seller/products/${row.id}/edit`}
+                      className="text-sm font-medium text-emerald-700"
+                    >
+                      Chỉnh sửa
+                    </Link>
+                    <Button
+                      size="sm"
+                      variant={row.seller_hidden || row.admin_hidden ? "secondary" : "ghost"}
+                      loading={submittingId === String(row.id)}
+                      onClick={() => handleToggleVisibility(row)}
+                    >
+                      {row.seller_hidden || row.admin_hidden ? "Hiện" : "Ẩn"}
+                    </Button>
+                  </div>
+                ),
+              },
+            ]}
+            rows={paginatedProducts}
+            emptyTitle="Chưa có sản phẩm"
+            emptyDescription="Tạo sản phẩm đầu tiên để shop bắt đầu vận hành."
+          />
+
+          {filteredProducts.length > PRODUCTS_PER_PAGE ? (
+            <Pagination page={currentPage} totalPages={totalPages} onPageChange={setPage} />
+          ) : null}
+        </>
       ) : null}
     </div>
   );

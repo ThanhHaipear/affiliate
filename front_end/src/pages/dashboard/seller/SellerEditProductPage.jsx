@@ -1,6 +1,14 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getSellerProductDetail, updateSellerAffiliateSetting, updateSellerProduct, uploadSellerProductImages } from "../../../api/productApi";
+import {
+  getProductCategories,
+  getProducts,
+  getSellerProductDetail,
+  getSellerProducts,
+  updateSellerAffiliateSetting,
+  updateSellerProduct,
+  uploadSellerProductImages,
+} from "../../../api/productApi";
 import EmptyState from "../../../components/common/EmptyState";
 import PageHeader from "../../../components/common/PageHeader";
 import StatusBadge from "../../../components/common/StatusBadge";
@@ -9,11 +17,19 @@ import { useToast } from "../../../hooks/useToast";
 import { buildProductPayload } from "../../../lib/apiPayloads";
 import { mapProductDto } from "../../../lib/apiMappers";
 
+const fallbackCategories = [
+  { id: 1, label: "Làm đẹp", value: "Làm đẹp" },
+  { id: 2, label: "Nhà cửa", value: "Nhà cửa" },
+  { id: 3, label: "Công nghệ", value: "Công nghệ" },
+  { id: 4, label: "Thời trang", value: "Thời trang" },
+];
+
 function SellerEditProductPage() {
   const { productId } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
   const [product, setProduct] = useState(null);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -21,14 +37,65 @@ function SellerEditProductPage() {
   useEffect(() => {
     let active = true;
 
-    async function loadProduct() {
+    async function loadPageData() {
       try {
         setLoading(true);
         setError("");
-        const response = await getSellerProductDetail(productId);
-        if (active) {
-          setProduct(mapProductDto(response));
+
+        const [productResponse, categoriesResponse, sellerProductsResponse, publicProductsResponse] = await Promise.all([
+          getSellerProductDetail(productId),
+          getProductCategories().catch(() => []),
+          getSellerProducts().catch(() => []),
+          getProducts().catch(() => []),
+        ]);
+
+        if (!active) {
+          return;
         }
+
+        const mappedProduct = mapProductDto(productResponse);
+        const uniqueCategories = new Map();
+
+        (categoriesResponse || [])
+          .map((category) => ({
+            id: category.id,
+            label: category.name,
+            value: category.name,
+          }))
+          .filter((category) => category.id && category.value)
+          .forEach((category) => {
+            uniqueCategories.set(String(category.id), category);
+          });
+
+        [...(sellerProductsResponse || []), ...(publicProductsResponse || [])].forEach((item) => {
+          const categoryId = item?.category?.id;
+          const categoryName = item?.category?.name;
+
+          if (!categoryId || !categoryName || uniqueCategories.has(String(categoryId))) {
+            return;
+          }
+
+          uniqueCategories.set(String(categoryId), {
+            id: categoryId,
+            label: categoryName,
+            value: categoryName,
+          });
+        });
+
+        if (mappedProduct.raw?.category?.id && mappedProduct.raw?.category?.name) {
+          uniqueCategories.set(String(mappedProduct.raw.category.id), {
+            id: mappedProduct.raw.category.id,
+            label: mappedProduct.raw.category.name,
+            value: mappedProduct.raw.category.name,
+          });
+        }
+
+        const resolvedCategories = Array.from(uniqueCategories.values()).sort((left, right) =>
+          left.label.localeCompare(right.label),
+        );
+
+        setCategories(resolvedCategories.length ? resolvedCategories : fallbackCategories);
+        setProduct(mappedProduct);
       } catch (loadError) {
         if (active) {
           setError(loadError.response?.data?.message || "Không tải được sản phẩm để chỉnh sửa.");
@@ -40,7 +107,7 @@ function SellerEditProductPage() {
       }
     }
 
-    loadProduct();
+    loadPageData();
     return () => {
       active = false;
     };
@@ -63,11 +130,13 @@ function SellerEditProductPage() {
           imageUrls,
         }),
       );
+
       await updateSellerAffiliateSetting(productId, {
         commissionType: values.commission_type,
         commissionValue: Number(values.commission_value),
         isEnabled: true,
       });
+
       toast.success("Đã cập nhật sản phẩm và gửi lại cho admin duyệt.");
       navigate("/dashboard/seller/products");
     } catch (submitError) {
@@ -90,18 +159,25 @@ function SellerEditProductPage() {
       <PageHeader
         eyebrow="Seller"
         title={`Chỉnh sửa ${product.name}`}
-        description="Seller có thể cập nhật lại giá bán, hoa hồng, bộ ảnh và gửi lại cấu hình affiliate khi cần."
+
       />
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <ProductForm
           submitLabel="Lưu thay đổi"
           loading={submitting}
           onSubmit={handleSubmit}
+          onInvalidSubmit={() => toast.error("Biểu mẫu chưa hợp lệ. Hãy kiểm tra lại tên, mô tả, giá, danh mục và tồn kho.")}
+          categoryOptions={categories}
           defaultValues={{
             name: product.name,
             description: product.description,
             price: product.price,
-            category: product.category,
+            category: product.raw?.category?.name || product.category || "",
+            categoryId: product.raw?.categoryId
+              ? String(product.raw.categoryId)
+              : product.raw?.category?.id
+                ? String(product.raw.category.id)
+                : "",
             stock: product.stock,
             commission_type: product.commission_type,
             commission_value: product.commission_value,

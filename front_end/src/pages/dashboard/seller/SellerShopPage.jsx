@@ -8,6 +8,7 @@ import Input from "../../../components/common/Input";
 import PageHeader from "../../../components/common/PageHeader";
 import { useToast } from "../../../hooks/useToast";
 import { sellerShopSchema } from "../../../schemas/sellerPortalSchemas";
+import { formatStatusLabel } from "../../../lib/format";
 
 function SellerShopPage() {
   const toast = useToast();
@@ -53,6 +54,7 @@ function SellerShopPage() {
         setLoading(true);
         setError("");
         const response = await getSellerProfile();
+
         if (!active) {
           return;
         }
@@ -61,7 +63,7 @@ function SellerShopPage() {
         reset(buildFormValues(response));
       } catch (loadError) {
         if (active) {
-          setError(loadError.response?.data?.message || "Khong tai duoc thong tin shop.");
+          setError(loadError.response?.data?.message || "Không tải được thông tin shop.");
         }
       } finally {
         if (active) {
@@ -87,21 +89,27 @@ function SellerShopPage() {
         shopDescription: values.shopDescription,
         taxCode: values.taxCode,
       });
+
       const refreshedProfile = await getSellerProfile();
       setProfile(refreshedProfile || null);
       reset(buildFormValues(refreshedProfile));
-      toast.success("Da cap nhat thong tin shop.");
+      toast.success("Đã cập nhật thông tin shop.");
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong cap nhat duoc thong tin shop.");
+      toast.error(submitError.response?.data?.message || "Không cập nhật được thông tin shop.");
     }
   }
 
   if (loading) {
-    return <EmptyState title="Dang tai thong tin shop" description="He thong dang doc profile seller tu backend." />;
+    return (
+      <EmptyState
+        title="Đang tải thông tin shop"
+        description="Hệ thống đang đọc hồ sơ seller từ backend."
+      />
+    );
   }
 
   if (error) {
-    return <EmptyState title="Khong tai duoc thong tin shop" description={error} />;
+    return <EmptyState title="Không tải được thông tin shop" description={error} />;
   }
 
   const paymentAccount = profile?.paymentAccounts?.[0] || null;
@@ -110,8 +118,8 @@ function SellerShopPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Seller"
-        title="Quan ly shop"
-        description="Form nay chi cho phep sua cac truong ma backend seller profile dang ho tro luu thuc te."
+        title="Quản lý shop"
+
       />
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
@@ -120,39 +128,47 @@ function SellerShopPage() {
           onSubmit={handleSubmit(onSubmit)}
         >
           <Section
-            title="Thong tin co ban"
-            description="Cap nhat ten shop, linh vuc kinh doanh va thong tin nhan dien co ban cua shop."
+            title="Thông tin cơ bản"
+            description="Cập nhật tên shop, lĩnh vực kinh doanh và các thông tin nhận diện cơ bản."
           >
             <div className="grid gap-4 md:grid-cols-2">
-              <Input label="Ten shop" error={errors.shopName?.message} {...register("shopName")} />
-              <Input label="Linh vuc kinh doanh" error={errors.businessField?.message} {...register("businessField")} />
+              <Input label="Tên shop" error={errors.shopName?.message} {...register("shopName")} />
+              <Input
+                label="Lĩnh vực kinh doanh"
+                error={errors.businessField?.message}
+                {...register("businessField")}
+              />
             </div>
           </Section>
 
           <Section
-            title="Lien he"
-            description="Du lieu trong phan nay dang noi truc tiep voi seller profile backend."
+            title="Thông tin liên hệ"
+            description="Các trường này đang kết nối trực tiếp với hồ sơ seller trên backend."
           >
             <div className="grid gap-4 md:grid-cols-2">
-              <Input label="Email lien he" error={errors.contactEmail?.message} {...register("contactEmail")} />
-              <Input label="So dien thoai" error={errors.phone?.message} {...register("phone")} />
+              <Input label="Email liên hệ" error={errors.contactEmail?.message} {...register("contactEmail")} />
+              <Input label="Số điện thoại" error={errors.phone?.message} {...register("phone")} />
             </div>
-            <Input label="Dia chi" error={errors.address?.message} {...register("address")} />
+            <Input label="Địa chỉ" error={errors.address?.message} {...register("address")} />
           </Section>
 
           <Section
-            title="Mo ta shop"
-            description="Thong tin nay duoc dung de gioi thieu shop tren he thong va cac bao cao noi bo."
-          >
-            <Input label="Mo ta shop" error={errors.shopDescription?.message} {...register("shopDescription")} />
-          </Section>
-
-          <Section
-            title="Phap ly"
-            description="Thong tin phap ly duoc luu tren seller profile. Tai khoan thanh toan hien dang xem o panel ben phai."
+            title="Mô tả shop"
+            description="Thông tin này được dùng để giới thiệu shop trên hệ thống và các báo cáo nội bộ."
           >
             <Input
-              label="Ma so thue / thong tin phap ly"
+              label="Mô tả shop"
+              error={errors.shopDescription?.message}
+              {...register("shopDescription")}
+            />
+          </Section>
+
+          <Section
+            title="Thông tin pháp lý"
+            description="Thông tin pháp lý được lưu trên seller profile. Tài khoản thanh toán mặc định hiển thị ở panel bên phải."
+          >
+            <Input
+              label="Mã số thuế / thông tin pháp lý"
               error={errors.taxCode?.message}
               {...register("taxCode")}
             />
@@ -160,53 +176,53 @@ function SellerShopPage() {
 
           <div className="flex flex-wrap gap-3">
             <Button type="submit" loading={isSubmitting}>
-              Luu thong tin shop
+              Lưu thông tin shop
             </Button>
             <Button type="button" variant="secondary" onClick={() => reset(buildFormValues(profile))}>
-              Dat lai form
+              Đặt lại form
             </Button>
           </div>
 
           {isSubmitSuccessful ? (
-            <p className="text-sm text-emerald-700">Thong tin shop da duoc gui cap nhat.</p>
+            <p className="text-sm text-emerald-700">Thông tin shop đã được gửi cập nhật thành công.</p>
           ) : null}
         </form>
 
         <div className="space-y-6">
           <InfoPanel
-            title="Trang thai shop"
+            title="Trạng thái shop"
             rows={[
               { label: "Shop", value: profile?.shopName || "--" },
-              { label: "Trang thai", value: profile?.approvalStatus || "APPROVED" },
+              { label: "Trạng thái", value: formatStatusLabel(profile?.approvalStatus || "APPROVED") },
               {
-                label: "Ngay tham gia",
+                label: "Ngày tham gia",
                 value: profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString("vi-VN") : "--",
               },
             ]}
           />
 
           <InfoPanel
-            title="Tai khoan thanh toan"
+            title="Tài khoản thanh toán"
             rows={[
-              { label: "Trang thai", value: paymentAccount ? "Da cau hinh" : "Chua co" },
-              { label: "Loai", value: paymentAccount?.type || "--" },
-              { label: "Ngan hang", value: paymentAccount?.bankName || "--" },
-              { label: "Chu tai khoan", value: paymentAccount?.accountName || "--" },
-              { label: "So tai khoan", value: paymentAccount?.accountNumber || "--" },
+              { label: "Trạng thái", value: paymentAccount ? "Đã cấu hình" : "Chưa có" },
+              { label: "Loại", value: paymentAccount?.type || "--" },
+              { label: "Ngân hàng", value: paymentAccount?.bankName || "--" },
+              { label: "Chủ tài khoản", value: paymentAccount?.accountName || "--" },
+              { label: "Số tài khoản", value: paymentAccount?.accountNumber || "--" },
             ]}
           />
 
           <InfoPanel
-            title="Ghi chu van hanh"
+            title="Ghi chú vận hành"
             rows={[
-              { label: "KYC", value: profile?.kyc?.status || "PENDING" },
+              { label: "KYC", value: formatStatusLabel(profile?.kyc?.status || "PENDING") },
               {
-                label: "Media branding",
-                value: "Chua ho tro upload logo/banner trong seller profile runtime.",
+                label: "Nhận diện thương hiệu",
+                value: "Hiện chưa hỗ trợ upload logo hoặc banner trực tiếp trong giao diện seller runtime.",
               },
               {
-                label: "Luong duyet",
-                value: "Seller duoc admin duyet truoc khi van hanh affiliate.",
+                label: "Luồng duyệt",
+                value: "Seller cần được admin duyệt trước khi vận hành đầy đủ trên hệ thống.",
               },
             ]}
           />

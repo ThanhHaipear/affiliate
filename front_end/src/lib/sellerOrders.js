@@ -6,27 +6,27 @@ function buildSellerOrderTimeline(order) {
   const events = [
     {
       id: `${order.id}-created`,
-      label: "Don hang da tao",
+      label: "Đơn hàng đã tạo",
       time: order.createdAt,
-      description: `Don ${order.orderCode || order.code} da duoc tao trong he thong.`,
+      description: `Đơn ${order.orderCode || order.code} đã được tạo trong hệ thống.`,
     },
   ];
 
   if (payment?.paidAt || order.payment_status === "PAID" || order.status === "PAID") {
     events.push({
       id: `${order.id}-paid`,
-      label: "Da thanh toan",
+      label: "Đã thanh toán",
       time: payment?.paidAt || order.updatedAt || order.createdAt,
-      description: "Thanh toan cua khach da duoc ghi nhan thanh cong.",
+      description: "Thanh toán của khách đã được ghi nhận thành công.",
     });
   }
 
   if (isRefunded) {
     events.push({
       id: `${order.id}-refunded`,
-      label: "Da hoan tien",
+      label: "Đã hoàn tiền",
       time: order.updatedAt || order.createdAt,
-      description: "Don hang da duoc hoan tien nen shop khong nhan tien va affiliate khong duoc cong hoa hong.",
+      description: "Đơn hàng đã được hoàn tiền nên shop không nhận tiền và affiliate không được cộng hoa hồng.",
     });
     return events;
   }
@@ -34,18 +34,18 @@ function buildSellerOrderTimeline(order) {
   if (isSettled) {
     events.push({
       id: `${order.id}-settled`,
-      label: "Don da hoan tat",
+      label: "Đơn đã hoàn tất",
       time: order.sellerConfirmedAt || order.updatedAt || order.createdAt,
-      description: "Shop da xac nhan nhan tien. He thong da hoan tat don hang va ghi nhan tien shop, phi san va hoa hong affiliate neu co.",
+      description: "Shop đã xác nhận nhận tiền. Hệ thống đã hoàn tất đơn hàng và ghi nhận tiền shop, phí sàn và hoa hồng affiliate nếu có.",
     });
     return events;
   }
 
   events.push({
     id: `${order.id}-waiting-settlement`,
-    label: "Cho shop xu ly",
+    label: "Chờ shop xử lý",
     time: order.updatedAt || order.createdAt,
-    description: "Don dang cho shop chon xac nhan da nhan tien hoac hoan tien.",
+    description: "Đơn đang chờ shop chọn xác nhận đã nhận tiền hoặc hoàn tiền.",
   });
 
   return events;

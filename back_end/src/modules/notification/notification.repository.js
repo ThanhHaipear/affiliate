@@ -91,7 +91,9 @@ exports.markNotificationAsRead = async (accountId, notificationId) => prisma.not
 exports.markAllNotificationsAsRead = async (accountId, audience) => prisma.notification.updateMany({
   where: {
     accountId,
-    isRead: false,
+    NOT: {
+      isRead: true,
+    },
     ...buildAudienceFilter(audience),
   },
   data: { isRead: true, readAt: new Date() },

@@ -83,7 +83,7 @@ function SellerProductDetailPage() {
       <PageHeader
         eyebrow="Seller"
         title={product.name}
-        description="Trang chi tiết sản phẩm để theo dõi giá bán, bộ ảnh, hoa hồng, trạng thái duyệt và các thao tác liên quan."
+
         action={
           <div className="flex gap-3">
             <Link to={`/dashboard/seller/products/${product.id}/edit`}>
@@ -131,22 +131,14 @@ function SellerProductDetailPage() {
               <StatusBadge status={product.affiliate_setting_status} />
               <StatusBadge status={product.visibility_status} />
             </div>
-            <p className="mt-4 text-sm leading-7 text-slate-600">
-              Nếu sản phẩm bật affiliate, cấu hình hoa hồng vẫn cần admin duyệt trước khi affiliate có thể tạo link tiếp thị.
-            </p>
+
             {product.admin_hidden ? (
               <p className="mt-3 text-sm leading-7 text-rose-700">
                 Admin đang ẩn sản phẩm này. Seller không thể tự mở lại cho đến khi admin cho phép hiển thị.
               </p>
             ) : null}
           </Panel>
-          <Panel title="Lịch sử cập nhật">
-            <ul className="space-y-3 text-sm text-slate-600">
-              <li>Seller tạo sản phẩm và nhập giá bán, tồn kho, mô tả.</li>
-              <li>Bộ ảnh hiện tại được lưu trong database qua `product_images`.</li>
-              <li>Nếu bật affiliate, hệ thống sẽ gửi cấu hình hoa hồng lên admin review.</li>
-            </ul>
-          </Panel>
+
         </div>
       </div>
     </div>

@@ -15,6 +15,7 @@ const ensureApprovedSeller = (seller) => {
 };
 
 exports.listProducts = () => productRepository.listApprovedProducts();
+exports.listCategories = () => productRepository.listCategories();
 
 exports.getProduct = async (productId) => {
   const product = await productRepository.findApprovedProductById(Number(productId));

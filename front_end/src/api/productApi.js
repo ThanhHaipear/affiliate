@@ -7,6 +7,11 @@ async function getProducts(params) {
   return unwrapResponseData(response);
 }
 
+async function getProductCategories() {
+  const response = await axiosClient.get(ENDPOINTS.products.categories);
+  return unwrapResponseData(response);
+}
+
 async function getProductDetail(productIdOrSlug) {
   const response = await axiosClient.get(ENDPOINTS.products.detail(productIdOrSlug));
   return unwrapResponseData(response);
@@ -77,6 +82,7 @@ async function updateSellerAffiliateSetting(productId, payload) {
 export {
   createProductReview,
   createSellerProduct,
+  getProductCategories,
   getProductDetail,
   getProducts,
   getProductReviews,

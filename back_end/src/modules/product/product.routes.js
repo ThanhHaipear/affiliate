@@ -9,6 +9,7 @@ const { createProductSchema, updateProductSchema, createReviewSchema } = require
 const router = express.Router();
 
 router.get("/", controller.listProducts);
+router.get("/categories", controller.listCategories);
 router.get("/:productId/reviews", authenticateOptional, controller.listProductReviews);
 router.get("/:productId", controller.getProduct);
 router.post("/:productId/reviews", authenticate, authorize("CUSTOMER"), validate(createReviewSchema), controller.createProductReview);
