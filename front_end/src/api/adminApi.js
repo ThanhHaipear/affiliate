@@ -12,6 +12,16 @@ async function getAdminProducts(params) {
   return unwrapResponseData(response);
 }
 
+async function getAdminCategories() {
+  const response = await axiosClient.get(ENDPOINTS.admin.categories);
+  return unwrapResponseData(response);
+}
+
+async function createAdminCategory(payload) {
+  const response = await axiosClient.post(ENDPOINTS.admin.categories, payload);
+  return unwrapResponseData(response);
+}
+
 async function getAdminProductDetail(productId) {
   const response = await axiosClient.get(ENDPOINTS.admin.productDetail(productId));
   return unwrapResponseData(response);
@@ -198,8 +208,10 @@ export {
   approveProduct,
   approveSeller,
   confirmPayoutBatchVnpayReturn,
+  createAdminCategory,
   createPayoutBatch,
   createPayoutBatchVnpayUrl,
+  getAdminCategories,
   getAdminFinancialStats,
   getAdminAffiliateLinks,
   getAdminOrders,

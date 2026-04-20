@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { getNotifications, markAllNotificationsAsRead, markNotificationAsRead } from "../../api/notificationApi";
+import { getNotifications, markNotificationAsRead } from "../../api/notificationApi";
 import AdminStatCard from "../../components/admin/AdminStatCard";
 import Button from "../../components/common/Button";
 import EmptyState from "../../components/common/EmptyState";
@@ -58,6 +58,14 @@ function formatNotificationType(type = "") {
   return notificationTypeLabels[type] || type || "--";
 }
 
+function getNotificationSortPriority(item) {
+  return item.unread ? 0 : 1;
+}
+
+function getNotificationTimestamp(item) {
+  return new Date(item.created_at || 0).getTime();
+}
+
 function AdminNotificationsPage() {
   const toast = useToast();
   const [items, setItems] = useState([]);
@@ -104,12 +112,23 @@ function AdminNotificationsPage() {
     };
   }, [items]);
 
-  const totalPages = Math.max(1, Math.ceil(items.length / NOTIFICATIONS_PER_PAGE));
+  const sortedItems = useMemo(() => {
+    return [...items].sort((left, right) => {
+      const priorityDiff = getNotificationSortPriority(left) - getNotificationSortPriority(right);
+      if (priorityDiff !== 0) {
+        return priorityDiff;
+      }
+
+      return getNotificationTimestamp(right) - getNotificationTimestamp(left);
+    });
+  }, [items]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedItems.length / NOTIFICATIONS_PER_PAGE));
   const currentPage = Math.min(page, totalPages);
   const paginatedItems = useMemo(() => {
     const startIndex = (currentPage - 1) * NOTIFICATIONS_PER_PAGE;
-    return items.slice(startIndex, startIndex + NOTIFICATIONS_PER_PAGE);
-  }, [currentPage, items]);
+    return sortedItems.slice(startIndex, startIndex + NOTIFICATIONS_PER_PAGE);
+  }, [currentPage, sortedItems]);
 
   async function handleRead(id) {
     try {
@@ -122,16 +141,28 @@ function AdminNotificationsPage() {
 
   async function handleReadAll() {
     try {
-      await markAllNotificationsAsRead({ audience: "admin" });
+      const unreadIds = items.filter((item) => item.unread).map((item) => item.id);
+
+      if (!unreadIds.length) {
+        toast.success("Tất cả thông báo đã ở trạng thái đã đọc.");
+        return;
+      }
+
+      await Promise.all(unreadIds.map((id) => markNotificationAsRead(id)));
       setItems((current) => current.map((item) => ({ ...item, unread: false })));
-      toast.success("Đã đánh dấu đã đọc toàn bộ thông báo quản trị.");
+      toast.success("Đã đánh dấu đã đọc tất cả thông báo.");
     } catch (submitError) {
       toast.error(submitError.response?.data?.message || "Không cập nhật được thông báo.");
     }
   }
 
   if (loading) {
-    return <EmptyState title="Đang tải thông báo quản trị" description="Hệ thống đang đọc thông báo của admin từ backend." />;
+    return (
+      <EmptyState
+        title="Đang tải thông báo quản trị"
+        description="Hệ thống đang đọc thông báo của admin từ backend."
+      />
+    );
   }
 
   if (error) {
@@ -143,8 +174,11 @@ function AdminNotificationsPage() {
       <PageHeader
         eyebrow="Quản trị"
         title="Thông báo"
-
-        action={<Button variant="secondary" onClick={handleReadAll}>Đánh dấu đã đọc tất cả</Button>}
+        action={
+          <Button variant="secondary" onClick={handleReadAll}>
+            Đánh dấu đã đọc tất cả
+          </Button>
+        }
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
@@ -155,13 +189,16 @@ function AdminNotificationsPage() {
       {!items.length ? (
         <EmptyState
           title="Chưa có thông báo quản trị"
-          description="Khi có phí nền tảng được ghi nhận hoặc bị đảo do hoàn tiền, hệ thống sẽ hiển thị thông báo tại đây."
+          description="Khi có sự kiện cần admin xử lý, thông báo sẽ hiển thị tại đây."
         />
       ) : (
         <>
           <div className="space-y-4">
             {paginatedItems.map((item) => (
-              <div key={item.id} className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-5 shadow-[0_20px_50px_rgba(2,6,23,0.18)]">
+              <div
+                key={item.id}
+                className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-5 shadow-[0_20px_50px_rgba(2,6,23,0.18)]"
+              >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="max-w-4xl">
                     <div className="flex flex-wrap items-center gap-3">
@@ -184,7 +221,9 @@ function AdminNotificationsPage() {
                     ) : null}
                   </div>
                   <div className="flex flex-col items-start gap-3 lg:items-end">
-                    <p className="text-xs uppercase tracking-[0.22em] text-slate-400">{formatDateTime(item.created_at)}</p>
+                    <p className="text-xs uppercase tracking-[0.22em] text-slate-400">
+                      {formatDateTime(item.created_at)}
+                    </p>
                     {item.unread ? (
                       <Button variant="secondary" size="sm" onClick={() => handleRead(item.id)}>
                         Đã đọc
@@ -196,7 +235,7 @@ function AdminNotificationsPage() {
             ))}
           </div>
 
-          {items.length > NOTIFICATIONS_PER_PAGE ? (
+          {sortedItems.length > NOTIFICATIONS_PER_PAGE ? (
             <Pagination page={currentPage} totalPages={totalPages} onPageChange={setPage} />
           ) : null}
         </>

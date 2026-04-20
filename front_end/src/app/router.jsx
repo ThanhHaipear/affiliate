@@ -61,6 +61,7 @@ import AffiliateNotificationsPage from "../pages/dashboard/affiliate/AffiliateNo
 import AffiliateChangePasswordPage from "../pages/dashboard/affiliate/AffiliateChangePasswordPage";
 import AdminLayout from "../components/admin/AdminLayout";
 import AdminDashboardPage from "../pages/admin/AdminDashboardPage";
+import AdminCategoriesPage from "../pages/admin/AdminCategoriesPage";
 import AdminAccountsPage from "../pages/admin/AdminAccountsPage";
 import AdminPendingSellersPage from "../pages/admin/AdminPendingSellersPage";
 import AdminSellerDetailPage from "../pages/admin/AdminSellerDetailPage";
@@ -316,6 +317,7 @@ const routes = [
         children: [
           { index: true, element: <Navigate to="/admin/dashboard" replace /> },
           { path: "dashboard", element: <AdminDashboardPage /> },
+          { path: "categories", element: <AdminCategoriesPage /> },
           { path: "products", element: <AdminProductsManagementPage /> },
           { path: "affiliate-links", element: <AdminAffiliateLinksPage /> },
           { path: "accounts", element: <AdminAccountsPage /> },

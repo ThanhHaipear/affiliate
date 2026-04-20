@@ -2,6 +2,16 @@ const prisma = require("../../config/prisma");
 const { summarizeOrderFinancialStats } = require("../../utils/order-financial-stats");
 const paymentRepository = require("../payment/payment.repository");
 
+function slugify(value = "") {
+  return String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function buildAccountWhere({ q, role, status }) {
   const where = {};
   const and = [];
@@ -79,6 +89,75 @@ exports.findPendingProducts = () => prisma.productAffiliateSetting.findMany({
   },
   orderBy: { updatedAt: "desc" },
 });
+
+exports.listCategories = () =>
+  prisma.category.findMany({
+    include: {
+      parent: true,
+      children: {
+        select: {
+          id: true,
+        },
+      },
+      _count: {
+        select: {
+          products: true,
+        },
+      },
+    },
+    orderBy: [{ parentId: "asc" }, { name: "asc" }],
+  });
+
+exports.createCategory = ({ name, parentId, adminId }) =>
+  prisma.$transaction(async (tx) => {
+    let slugBase = slugify(name);
+    if (!slugBase) {
+      slugBase = `category-${Date.now()}`;
+    }
+
+    let slug = slugBase;
+    let sequence = 1;
+    while (await tx.category.findFirst({ where: { slug } })) {
+      sequence += 1;
+      slug = `${slugBase}-${sequence}`;
+    }
+
+    const now = new Date();
+    const created = await tx.category.create({
+      data: {
+        name,
+        parentId: parentId || null,
+        slug,
+        createdAt: now,
+      },
+      include: {
+        parent: true,
+        children: {
+          select: {
+            id: true,
+          },
+        },
+        _count: {
+          select: {
+            products: true,
+          },
+        },
+      },
+    });
+
+    await tx.activityLog.create({
+      data: {
+        accountId: adminId,
+        action: "ADMIN_CREATE_CATEGORY",
+        targetType: "CATEGORY",
+        targetId: BigInt(created.id),
+        description: `Admin created category ${created.name}`,
+        createdAt: now,
+      },
+    });
+
+    return created;
+  });
 
 exports.listAccounts = ({ q, role, status }) =>
   prisma.account.findMany({

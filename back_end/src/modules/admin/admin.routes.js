@@ -12,6 +12,7 @@ const {
   productVisibilitySchema,
   accountListQuerySchema,
   adminProductsQuerySchema,
+  categoryCreateSchema,
   adminOrdersQuerySchema,
   fraudAlertsQuerySchema,
   affiliateLinksQuerySchema,
@@ -26,6 +27,8 @@ const router = express.Router();
 router.use(authenticate, authorize("ADMIN"));
 router.get("/dashboard", controller.getDashboard);
 router.get("/accounts", validate(accountListQuerySchema), controller.getAccounts);
+router.get("/categories", controller.getCategories);
+router.post("/categories", validate(categoryCreateSchema), controller.createCategory);
 router.get("/products", validate(adminProductsQuerySchema), controller.getProducts);
 router.patch("/accounts/:accountId/lock", validate(lockAccountSchema), controller.lockAccount);
 router.patch("/accounts/:accountId/unlock", validate(accountActionParamsSchema), controller.unlockAccount);

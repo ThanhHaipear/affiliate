@@ -56,6 +56,13 @@ exports.adminProductsQuerySchema = z.object({
   }),
 });
 
+exports.categoryCreateSchema = z.object({
+  body: z.object({
+    name: z.string().trim().min(2).max(255),
+    parentId: z.coerce.number().int().positive().optional().nullable(),
+  }),
+});
+
 exports.adminOrdersQuerySchema = z.object({
   query: z.object({
     status: z.string().trim().optional(),

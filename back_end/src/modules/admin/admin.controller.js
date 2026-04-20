@@ -17,6 +17,16 @@ exports.getProducts = asyncHandler(async (req, res) => {
   successResponse(res, data, "Admin products loaded");
 });
 
+exports.getCategories = asyncHandler(async (_req, res) => {
+  const data = await adminService.getCategories();
+  successResponse(res, data, "Admin categories loaded");
+});
+
+exports.createCategory = asyncHandler(async (req, res) => {
+  const data = await adminService.createCategory(req.user.id, req.validated?.body || req.body || {});
+  successResponse(res, data, "Category created", 201);
+});
+
 exports.lockAccount = asyncHandler(async (req, res) => {
   const data = await adminService.lockAccount(req.params.accountId, req.user.id, req.validated?.body || req.body || {});
   successResponse(res, data, "Account locked");

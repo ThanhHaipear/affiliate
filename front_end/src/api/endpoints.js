@@ -17,6 +17,7 @@ const ENDPOINTS = {
   },
   admin: {
     dashboard: `${API_PREFIX}/admin/dashboard`,
+    categories: `${API_PREFIX}/admin/categories`,
     products: `${API_PREFIX}/admin/products`,
     productDetail: (productId) => `${API_PREFIX}/admin/products/${productId}`,
     productVisibility: (productId) => `${API_PREFIX}/admin/products/${productId}/visibility`,

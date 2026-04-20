@@ -20,6 +20,20 @@ exports.getProducts = async (query) =>
     limit: query?.limit ? Number(query.limit) : undefined,
   });
 
+exports.getCategories = async () => adminRepository.listCategories();
+
+exports.createCategory = async (adminId, payload) => {
+  try {
+    return await adminRepository.createCategory({
+      name: payload?.name,
+      parentId: payload?.parentId ? Number(payload.parentId) : null,
+      adminId,
+    });
+  } catch (error) {
+    throw new AppError(error.message, 400);
+  }
+};
+
 exports.lockAccount = async (accountId, adminId, payload) => {
   try {
     return await adminRepository.lockAccount({
