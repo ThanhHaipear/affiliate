@@ -20,15 +20,6 @@ function getFeePreview(activeFee) {
   return `${activeFee.feeValue}%`;
 }
 
-function calcRate(amount, base) {
-  const normalizedBase = Number(base || 0);
-  if (!normalizedBase) {
-    return "0.0%";
-  }
-
-  return `${((Number(amount || 0) / normalizedBase) * 100).toFixed(1)}%`;
-}
-
 function InsightCard({ title, description, rows }) {
   return (
     <div className="space-y-4 rounded-[2rem] border border-slate-300 bg-white p-6 shadow-sm">
@@ -132,6 +123,7 @@ function AdminSettingsPage() {
 
   const activeFee = settings?.activePlatformFee || settings?.latestPlatformFee;
   const withdrawalConfigs = settings?.withdrawalConfigs || [];
+  const recentWithdrawalConfigs = withdrawalConfigs.slice(0, 4);
   const latestWithdrawalConfig = withdrawalConfigs[0] || null;
   const spotlightOrderId = searchParams.get("orderId") || "";
   const targetTypes = useMemo(
@@ -139,6 +131,28 @@ function AdminSettingsPage() {
     [withdrawalConfigs],
   );
   const amounts = financialStats?.amounts || {};
+  const financialSnapshotRows = [
+    {
+      label: "Tổng doanh thu hợp lệ",
+      value: formatCurrency(amounts.grossRevenue || 0),
+      hint: "Không tính đơn đã hủy hoặc đã hoàn tiền.",
+    },
+    {
+      label: "Seller đã ghi nhận",
+      value: formatCurrency(amounts.settledSellerNet || 0),
+      hint: "Tiền đã được ghi nhận vào ví seller.",
+    },
+    {
+      label: "Affiliate đã ghi nhận",
+      value: formatCurrency(amounts.settledCommission || 0),
+      hint: "Hoa hồng đã được ghi nhận vào ví affiliate.",
+    },
+    {
+      label: "Phí nền tảng đã ghi nhận",
+      value: formatCurrency(amounts.settledPlatformFee || 0),
+      hint: "Phần phí nền tảng đã được ghi nhận.",
+    },
+  ];
   const spotlightOrder = useMemo(() => {
     if (!spotlightOrderId) {
       return null;
@@ -172,7 +186,7 @@ function AdminSettingsPage() {
       <PageHeader
         eyebrow="Trung tâm điều khiển"
         title="Cài đặt nền tảng và kiểm soát tài chính"
-        description="Trang này gom toàn bộ fee snapshot, deep link order tài chính, cấu hình platform fee và ngưỡng rút tiền để admin không phải tách qua hai màn hình."
+
       />
 
       {spotlightOrderId ? (
@@ -227,21 +241,21 @@ function AdminSettingsPage() {
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <AdminStatCard label="Platform fee hiện hành" value={getFeePreview(activeFee)} meta="Cấu hình đang active" tone="cyan" />
-        <AdminStatCard label="Phí tạm tính" value={formatCompactCurrency(amounts.pendingPlatformFee || 0)} tooltip={formatCurrency(amounts.pendingPlatformFee || 0)} meta={calcRate(amounts.pendingPlatformFee, amounts.grossRevenue)} tone="rose" />
-        <AdminStatCard label="Phí đã ghi nhận" value={formatCompactCurrency(amounts.settledPlatformFee || 0)} tooltip={formatCurrency(amounts.settledPlatformFee || 0)} meta={calcRate(amounts.settledPlatformFee, amounts.grossRevenue)} tone="emerald" />
-        <AdminStatCard label="Fraud alert đang mở" value={String(settings?.openFraudAlerts || 0)} meta="Chờ admin xử lý" tone="amber" />
+        <AdminStatCard label="Phí nền tảng hiện hành" value={getFeePreview(activeFee)} meta="Cấu hình đang áp dụng" tone="cyan" />
+        <AdminStatCard label="Phí tạm tính" value={formatCompactCurrency(amounts.pendingPlatformFee || 0)} tooltip={formatCurrency(amounts.pendingPlatformFee || 0)} tone="rose" />
+        <AdminStatCard label="Phí đã ghi nhận" value={formatCompactCurrency(amounts.settledPlatformFee || 0)} tooltip={formatCurrency(amounts.settledPlatformFee || 0)} tone="emerald" />
+        <AdminStatCard label="Cảnh báo đang có" value={String(settings?.openFraudAlerts || 0)} meta="Chờ admin xử lý" tone="amber" />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <InsightCard
           title="Ảnh chụp tài chính"
-          description="Tóm tắt nhanh biên lợi của nền tảng và dòng tiền liên quan sau checkout."
-          rows={[
+          description="Tóm tắt nhanh biên lợi của nền tảng và dòng tiền liên quan sau khi đơn đã hoàn tất."
+          rows={financialSnapshotRows || [
             {
               label: "Tổng doanh thu hợp lệ",
               value: formatCurrency(amounts.grossRevenue || 0),
-              hint: "Không tính đơn đã hủy hoặc đã refund.",
+              hint: "Không tính đơn đã hủy hoặc đã hoàn tiền.",
             },
             {
               label: "Seller net tạm tính",
@@ -272,7 +286,7 @@ function AdminSettingsPage() {
             {
               label: "Rút tối đa hiện tại",
               value: latestWithdrawalConfig ? String(latestWithdrawalConfig.maxAmount) : "--",
-              hint: "Giới hạn mỗi lần rút trên hệ thống.",
+              hint: "Áp dụng đồng loạt cho ví seller và affiliate.",
             },
           ]}
         />
@@ -283,7 +297,7 @@ function AdminSettingsPage() {
           <div>
             <h2 className="text-xl font-semibold text-slate-900">Cập nhật platform fee</h2>
             <p className="mt-2 text-sm leading-7 text-slate-600">
-              Giá trị này sẽ được dùng cho các đơn mới sau thời điểm cập nhật. Đơn đã tạo trước đó vẫn giữ snapshot phí cũ.
+              Giá trị này sẽ được dùng cho các đơn mới sau thời điểm cập nhật. Đơn đã tạo trước đó vẫn giữ phí cũ.
             </p>
           </div>
           <Input
@@ -294,9 +308,9 @@ function AdminSettingsPage() {
             step="1"
             value={feeValue}
             onChange={(event) => setFeeValue(event.target.value)}
-            hint="Mặc định 5 cho 5% phí nền tảng."
+            hint="Mặc định 5% cho phí nền tảng."
           />
-          <Button type="submit" loading={savingFee}>Lưu platform fee</Button>
+          <Button type="submit" loading={savingFee}>Lưu phí nền tảng</Button>
         </form>
 
         <form onSubmit={handleWithdrawalSubmit} className="space-y-4 rounded-[2rem] border border-slate-300 bg-white p-6 shadow-sm">
@@ -313,7 +327,7 @@ function AdminSettingsPage() {
             step="1"
             value={minAmount}
             onChange={(event) => setMinAmount(event.target.value)}
-            hint="Số tiền tối thiểu để được tạo yêu cầu rút."
+            hint="Số tiền tối thiểu mỗi lần rút trong hệ thống."
           />
           <Input
             label="Mức tối đa"
@@ -324,21 +338,19 @@ function AdminSettingsPage() {
             onChange={(event) => setMaxAmount(event.target.value)}
             hint="Số tiền tối đa mỗi lần rút trong hệ thống."
           />
-          <Button type="submit" loading={savingWithdrawal}>Lưu withdrawal config</Button>
+          <Button type="submit" loading={savingWithdrawal}>Lưu cấu hình rút tiền</Button>
         </form>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="space-y-4 rounded-[2rem] border border-slate-300 bg-white p-6 shadow-sm">
           <div>
-            <h2 className="text-xl font-semibold text-slate-900">Withdrawal config gần nhất</h2>
-            <p className="mt-2 text-sm leading-7 text-slate-600">
-              Danh sách này đọc trực tiếp từ database để admin đối chiếu threshold rút tiền hiện hành.
-            </p>
+            <h2 className="text-xl font-semibold text-slate-900">Cấu hình rút tiền gần nhất</h2>
+
           </div>
-          {withdrawalConfigs.length ? (
+          {recentWithdrawalConfigs.length ? (
             <div className="space-y-3">
-              {withdrawalConfigs.map((config) => (
+              {recentWithdrawalConfigs.map((config) => (
                 <div key={config.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
                   <p className="font-medium text-slate-900">{config.targetType}</p>
                   <p className="mt-1">Min: {config.minAmount} | Max: {config.maxAmount}</p>
@@ -353,22 +365,12 @@ function AdminSettingsPage() {
 
         <div className="space-y-4 rounded-[2rem] border border-slate-300 bg-white p-6 shadow-sm">
           <div>
-            <h2 className="text-xl font-semibold text-slate-900">Snapshot vận hành</h2>
-            <p className="mt-2 text-sm leading-7 text-slate-600">
-              Tóm tắt nhanh để admin xác nhận fee và threshold rút tiền đang active trên hệ thống.
-            </p>
+            <h2 className="text-xl font-semibold text-slate-900">Vận hành</h2>
+
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Phí có hiệu lực từ</p>
             <p className="mt-2 font-semibold text-slate-900">{formatDateTime(activeFee?.effectiveFrom)}</p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Hoa hồng tạm tính</p>
-            <p className="mt-2 font-semibold text-slate-900">{formatCurrency(amounts.pendingCommission || 0)}</p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Hoa hồng đã chốt</p>
-            <p className="mt-2 font-semibold text-slate-900">{formatCurrency(amounts.settledCommission || 0)}</p>
           </div>
         </div>
       </div>

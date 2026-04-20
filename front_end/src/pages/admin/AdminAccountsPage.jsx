@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getAdminUsers, lockUser, unlockUserByTarget } from "../../api/adminApi";
 import AdminStatCard from "../../components/admin/AdminStatCard";
 import Button from "../../components/common/Button";
@@ -8,10 +8,36 @@ import EmptyState from "../../components/common/EmptyState";
 import Input from "../../components/common/Input";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import PageHeader from "../../components/common/PageHeader";
+import Pagination from "../../components/common/Pagination";
 import StatusBadge from "../../components/common/StatusBadge";
 import { useToast } from "../../hooks/useToast";
 import { mapAdminAccountDto } from "../../lib/adminMappers";
 import { formatDateTime } from "../../lib/format";
+
+const ACCOUNTS_PER_PAGE = 8;
+
+const roleOptions = [
+  { label: "Tất cả", value: "ALL" },
+  { label: "Quản trị viên", value: "ADMIN" },
+  { label: "Người bán", value: "SELLER" },
+  { label: "Affiliate", value: "AFFILIATE" },
+  { label: "Khách hàng", value: "CUSTOMER" },
+];
+
+const statusOptions = [
+  { label: "Tất cả", value: "ALL" },
+  { label: "Đang hoạt động", value: "ACTIVE" },
+  { label: "Đã khóa", value: "LOCKED" },
+  { label: "Chờ duyệt", value: "PENDING" },
+];
+
+function formatRoleLabel(label = "") {
+  return String(label)
+    .replace("ADMIN", "QUẢN TRỊ VIÊN")
+    .replace("SELLER", "NGƯỜI BÁN")
+    .replace("AFFILIATE", "AFFILIATE")
+    .replace("CUSTOMER", "KHÁCH HÀNG");
+}
 
 function AdminAccountsPage() {
   const toast = useToast();
@@ -25,10 +51,15 @@ function AdminAccountsPage() {
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [selectedAction, setSelectedAction] = useState("");
   const [lockReason, setLockReason] = useState("");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     loadAccounts();
   }, []);
+
+  useEffect(() => {
+    setPage(1);
+  }, [role, search, status]);
 
   async function loadAccounts() {
     try {
@@ -60,9 +91,9 @@ function AdminAccountsPage() {
 
     if (account.hasCustomerCapability) {
       if (account.customerLocked) {
-        options.push({ value: "UNLOCK_CUSTOMER", label: "Mở khóa vai trò customer" });
+        options.push({ value: "UNLOCK_CUSTOMER", label: "Mở khóa vai trò khách hàng" });
       } else if (account.roles.includes("CUSTOMER")) {
-        options.push({ value: "LOCK_CUSTOMER", label: "Khóa vai trò customer" });
+        options.push({ value: "LOCK_CUSTOMER", label: "Khóa vai trò khách hàng" });
       }
     }
 
@@ -82,7 +113,7 @@ function AdminAccountsPage() {
     setSelectedAction(getActionOptions(account)[0]?.value || "");
   }
 
-  const filtered = useMemo(() => {
+  const filteredAccounts = useMemo(() => {
     return accounts.filter((account) => {
       const matchSearch =
         !search ||
@@ -109,16 +140,23 @@ function AdminAccountsPage() {
   }, [accounts, role, search, status]);
 
   const summary = useMemo(() => {
-    return filtered.reduce(
+    return filteredAccounts.reduce(
       (result, account) => ({
         total: result.total + 1,
         locked: result.locked + (account.status === "LOCKED" ? 1 : 0),
         customerLocked: result.customerLocked + (account.customerLocked ? 1 : 0),
         affiliateLocked: result.affiliateLocked + (account.affiliateLocked ? 1 : 0),
-      }), 
+      }),
       { total: 0, locked: 0, customerLocked: 0, affiliateLocked: 0 },
     );
-  }, [filtered]);
+  }, [filteredAccounts]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredAccounts.length / ACCOUNTS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedAccounts = useMemo(() => {
+    const startIndex = (currentPage - 1) * ACCOUNTS_PER_PAGE;
+    return filteredAccounts.slice(startIndex, startIndex + ACCOUNTS_PER_PAGE);
+  }, [currentPage, filteredAccounts]);
 
   async function handleConfirmAction() {
     if (!selectedAccount || !selectedAction) {
@@ -133,13 +171,13 @@ function AdminAccountsPage() {
         toast.success("Đã mở khóa toàn bộ tài khoản.");
       } else if (selectedAction === "UNLOCK_CUSTOMER") {
         await unlockUserByTarget(selectedAccount.id, { target: "CUSTOMER" });
-        toast.success("Đã mở khóa vai trò customer.");
+        toast.success("Đã mở khóa vai trò khách hàng.");
       } else if (selectedAction === "UNLOCK_AFFILIATE") {
         await unlockUserByTarget(selectedAccount.id, { target: "AFFILIATE" });
         toast.success("Đã mở khóa vai trò affiliate.");
       } else if (selectedAction === "LOCK_CUSTOMER") {
         await lockUser(selectedAccount.id, { target: "CUSTOMER", reason: lockReason });
-        toast.success("Đã khóa vai trò customer.");
+        toast.success("Đã khóa vai trò khách hàng.");
       } else if (selectedAction === "LOCK_AFFILIATE") {
         await lockUser(selectedAccount.id, { target: "AFFILIATE", reason: lockReason });
         toast.success("Đã khóa vai trò affiliate.");
@@ -164,43 +202,49 @@ function AdminAccountsPage() {
   }
 
   if (error) {
-    return <EmptyState title="Không tải được tài khoản admin" description={error} />;
+    return <EmptyState title="Không tải được tài khoản" description={error} />;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Admin"
-        title="Trung tâm quản lý tài khoản"
-        description="Bạn có thể khóa toàn bộ tài khoản hoặc khóa riêng từng vai trò customer và affiliate trên cùng một account."
+        eyebrow="Quản trị tài khoản"
+        title="Tài khoản"
+        description="Bạn có thể khóa toàn bộ tài khoản hoặc khóa riêng từng vai trò khách hàng và affiliate trên cùng một tài khoản."
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <AdminStatCard label="Tổng tài khoản" value={summary.total.toLocaleString("vi-VN")} meta="Theo bộ lọc hiện tại" tone="cyan" />
-        <AdminStatCard label="Khóa toàn bộ" value={summary.locked.toLocaleString("vi-VN")} meta="Khóa cấp account" tone="rose" />
-        <AdminStatCard label="Customer bị khóa" value={summary.customerLocked.toLocaleString("vi-VN")} meta="Khóa riêng vai trò customer" tone="amber" />
+        <AdminStatCard label="Tổng tài khoản" value={summary.total.toLocaleString("vi-VN")} tone="cyan" />
+        <AdminStatCard label="Khóa toàn bộ" value={summary.locked.toLocaleString("vi-VN")} meta="Khóa cấp tài khoản" tone="rose" />
+        <AdminStatCard label="Khách hàng bị khóa" value={summary.customerLocked.toLocaleString("vi-VN")} meta="Khóa riêng vai trò khách hàng" tone="amber" />
         <AdminStatCard label="Affiliate bị khóa" value={summary.affiliateLocked.toLocaleString("vi-VN")} meta="Khóa riêng vai trò affiliate" tone="emerald" />
       </div>
 
       <div className="grid gap-4 rounded-[2rem] border border-slate-300 bg-white p-6 shadow-sm lg:grid-cols-[1.5fr_0.7fr_0.7fr]">
-        <Input label="Tìm kiếm" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Email, số điện thoại, tên, shop..." />
+        <Input
+          label="Tìm kiếm"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Email, số điện thoại, tên, shop..."
+        />
         <label className="block space-y-2">
           <span className="text-sm font-medium text-slate-800">Vai trò</span>
           <select className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900" value={role} onChange={(event) => setRole(event.target.value)}>
-            <option value="ALL">Tất cả</option>
-            <option value="ADMIN">Admin</option>
-            <option value="SELLER">Seller</option>
-            <option value="AFFILIATE">Affiliate</option>
-            <option value="CUSTOMER">Customer</option>
+            {roleOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </label>
         <label className="block space-y-2">
           <span className="text-sm font-medium text-slate-800">Trạng thái</span>
           <select className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900" value={status} onChange={(event) => setStatus(event.target.value)}>
-            <option value="ALL">Tất cả</option>
-            <option value="ACTIVE">ACTIVE</option>
-            <option value="LOCKED">LOCKED</option>
-            <option value="PENDING">PENDING</option>
+            {statusOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </label>
       </div>
@@ -230,7 +274,7 @@ function AdminAccountsPage() {
           {
             key: "roles",
             title: "Vai trò",
-            render: (row) => row.roleLabels.join(", ") || "--",
+            render: (row) => row.roleLabels.map(formatRoleLabel).join(", ") || "--",
           },
           {
             key: "roleLocks",
@@ -243,7 +287,7 @@ function AdminAccountsPage() {
               const states = [];
 
               if (row.customerLocked) {
-                states.push("Customer đã khóa");
+                states.push("Khách hàng đã khóa");
               }
 
               if (row.affiliateLocked) {
@@ -273,10 +317,14 @@ function AdminAccountsPage() {
             ),
           },
         ]}
-        rows={filtered}
+        rows={paginatedAccounts}
         emptyTitle="Không có tài khoản phù hợp"
         emptyDescription="Thử đổi bộ lọc hoặc tìm kiếm theo email, số điện thoại, vai trò."
       />
+
+      {filteredAccounts.length > ACCOUNTS_PER_PAGE ? (
+        <Pagination page={currentPage} totalPages={totalPages} onPageChange={setPage} />
+      ) : null}
 
       <ConfirmModal
         open={Boolean(selectedAccount)}
@@ -324,8 +372,8 @@ function AdminAccountsPage() {
               ? `Tài khoản đang bị khóa toàn bộ. Lý do hiện tại: ${selectedAccount?.lockReason || "Không có ghi chú."}`
               : selectedAccount?.isFullyRoleLocked
                 ? "Tài khoản hiện đã bị khóa toàn bộ theo vai trò. Bạn có thể mở lại từng vai trò riêng lẻ."
-              : [
-                  selectedAccount?.customerLocked ? "Customer đang bị khóa." : null,
+                : [
+                  selectedAccount?.customerLocked ? "Khách hàng đang bị khóa." : null,
                   selectedAccount?.affiliateLocked ? "Affiliate đang bị khóa." : null,
                 ].filter(Boolean).join(" ") || "Không có vai trò nào đang bị khóa."}
           </div>

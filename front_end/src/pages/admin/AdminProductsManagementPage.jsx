@@ -7,10 +7,13 @@ import Button from "../../components/common/Button";
 import DataTable from "../../components/common/DataTable";
 import EmptyState from "../../components/common/EmptyState";
 import PageHeader from "../../components/common/PageHeader";
+import Pagination from "../../components/common/Pagination";
 import StatusBadge from "../../components/common/StatusBadge";
 import { useToast } from "../../hooks/useToast";
 import { mapProductDto } from "../../lib/apiMappers";
 import { formatCurrency, formatDateTime } from "../../lib/format";
+
+const PRODUCTS_PER_PAGE = 8;
 
 function AdminProductsManagementPage() {
   const toast = useToast();
@@ -21,6 +24,7 @@ function AdminProductsManagementPage() {
   const [approvalStatus, setApprovalStatus] = useState("ALL");
   const [visibilityStatus, setVisibilityStatus] = useState("ALL");
   const [submittingId, setSubmittingId] = useState("");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let active = true;
@@ -35,7 +39,7 @@ function AdminProductsManagementPage() {
         }
       } catch (loadError) {
         if (active) {
-          setError(loadError.response?.data?.message || "Khong tai duoc danh sach san pham admin.");
+          setError(loadError.response?.data?.message || "Không tải được danh sách sản phẩm.");
         }
       } finally {
         if (active) {
@@ -51,18 +55,35 @@ function AdminProductsManagementPage() {
     };
   }, []);
 
+  useEffect(() => {
+    setPage(1);
+  }, [approvalStatus, search, visibilityStatus]);
+
   const filteredProducts = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
-    return products.filter((product) => {
-      const matchesSearch =
-        !normalizedSearch ||
-        [product.name, product.seller_name, product.category].join(" ").toLowerCase().includes(normalizedSearch);
-      const matchesApproval = approvalStatus === "ALL" || product.approval_status === approvalStatus;
-      const matchesVisibility = visibilityStatus === "ALL" || product.visibility_status === visibilityStatus;
+    return products
+      .filter((product) => {
+        const matchesSearch =
+          !normalizedSearch ||
+          [product.name, product.seller_name, product.category].join(" ").toLowerCase().includes(normalizedSearch);
+        const matchesApproval = approvalStatus === "ALL" || product.approval_status === approvalStatus;
+        const matchesVisibility = visibilityStatus === "ALL" || product.visibility_status === visibilityStatus;
 
-      return matchesSearch && matchesApproval && matchesVisibility;
-    });
+        return matchesSearch && matchesApproval && matchesVisibility;
+      })
+      .sort((left, right) => {
+        const leftPending = left.approval_status === "PENDING" ? 1 : 0;
+        const rightPending = right.approval_status === "PENDING" ? 1 : 0;
+
+        if (leftPending !== rightPending) {
+          return rightPending - leftPending;
+        }
+
+        const leftTime = new Date(left.raw?.updatedAt || left.raw?.createdAt || 0).getTime();
+        const rightTime = new Date(right.raw?.updatedAt || right.raw?.createdAt || 0).getTime();
+        return rightTime - leftTime;
+      });
   }, [approvalStatus, products, search, visibilityStatus]);
 
   const summary = useMemo(() => {
@@ -84,6 +105,13 @@ function AdminProductsManagementPage() {
     );
   }, [filteredProducts]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * PRODUCTS_PER_PAGE;
+    return filteredProducts.slice(startIndex, startIndex + PRODUCTS_PER_PAGE);
+  }, [currentPage, filteredProducts]);
+
   async function handleToggleVisibility(product) {
     const shouldShowProduct = product.visibility_status !== "ACTIVE";
 
@@ -96,9 +124,9 @@ function AdminProductsManagementPage() {
       setProducts((current) =>
         current.map((item) => (String(item.id) === String(product.id) ? mapProductDto(updated) : item)),
       );
-      toast.success(shouldShowProduct ? "Da hien lai san pham." : "Da an san pham khoi marketplace.");
+      toast.success(shouldShowProduct ? "Đã hiện lại sản phẩm." : "Đã ẩn sản phẩm khỏi marketplace.");
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong cap nhat duoc trang thai hien thi san pham.");
+      toast.error(submitError.response?.data?.message || "Không cập nhật được trạng thái hiển thị sản phẩm.");
     } finally {
       setSubmittingId("");
     }
@@ -109,57 +137,57 @@ function AdminProductsManagementPage() {
   }
 
   if (error) {
-    return <EmptyState title="Khong tai duoc san pham" description={error} />;
+    return <EmptyState title="Không tải được sản phẩm" description={error} />;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Quan ly san pham"
-        title="San pham cua toan he thong"
-        description="Trang rieng de admin xem, loc, mo, an va di vao chi tiet tung san pham. Khong de chung trong dashboard tong quan nua."
-        action={(
+        eyebrow="Sản phẩm"
+        title="Sản phẩm"
+
+        action={
           <Link to="/admin/products/pending">
-            <Button variant="secondary">Hang doi duyet</Button>
+            <Button variant="secondary">Hàng đợi duyệt</Button>
           </Link>
-        )}
+        }
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="Tong san pham" value={summary.total} hint="Theo bo loc hien tai" />
-        <SummaryCard label="Da duyet" value={summary.approved} hint="Trang thai APPROVED" />
-        <SummaryCard label="Dang hien thi" value={summary.visible} hint="ACTIVE tren marketplace" />
-        <SummaryCard label="Bi admin an" value={summary.hiddenByAdmin} hint="HIDDEN_BY_ADMIN" />
+        <SummaryCard label="Tổng sản phẩm" value={summary.total} />
+        <SummaryCard label="Đã duyệt" value={summary.approved} />
+        <SummaryCard label="Đang có" value={summary.visible} />
+        <SummaryCard label="Bị ẩn" value={summary.hiddenByAdmin} />
       </div>
 
       <FilterBar
         searchValue={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Tim theo ten san pham, seller hoac danh muc"
+        searchPlaceholder="Tìm theo tên sản phẩm, người bán hoặc danh mục"
         filters={[
           {
             key: "approvalStatus",
-            label: "Trang thai duyet",
+
             value: approvalStatus,
             onChange: setApprovalStatus,
             options: [
-              { label: "Tat ca", value: "ALL" },
-              { label: "APPROVED", value: "APPROVED" },
-              { label: "PENDING", value: "PENDING" },
-              { label: "REJECTED", value: "REJECTED" },
-              { label: "DRAFT", value: "DRAFT" },
+              { label: "Tất cả", value: "ALL" },
+              { label: "Đã duyệt", value: "APPROVED" },
+              { label: "Đang chờ", value: "PENDING" },
+              { label: "Đã từ chối", value: "REJECTED" },
+              { label: "Bản nháp", value: "DRAFT" },
             ],
           },
           {
             key: "visibilityStatus",
-            label: "Hien thi",
+
             value: visibilityStatus,
             onChange: setVisibilityStatus,
             options: [
-              { label: "Tat ca", value: "ALL" },
-              { label: "ACTIVE", value: "ACTIVE" },
-              { label: "HIDDEN_BY_ADMIN", value: "HIDDEN_BY_ADMIN" },
-              { label: "HIDDEN_BY_SELLER", value: "HIDDEN_BY_SELLER" },
+              { label: "Tất cả", value: "ALL" },
+              { label: "Đang hoạt động", value: "ACTIVE" },
+              { label: "Bị admin ẩn", value: "HIDDEN_BY_ADMIN" },
+              { label: "Bị người bán ẩn", value: "HIDDEN_BY_SELLER" },
             ],
           },
         ]}
@@ -167,24 +195,38 @@ function AdminProductsManagementPage() {
 
       <DataTable
         columns={[
-          { key: "name", title: "San pham" },
-          { key: "seller_name", title: "Seller" },
-          { key: "category", title: "Danh muc" },
-          { key: "price", title: "Gia", render: (row) => formatCurrency(row.price || 0) },
-          { key: "stock", title: "Ton kho" },
-          { key: "approval_status", title: "Duyet", render: (row) => <StatusBadge status={row.approval_status} /> },
-          { key: "visibility_status", title: "Hien thi", render: (row) => <StatusBadge status={row.visibility_status} /> },
-          { key: "updated_at", title: "Cap nhat", render: (row) => formatDateTime(row.raw?.updatedAt || row.raw?.createdAt) },
+          { key: "name", title: "Sản phẩm" },
+          { key: "seller_name", title: "Người bán" },
+          { key: "category", title: "Danh mục" },
+          { key: "price", title: "Giá", render: (row) => formatCurrency(row.price || 0) },
+          { key: "stock", title: "Tồn kho" },
+          {
+            key: "approval_status",
+            title: "Duyệt",
+            render: (row) => <StatusBadge status={row.approval_status} />,
+          },
+          {
+            key: "visibility_status",
+            title: "Hiển thị",
+            render: (row) => <StatusBadge status={row.visibility_status} />,
+          },
+          {
+            key: "updated_at",
+            title: "Cập nhật",
+            render: (row) => formatDateTime(row.raw?.updatedAt || row.raw?.createdAt),
+          },
           {
             key: "actions",
-            title: "Tac vu",
+            title: "Tác vụ",
             render: (row) => {
               const shouldShowProduct = row.visibility_status !== "ACTIVE";
 
               return (
                 <div className="flex flex-wrap gap-2">
                   <Link to={`/admin/products/${row.id}`}>
-                    <Button size="sm" variant="secondary">Chi tiet</Button>
+                    <Button size="sm" variant="secondary">
+                      Chi tiết
+                    </Button>
                   </Link>
                   <Button
                     size="sm"
@@ -192,17 +234,21 @@ function AdminProductsManagementPage() {
                     loading={submittingId === String(row.id)}
                     onClick={() => handleToggleVisibility(row)}
                   >
-                    {shouldShowProduct ? "Hien" : "An"}
+                    {shouldShowProduct ? "Hiện" : "Ẩn"}
                   </Button>
                 </div>
               );
             },
           },
         ]}
-        rows={filteredProducts}
-        emptyTitle="Khong co san pham"
-        emptyDescription="Khong co san pham nao khop voi bo loc hien tai."
+        rows={paginatedProducts}
+        emptyTitle="Không có sản phẩm"
+        emptyDescription="Không có sản phẩm nào khớp với bộ lọc hiện tại."
       />
+
+      {filteredProducts.length > PRODUCTS_PER_PAGE ? (
+        <Pagination page={currentPage} totalPages={totalPages} onPageChange={setPage} />
+      ) : null}
     </div>
   );
 }

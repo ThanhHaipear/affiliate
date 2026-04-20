@@ -9,10 +9,20 @@ import DataTable from "../../components/common/DataTable";
 import EmptyState from "../../components/common/EmptyState";
 import Input from "../../components/common/Input";
 import PageHeader from "../../components/common/PageHeader";
+import Pagination from "../../components/common/Pagination";
 import StatusBadge from "../../components/common/StatusBadge";
 import { useToast } from "../../hooks/useToast";
 import { mapAdminOverview } from "../../lib/adminMappers";
-import { formatDateTime } from "../../lib/format";
+import { formatDateTime, formatStatusLabel } from "../../lib/format";
+
+const SELLERS_PER_PAGE = 8;
+
+const riskOptions = [
+  { label: "Tất cả mức rủi ro", value: "ALL" },
+  { label: "Thấp", value: "LOW" },
+  { label: "Trung bình", value: "MEDIUM" },
+  { label: "Cao", value: "HIGH" },
+];
 
 function AdminPendingSellersPage() {
   const toast = useToast();
@@ -24,10 +34,15 @@ function AdminPendingSellersPage() {
   const [risk, setRisk] = useState("ALL");
   const [action, setAction] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     loadSellers();
   }, []);
+
+  useEffect(() => {
+    setPage(1);
+  }, [risk, search]);
 
   async function loadSellers() {
     try {
@@ -36,13 +51,13 @@ function AdminPendingSellersPage() {
       const response = await getAdminOverview();
       setPendingSellers(mapAdminOverview(response).pendingSellers);
     } catch (loadError) {
-      setError(loadError.response?.data?.message || "Không tải được danh sách seller chờ duyệt.");
+      setError(loadError.response?.data?.message || "Không tải được danh sách người bán chờ duyệt.");
     } finally {
       setLoading(false);
     }
   }
 
-  const rows = useMemo(() => {
+  const filteredRows = useMemo(() => {
     return pendingSellers.filter((seller) => {
       const matchesSearch = [seller.shopName, seller.ownerName, seller.email]
         .join(" ")
@@ -53,6 +68,13 @@ function AdminPendingSellersPage() {
     });
   }, [pendingSellers, risk, search]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / SELLERS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedRows = useMemo(() => {
+    const startIndex = (currentPage - 1) * SELLERS_PER_PAGE;
+    return filteredRows.slice(startIndex, startIndex + SELLERS_PER_PAGE);
+  }, [currentPage, filteredRows]);
+
   async function handleConfirmAction() {
     if (!action?.row) {
       return;
@@ -62,16 +84,16 @@ function AdminPendingSellersPage() {
       setSubmitting(true);
       if (action.type === "approve") {
         await approveSeller(action.row.id);
-        toast.success("Đã duyệt seller.");
+        toast.success("Đã duyệt người bán.");
       } else {
         await rejectSeller(action.row.id, { rejectReason });
-        toast.success("Đã từ chối seller.");
+        toast.success("Đã từ chối người bán.");
       }
       setAction(null);
       setRejectReason("");
       await loadSellers();
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Không cập nhật được trạng thái seller.");
+      toast.error(submitError.response?.data?.message || "Không cập nhật được trạng thái người bán.");
     } finally {
       setSubmitting(false);
     }
@@ -82,16 +104,17 @@ function AdminPendingSellersPage() {
   }
 
   if (error) {
-    return <EmptyState title="Không tải được seller chờ duyệt" description={error} />;
+    return <EmptyState title="Không tải được người bán chờ duyệt" description={error} />;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Duyệt seller"
-        title="Seller chờ duyệt"
-        description="Danh sách này đang đọc trực tiếp từ backend. Chỉ nên duyệt khi seller đã có KYC và tài khoản nhận tiền hợp lệ."
+        eyebrow="Duyệt người bán"
+        title="Người bán chờ duyệt"
+        description="Chỉ nên duyệt khi người bán đã có KYC và tài khoản nhận tiền hợp lệ."
       />
+
       <FilterBar
         searchValue={search}
         onSearchChange={setSearch}
@@ -99,25 +122,25 @@ function AdminPendingSellersPage() {
         filters={[
           {
             key: "risk",
-            label: "Rủi ro",
+
             value: risk,
             onChange: setRisk,
-            options: [
-              { label: "Tất cả mức rủi ro", value: "ALL" },
-              { label: "Thấp", value: "LOW" },
-              { label: "Trung bình", value: "MEDIUM" },
-              { label: "Cao", value: "HIGH" },
-            ],
+            options: riskOptions,
           },
         ]}
       />
+
       <DataTable
         columns={[
           { key: "shopName", title: "Shop" },
           { key: "ownerName", title: "Chủ sở hữu" },
           { key: "category", title: "Ngành hàng" },
           { key: "submittedAt", title: "Ngày gửi", render: (row) => formatDateTime(row.submittedAt) },
-          { key: "riskLevel", title: "Rủi ro", render: (row) => row.riskLevel },
+          {
+            key: "riskLevel",
+            title: "Rủi ro",
+            render: (row) => formatStatusLabel(row.riskLevel),
+          },
           { key: "kycStatus", title: "KYC", render: (row) => <StatusBadge status={row.kycStatus} /> },
           {
             key: "actions",
@@ -139,14 +162,19 @@ function AdminPendingSellersPage() {
             ),
           },
         ]}
-        rows={rows}
+        rows={paginatedRows}
         keyField="rowKey"
-        emptyTitle="Không còn seller chờ duyệt"
-        emptyDescription="Backend hiện tại không trả về seller pending nào."
+        emptyTitle="Không còn người bán chờ duyệt"
+        emptyDescription="Backend hiện tại không trả về người bán pending nào."
       />
+
+      {filteredRows.length > SELLERS_PER_PAGE ? (
+        <Pagination page={currentPage} totalPages={totalPages} onPageChange={setPage} />
+      ) : null}
+
       <ConfirmModal
         open={Boolean(action)}
-        title={action?.type === "approve" ? "Duyệt seller" : "Từ chối seller"}
+        title={action?.type === "approve" ? "Duyệt người bán" : "Từ chối người bán"}
         description={`Xác nhận quyết định review cho ${action?.row?.shopName || ""}.`}
         confirmVariant={action?.type === "approve" ? "primary" : "danger"}
         onClose={() => {

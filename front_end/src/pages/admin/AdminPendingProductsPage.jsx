@@ -15,10 +15,19 @@ import DataTable from "../../components/common/DataTable";
 import EmptyState from "../../components/common/EmptyState";
 import Input from "../../components/common/Input";
 import PageHeader from "../../components/common/PageHeader";
+import Pagination from "../../components/common/Pagination";
 import StatusBadge from "../../components/common/StatusBadge";
 import { useToast } from "../../hooks/useToast";
 import { mapAdminOverview } from "../../lib/adminMappers";
 import { formatDateTime } from "../../lib/format";
+
+const PRODUCTS_PER_PAGE = 8;
+
+const categoryOptions = [
+  { label: "Tất cả", value: "ALL" },
+  { label: "Có catalog chờ duyệt", value: "CATALOG" },
+  { label: "Có affiliate chờ duyệt", value: "AFFILIATE" },
+];
 
 function AdminPendingProductsPage() {
   const toast = useToast();
@@ -30,10 +39,15 @@ function AdminPendingProductsPage() {
   const [category, setCategory] = useState("ALL");
   const [action, setAction] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     loadProducts();
   }, []);
+
+  useEffect(() => {
+    setPage(1);
+  }, [category, search]);
 
   async function loadProducts() {
     try {
@@ -48,7 +62,7 @@ function AdminPendingProductsPage() {
     }
   }
 
-  const rows = useMemo(() => {
+  const filteredRows = useMemo(() => {
     return pendingProducts.filter((product) => {
       const matchesSearch = [product.name, product.sellerName, product.productCategory]
         .join(" ")
@@ -67,6 +81,13 @@ function AdminPendingProductsPage() {
     });
   }, [category, pendingProducts, search]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PRODUCTS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedRows = useMemo(() => {
+    const startIndex = (currentPage - 1) * PRODUCTS_PER_PAGE;
+    return filteredRows.slice(startIndex, startIndex + PRODUCTS_PER_PAGE);
+  }, [currentPage, filteredRows]);
+
   async function handleConfirmAction() {
     if (!action?.row) {
       return;
@@ -74,6 +95,7 @@ function AdminPendingProductsPage() {
 
     try {
       setSubmitting(true);
+
       if (action.row.catalogReview.available) {
         await (
           action.type === "approve"
@@ -116,8 +138,9 @@ function AdminPendingProductsPage() {
       <PageHeader
         eyebrow="Duyệt sản phẩm"
         title="Sản phẩm chờ duyệt"
-        description="Mỗi sản phẩm chỉ duyệt một lần. Khi admin duyệt hoặc từ chối, hệ thống sẽ cập nhật toàn bộ phần catalog và affiliate đang chờ duyệt của sản phẩm đó."
+
       />
+
       <FilterBar
         searchValue={search}
         onSearchChange={setSearch}
@@ -125,28 +148,29 @@ function AdminPendingProductsPage() {
         filters={[
           {
             key: "category",
-            label: "Phạm vi chờ duyệt",
+
             value: category,
             onChange: setCategory,
-            options: [
-              { label: "Tất cả", value: "ALL" },
-              { label: "Có catalog pending", value: "CATALOG" },
-              { label: "Có affiliate pending", value: "AFFILIATE" },
-            ],
+            options: categoryOptions,
           },
         ]}
       />
+
       <DataTable
         columns={[
           { key: "name", title: "Sản phẩm" },
           { key: "sellerName", title: "Seller" },
           { key: "productCategory", title: "Danh mục" },
-          { key: "price", title: "Giá / Giá gốc", render: (row) => (row.price ? row.price.toLocaleString("vi-VN") : "--") },
+          {
+            key: "price",
+            title: "Giá / Giá gốc",
+            render: (row) => (row.price ? row.price.toLocaleString("vi-VN") : "--"),
+          },
           { key: "commissionRate", title: "Hoa hồng", render: (row) => row.commissionRate || "--" },
           { key: "submittedAt", title: "Ngày gửi", render: (row) => formatDateTime(row.submittedAt) },
           {
             key: "reviewStatus",
-            title: "Trạng thái review",
+            title: "Trạng thái duyệt",
             render: (row) => (
               <div className="space-y-2">
                 <StatusBadge status={row.reviewStatus} />
@@ -168,11 +192,16 @@ function AdminPendingProductsPage() {
             ),
           },
         ]}
-        rows={rows}
+        rows={paginatedRows}
         keyField="rowKey"
         emptyTitle="Không còn sản phẩm chờ duyệt"
         emptyDescription="Backend hiện tại không trả về sản phẩm pending nào."
       />
+
+      {filteredRows.length > PRODUCTS_PER_PAGE ? (
+        <Pagination page={currentPage} totalPages={totalPages} onPageChange={setPage} />
+      ) : null}
+
       <ConfirmModal
         open={Boolean(action)}
         title={action?.type === "approve" ? "Duyệt sản phẩm" : "Từ chối sản phẩm"}

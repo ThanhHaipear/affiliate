@@ -77,6 +77,7 @@ function AdminProductDetailPage() {
 
     const catalogPending = product.raw?.status === "PENDING";
     const affiliatePending = product.raw?.affiliateSetting?.approvalStatus === "PENDING";
+    const canManageVisibility = product.raw?.status === "APPROVED";
 
     try {
       setSubmitting(true);
@@ -97,7 +98,7 @@ function AdminProductDetailPage() {
         }
       }
 
-      if (action === "hide" || action === "show") {
+      if ((action === "hide" || action === "show") && canManageVisibility) {
         await setAdminProductVisibility(product.id, {
           visible: action === "show",
           reason: action === "hide" ? rejectReason : undefined,
@@ -142,6 +143,7 @@ function AdminProductDetailPage() {
   const catalogPending = product.raw?.status === "PENDING";
   const affiliatePending = product.raw?.affiliateSetting?.approvalStatus === "PENDING";
   const canReview = catalogPending || affiliatePending;
+  const canManageVisibility = product.raw?.status === "APPROVED";
   const reviewSummary = buildReviewSummary(product);
 
   return (
@@ -152,12 +154,14 @@ function AdminProductDetailPage() {
         description={product.description}
         action={
           <div className="flex flex-wrap gap-3">
-            <Button
-              variant={product.admin_hidden ? "secondary" : "danger"}
-              onClick={() => setAction(product.admin_hidden ? "show" : "hide")}
-            >
-              {product.admin_hidden ? "Hiện sản phẩm" : "Ẩn sản phẩm"}
-            </Button>
+            {canManageVisibility ? (
+              <Button
+                variant={product.admin_hidden ? "secondary" : "danger"}
+                onClick={() => setAction(product.admin_hidden ? "show" : "hide")}
+              >
+                {product.admin_hidden ? "Hiện sản phẩm" : "Ẩn sản phẩm"}
+              </Button>
+            ) : null}
             {canReview ? (
               <>
                 <Button variant="danger" onClick={() => setAction("reject")}>

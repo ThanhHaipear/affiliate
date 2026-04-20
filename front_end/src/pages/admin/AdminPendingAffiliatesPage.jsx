@@ -9,9 +9,19 @@ import DataTable from "../../components/common/DataTable";
 import EmptyState from "../../components/common/EmptyState";
 import Input from "../../components/common/Input";
 import PageHeader from "../../components/common/PageHeader";
+import Pagination from "../../components/common/Pagination";
 import { useToast } from "../../hooks/useToast";
 import { mapAdminOverview } from "../../lib/adminMappers";
-import { formatDateTime } from "../../lib/format";
+import { formatDateTime, formatStatusLabel } from "../../lib/format";
+
+const AFFILIATES_PER_PAGE = 8;
+
+const channelOptions = [
+  { label: "Tất cả trạng thái", value: "ALL" },
+  { label: "Đang hoạt động", value: "ACTIVE" },
+  { label: "Không hoạt động", value: "INACTIVE" },
+  { label: "Đã khóa", value: "LOCKED" },
+];
 
 function AdminPendingAffiliatesPage() {
   const toast = useToast();
@@ -23,10 +33,15 @@ function AdminPendingAffiliatesPage() {
   const [channel, setChannel] = useState("ALL");
   const [action, setAction] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     loadAffiliates();
   }, []);
+
+  useEffect(() => {
+    setPage(1);
+  }, [channel, search]);
 
   async function loadAffiliates() {
     try {
@@ -41,7 +56,7 @@ function AdminPendingAffiliatesPage() {
     }
   }
 
-  const rows = useMemo(() => {
+  const filteredRows = useMemo(() => {
     return pendingAffiliates.filter((affiliate) => {
       const matchesSearch = [affiliate.fullName, affiliate.email, affiliate.primaryChannel]
         .join(" ")
@@ -51,6 +66,13 @@ function AdminPendingAffiliatesPage() {
       return matchesSearch && matchesChannel;
     });
   }, [channel, pendingAffiliates, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / AFFILIATES_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedRows = useMemo(() => {
+    const startIndex = (currentPage - 1) * AFFILIATES_PER_PAGE;
+    return filteredRows.slice(startIndex, startIndex + AFFILIATES_PER_PAGE);
+  }, [currentPage, filteredRows]);
 
   async function handleConfirmAction() {
     if (!action?.row) {
@@ -89,8 +111,9 @@ function AdminPendingAffiliatesPage() {
       <PageHeader
         eyebrow="Duyệt affiliate"
         title="Affiliate chờ duyệt"
-        description="Danh sách này đang đọc trực tiếp từ backend. Chỉ nên duyệt khi affiliate đã có KYC và payment account hợp lệ."
+        description="Chỉ nên duyệt khi affiliate đã có KYC và tài khoản nhận chi trả hợp lệ."
       />
+
       <FilterBar
         searchValue={search}
         onSearchChange={setSearch}
@@ -98,25 +121,29 @@ function AdminPendingAffiliatesPage() {
         filters={[
           {
             key: "channel",
-            label: "Trạng thái hoạt động",
+
             value: channel,
             onChange: setChannel,
-            options: [
-              { label: "Tất cả trạng thái", value: "ALL" },
-              { label: "Đang hoạt động", value: "ACTIVE" },
-              { label: "Không hoạt động", value: "INACTIVE" },
-              { label: "Đã khóa", value: "LOCKED" },
-            ],
+            options: channelOptions,
           },
         ]}
       />
+
       <DataTable
         columns={[
           { key: "fullName", title: "Affiliate" },
-          { key: "primaryChannel", title: "Hoạt động" },
+          {
+            key: "primaryChannel",
+            title: "Hoạt động",
+            render: (row) => formatStatusLabel(row.primaryChannel),
+          },
           { key: "paymentMethod", title: "Nhận chi trả" },
           { key: "submittedAt", title: "Ngày gửi", render: (row) => formatDateTime(row.submittedAt) },
-          { key: "riskLevel", title: "Rủi ro" },
+          {
+            key: "riskLevel",
+            title: "Rủi ro",
+            render: (row) => formatStatusLabel(row.riskLevel),
+          },
           {
             key: "actions",
             title: "Thao tác",
@@ -137,11 +164,16 @@ function AdminPendingAffiliatesPage() {
             ),
           },
         ]}
-        rows={rows}
+        rows={paginatedRows}
         keyField="rowKey"
         emptyTitle="Không còn affiliate chờ duyệt"
         emptyDescription="Backend hiện tại không trả về affiliate pending nào."
       />
+
+      {filteredRows.length > AFFILIATES_PER_PAGE ? (
+        <Pagination page={currentPage} totalPages={totalPages} onPageChange={setPage} />
+      ) : null}
+
       <ConfirmModal
         open={Boolean(action)}
         title={action?.type === "approve" ? "Duyệt affiliate" : "Từ chối affiliate"}

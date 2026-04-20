@@ -1,14 +1,28 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { getNotifications, markAllNotificationsAsRead, markNotificationAsRead } from "../../api/notificationApi";
 import AdminStatCard from "../../components/admin/AdminStatCard";
 import Button from "../../components/common/Button";
 import EmptyState from "../../components/common/EmptyState";
 import PageHeader from "../../components/common/PageHeader";
+import Pagination from "../../components/common/Pagination";
 import StatusBadge from "../../components/common/StatusBadge";
 import { useToast } from "../../hooks/useToast";
-import { getNotifications, markAllNotificationsAsRead, markNotificationAsRead } from "../../api/notificationApi";
 import { mapNotificationDto } from "../../lib/apiMappers";
 import { formatDateTime } from "../../lib/format";
+
+const NOTIFICATIONS_PER_PAGE = 8;
+
+const notificationTypeLabels = {
+  ADMIN_PENDING_SELLER: "Người bán chờ duyệt",
+  ADMIN_PENDING_AFFILIATE: "Affiliate chờ duyệt",
+  ADMIN_PENDING_PRODUCT: "Sản phẩm chờ duyệt",
+  ADMIN_PENDING_AFFILIATE_SUBQUEUE: "Cấu hình affiliate chờ duyệt",
+  ORDER_REFUND_REQUESTED: "Yêu cầu hoàn tiền",
+  ORDER_REFUND_REJECTED: "Hoàn tiền bị từ chối",
+  PLATFORM_FEE_CREDIT: "Ghi nhận phí nền tảng",
+  PLATFORM_FEE_REVERSAL: "Đảo phí nền tảng",
+};
 
 function resolveAdminNotificationLink(item) {
   const targetId = item?.raw?.targetId || item?.raw?.target_id || null;
@@ -40,11 +54,16 @@ function resolveAdminNotificationLink(item) {
   return `/admin/orders?orderId=${targetId}`;
 }
 
+function formatNotificationType(type = "") {
+  return notificationTypeLabels[type] || type || "--";
+}
+
 function AdminNotificationsPage() {
   const toast = useToast();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let active = true;
@@ -59,7 +78,7 @@ function AdminNotificationsPage() {
         }
       } catch (loadError) {
         if (active) {
-          setError(loadError.response?.data?.message || "Không tải được thông báo admin.");
+          setError(loadError.response?.data?.message || "Không tải được thông báo quản trị.");
         }
       } finally {
         if (active) {
@@ -77,16 +96,20 @@ function AdminNotificationsPage() {
 
   const summary = useMemo(() => {
     const unread = items.filter((item) => item.unread).length;
-    const credited = items.filter((item) => item.type === "PLATFORM_FEE_CREDIT").length;
-    const reversed = items.filter((item) => item.type === "PLATFORM_FEE_REVERSAL").length;
-
+    const read = items.length - unread;
     return {
       total: items.length,
       unread,
-      credited,
-      reversed,
+      read,
     };
   }, [items]);
+
+  const totalPages = Math.max(1, Math.ceil(items.length / NOTIFICATIONS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * NOTIFICATIONS_PER_PAGE;
+    return items.slice(startIndex, startIndex + NOTIFICATIONS_PER_PAGE);
+  }, [currentPage, items]);
 
   async function handleRead(id) {
     try {
@@ -101,78 +124,82 @@ function AdminNotificationsPage() {
     try {
       await markAllNotificationsAsRead({ audience: "admin" });
       setItems((current) => current.map((item) => ({ ...item, unread: false })));
-      toast.success("Đã đánh dấu đã đọc toàn bộ thông báo admin.");
+      toast.success("Đã đánh dấu đã đọc toàn bộ thông báo quản trị.");
     } catch (submitError) {
       toast.error(submitError.response?.data?.message || "Không cập nhật được thông báo.");
     }
   }
 
   if (loading) {
-    return <EmptyState title="Đang tải thông báo admin" description="Hệ thống đang đọc notification của admin từ backend." />;
+    return <EmptyState title="Đang tải thông báo quản trị" description="Hệ thống đang đọc thông báo của admin từ backend." />;
   }
 
   if (error) {
-    return <EmptyState title="Không tải được thông báo admin" description={error} />;
+    return <EmptyState title="Không tải được thông báo quản trị" description={error} />;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Admin"
-        title="Thông báo admin"
-        description="Theo dõi các biến động tài chính của nền tảng, đặc biệt là phí nền tảng đã ghi nhận hoặc bị đảo bút toán sau refund."
+        eyebrow="Quản trị"
+        title="Thông báo"
+
         action={<Button variant="secondary" onClick={handleReadAll}>Đánh dấu đã đọc tất cả</Button>}
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <AdminStatCard label="Tổng thông báo" value={summary.total.toLocaleString("vi-VN")} meta="Theo audience admin" tone="cyan" />
-        <AdminStatCard label="Chưa đọc" value={summary.unread.toLocaleString("vi-VN")} meta="Cần admin xử lý hoặc đối chiếu" tone="amber" />
-        <AdminStatCard label="Phí đã ghi nhận" value={summary.credited.toLocaleString("vi-VN")} meta="Sự kiện cộng phí nền tảng" tone="emerald" />
-        <AdminStatCard label="Phí bị đảo" value={summary.reversed.toLocaleString("vi-VN")} meta="Sự kiện đảo phí sau refund" tone="rose" />
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
+        <AdminStatCard label="Tổng thông báo" value={summary.total.toLocaleString("vi-VN")} tone="cyan" />
+        <AdminStatCard label="Thông báo đã đọc" value={summary.read.toLocaleString("vi-VN")} tone="amber" />
       </div>
 
       {!items.length ? (
         <EmptyState
-          title="Chưa có thông báo admin"
-          description="Khi có phí nền tảng được ghi nhận hoặc bị đảo do refund, hệ thống sẽ hiển thị thông báo tại đây."
+          title="Chưa có thông báo quản trị"
+          description="Khi có phí nền tảng được ghi nhận hoặc bị đảo do hoàn tiền, hệ thống sẽ hiển thị thông báo tại đây."
         />
       ) : (
-        <div className="space-y-4">
-          {items.map((item) => (
-            <div key={item.id} className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-5 shadow-[0_20px_50px_rgba(2,6,23,0.18)]">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="max-w-4xl">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <StatusBadge status={item.unread ? "PENDING" : "APPROVED"} />
-                    <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs uppercase tracking-[0.24em] text-cyan-100">
-                      {item.type}
-                    </span>
-                  </div>
-                  <h3 className="mt-3 text-lg font-semibold text-white">{item.title}</h3>
-                  <p className="mt-2 text-sm leading-7 text-slate-300">{item.description}</p>
-                  {resolveAdminNotificationLink(item) ? (
-                    <div className="mt-4">
-                      <Link
-                        to={resolveAdminNotificationLink(item)}
-                        className="inline-flex rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-100 transition hover:border-cyan-200/50 hover:bg-cyan-300/15"
-                      >
-                        Mở bản ghi liên quan
-                      </Link>
+        <>
+          <div className="space-y-4">
+            {paginatedItems.map((item) => (
+              <div key={item.id} className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-5 shadow-[0_20px_50px_rgba(2,6,23,0.18)]">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="max-w-4xl">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <StatusBadge status={item.unread ? "PENDING" : "APPROVED"} />
+                      <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs uppercase tracking-[0.24em] text-cyan-100">
+                        {formatNotificationType(item.type)}
+                      </span>
                     </div>
-                  ) : null}
-                </div>
-                <div className="flex flex-col items-start gap-3 lg:items-end">
-                  <p className="text-xs uppercase tracking-[0.22em] text-slate-400">{formatDateTime(item.created_at)}</p>
-                  {item.unread ? (
-                    <Button variant="secondary" size="sm" onClick={() => handleRead(item.id)}>
-                      Đã đọc
-                    </Button>
-                  ) : null}
+                    <h3 className="mt-3 text-lg font-semibold text-white">{item.title}</h3>
+                    <p className="mt-2 text-sm leading-7 text-slate-300">{item.description}</p>
+                    {resolveAdminNotificationLink(item) ? (
+                      <div className="mt-4">
+                        <Link
+                          to={resolveAdminNotificationLink(item)}
+                          className="inline-flex rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-100 transition hover:border-cyan-200/50 hover:bg-cyan-300/15"
+                        >
+                          Mở bản ghi liên quan
+                        </Link>
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-col items-start gap-3 lg:items-end">
+                    <p className="text-xs uppercase tracking-[0.22em] text-slate-400">{formatDateTime(item.created_at)}</p>
+                    {item.unread ? (
+                      <Button variant="secondary" size="sm" onClick={() => handleRead(item.id)}>
+                        Đã đọc
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+
+          {items.length > NOTIFICATIONS_PER_PAGE ? (
+            <Pagination page={currentPage} totalPages={totalPages} onPageChange={setPage} />
+          ) : null}
+        </>
       )}
     </div>
   );

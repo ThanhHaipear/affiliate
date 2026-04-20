@@ -13,36 +13,72 @@ import DataTable from "../../components/common/DataTable";
 import EmptyState from "../../components/common/EmptyState";
 import MoneyText from "../../components/common/MoneyText";
 import PageHeader from "../../components/common/PageHeader";
+import Pagination from "../../components/common/Pagination";
 import StatusBadge from "../../components/common/StatusBadge";
 import { useToast } from "../../hooks/useToast";
 import { formatCompactCurrency, formatCurrency as formatFullCurrency, formatDateTime } from "../../lib/format";
 import { mapWithdrawalDto } from "../../lib/apiMappers";
 
-const formatCurrency = (value) => new Intl.NumberFormat("vi-VN", {
-  style: "currency",
-  currency: "VND",
-  maximumFractionDigits: 0,
-}).format(Number(value || 0));
+const ROWS_PER_PAGE = 8;
 
-const baseColumns = [
-  { key: "id", title: "Yêu cầu" },
-  {
-    key: "owner_type",
-    title: "Loại ví",
-    render: (row) => row.raw?.ownerType || "--",
-  },
-  { key: "amount", title: "Số tiền", render: (row) => <MoneyText value={row.amount} /> },
-  {
-    key: "receiver",
-    title: "Tài khoản nhận",
-    render: (row) => {
-      const paymentAccount = row.raw?.affiliatePaymentAccount || row.raw?.sellerPaymentAccount;
-      return paymentAccount?.accountNumber || paymentAccount?.bankName || "--";
-    },
-  },
-  { key: "requested_at", title: "Ngày gửi", render: (row) => formatDateTime(row.requested_at) },
-  { key: "status", title: "Trạng thái", render: (row) => <StatusBadge status={row.status} /> },
-];
+function formatOwnerType(ownerType = "") {
+  if (ownerType === "AFFILIATE") {
+    return "Ví affiliate";
+  }
+
+  if (ownerType === "SELLER") {
+    return "Ví seller";
+  }
+
+  return ownerType || "--";
+}
+
+function buildReceiverLabel(row) {
+  const paymentAccount = row.raw?.affiliatePaymentAccount || row.raw?.sellerPaymentAccount;
+  if (!paymentAccount) {
+    return "--";
+  }
+
+  return [
+    paymentAccount.bankName,
+    paymentAccount.accountNumber,
+    paymentAccount.accountName,
+  ].filter(Boolean).join(" | ") || "--";
+}
+
+function sortPendingWithdrawals(rows = []) {
+  return [...rows].sort((left, right) => {
+    const leftTime = new Date(left.requested_at || left.raw?.requestedAt || 0).getTime();
+    const rightTime = new Date(right.requested_at || right.raw?.requestedAt || 0).getTime();
+    return rightTime - leftTime;
+  });
+}
+
+function sortApprovedWithdrawals(rows = []) {
+  return [...rows].sort((left, right) => {
+    const leftUnpaidWeight = left.status === "PAID" ? 1 : 0;
+    const rightUnpaidWeight = right.status === "PAID" ? 1 : 0;
+
+    if (leftUnpaidWeight !== rightUnpaidWeight) {
+      return leftUnpaidWeight - rightUnpaidWeight;
+    }
+
+    const leftTime = new Date(
+      left.raw?.processedAt ||
+      left.raw?.requestedAt ||
+      left.requested_at ||
+      0,
+    ).getTime();
+    const rightTime = new Date(
+      right.raw?.processedAt ||
+      right.raw?.requestedAt ||
+      right.requested_at ||
+      0,
+    ).getTime();
+
+    return rightTime - leftTime;
+  });
+}
 
 function AdminPendingWithdrawalsPage() {
   const toast = useToast();
@@ -57,6 +93,8 @@ function AdminPendingWithdrawalsPage() {
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState(null);
   const [error, setError] = useState("");
+  const [pendingPage, setPendingPage] = useState(1);
+  const [approvedPage, setApprovedPage] = useState(1);
 
   useEffect(() => {
     let active = true;
@@ -83,7 +121,7 @@ function AdminPendingWithdrawalsPage() {
         }
       } catch (loadError) {
         if (active) {
-          setError(loadError.response?.data?.message || "Không tải được dữ liệu withdrawal admin.");
+          setError(loadError.response?.data?.message || "Không tải được dữ liệu duyệt rút tiền.");
         }
       } finally {
         if (active) {
@@ -98,6 +136,46 @@ function AdminPendingWithdrawalsPage() {
       active = false;
     };
   }, []);
+
+  const sortedPendingWithdrawals = useMemo(
+    () => sortPendingWithdrawals(pendingWithdrawals),
+    [pendingWithdrawals],
+  );
+  const sortedApprovedWithdrawals = useMemo(
+    () => sortApprovedWithdrawals(approvedWithdrawals),
+    [approvedWithdrawals],
+  );
+
+  const pendingTotalPages = Math.max(1, Math.ceil(sortedPendingWithdrawals.length / ROWS_PER_PAGE));
+  const approvedTotalPages = Math.max(1, Math.ceil(sortedApprovedWithdrawals.length / ROWS_PER_PAGE));
+  const currentPendingPage = Math.min(pendingPage, pendingTotalPages);
+  const currentApprovedPage = Math.min(approvedPage, approvedTotalPages);
+
+  const paginatedPendingWithdrawals = useMemo(() => {
+    const startIndex = (currentPendingPage - 1) * ROWS_PER_PAGE;
+    return sortedPendingWithdrawals.slice(startIndex, startIndex + ROWS_PER_PAGE);
+  }, [currentPendingPage, sortedPendingWithdrawals]);
+
+  const paginatedApprovedWithdrawals = useMemo(() => {
+    const startIndex = (currentApprovedPage - 1) * ROWS_PER_PAGE;
+    return sortedApprovedWithdrawals.slice(startIndex, startIndex + ROWS_PER_PAGE);
+  }, [currentApprovedPage, sortedApprovedWithdrawals]);
+
+  const pendingSummary = useMemo(() => {
+    return pendingWithdrawals.reduce(
+      (result, item) => {
+        result.totalAmount += Number(item.amount || 0);
+        if (item.raw?.ownerType === "AFFILIATE") {
+          result.affiliateCount += 1;
+        }
+        if (item.raw?.ownerType === "SELLER") {
+          result.sellerCount += 1;
+        }
+        return result;
+      },
+      { totalAmount: 0, affiliateCount: 0, sellerCount: 0 },
+    );
+  }, [pendingWithdrawals]);
 
   async function handleReview(withdrawalId, status) {
     const rejectReason = status === "REJECTED"
@@ -117,19 +195,26 @@ function AdminPendingWithdrawalsPage() {
         rejectReason: rejectReason || undefined,
       });
 
-      setPendingWithdrawals((current) => current.filter((item) => String(item.id) !== String(withdrawalId)));
+      setPendingWithdrawals((current) =>
+        current.filter((item) => String(item.id) !== String(withdrawalId)));
 
       if (status === "APPROVED" && reviewedRow) {
         setApprovedWithdrawals((current) => [mapWithdrawalDto(reviewedWithdrawal), ...current]);
         setApprovedSummary((current) => ({
           approvedAmount: current.approvedAmount + Number(reviewedRow.amount || 0),
           approvedCount: current.approvedCount + 1,
-          affiliateApprovedCount: current.affiliateApprovedCount + (reviewedRow.raw?.ownerType === "AFFILIATE" ? 1 : 0),
-          sellerApprovedCount: current.sellerApprovedCount + (reviewedRow.raw?.ownerType === "SELLER" ? 1 : 0),
+          affiliateApprovedCount:
+            current.affiliateApprovedCount + (reviewedRow.raw?.ownerType === "AFFILIATE" ? 1 : 0),
+          sellerApprovedCount:
+            current.sellerApprovedCount + (reviewedRow.raw?.ownerType === "SELLER" ? 1 : 0),
         }));
       }
 
-      toast.success(status === "APPROVED" ? "Đã duyệt yêu cầu và cập nhật vào danh sách đã duyệt." : "Đã từ chối yêu cầu rút tiền.");
+      toast.success(
+        status === "APPROVED"
+          ? "Đã duyệt yêu cầu và chuyển vào danh sách đã duyệt."
+          : "Đã từ chối yêu cầu rút tiền.",
+      );
     } catch (reviewError) {
       toast.error(reviewError.response?.data?.message || "Không cập nhật được yêu cầu rút tiền.");
     } finally {
@@ -160,10 +245,10 @@ function AdminPendingWithdrawalsPage() {
           current.map((item) =>
             String(item.id) === String(row.id)
               ? mapWithdrawalDto({
-                  ...row.raw,
-                  payoutBatchId: createdBatch?.id,
-                  status: "PROCESSING",
-                })
+                ...row.raw,
+                payoutBatchId: createdBatch?.id,
+                status: "PROCESSING",
+              })
               : item,
           ),
         );
@@ -176,27 +261,60 @@ function AdminPendingWithdrawalsPage() {
 
       window.location.href = vnpay.paymentUrl;
     } catch (payError) {
-      toast.error(payError.response?.data?.message || payError.message || "Không khởi tạo được thanh toán payout qua VNPAY.");
+      toast.error(
+        payError.response?.data?.message ||
+        payError.message ||
+        "Không khởi tạo được thanh toán payout qua VNPAY.",
+      );
     } finally {
       setActionId(null);
     }
   }
 
-  const pendingSummary = useMemo(() => {
-    return pendingWithdrawals.reduce(
-      (result, item) => {
-        result.totalAmount += Number(item.amount || 0);
-        if (item.raw?.ownerType === "AFFILIATE") {
-          result.affiliateCount += 1;
-        }
-        if (item.raw?.ownerType === "SELLER") {
-          result.sellerCount += 1;
-        }
-        return result;
-      },
-      { totalAmount: 0, affiliateCount: 0, sellerCount: 0 },
-    );
-  }, [pendingWithdrawals]);
+  const baseColumns = [
+    { key: "id", title: "Yêu cầu" },
+    {
+      key: "owner_type",
+      title: "Loại ví",
+      render: (row) => formatOwnerType(row.raw?.ownerType),
+    },
+    { key: "amount", title: "Số tiền", render: (row) => <MoneyText value={row.amount} /> },
+    {
+      key: "receiver",
+      title: "Tài khoản nhận",
+      render: (row) => buildReceiverLabel(row),
+    },
+    { key: "requested_at", title: "Ngày gửi", render: (row) => formatDateTime(row.requested_at) },
+    { key: "status", title: "Trạng thái", render: (row) => <StatusBadge status={row.status} /> },
+  ];
+
+  const pendingColumns = [
+    ...baseColumns,
+    {
+      key: "actions",
+      title: "Thao tác",
+      render: (row) => (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            loading={actionId === row.id}
+            disabled={Boolean(actionId)}
+            onClick={() => handleReview(row.id, "APPROVED")}
+          >
+            Duyệt
+          </Button>
+          <Button
+            size="sm"
+            variant="danger"
+            disabled={Boolean(actionId)}
+            onClick={() => handleReview(row.id, "REJECTED")}
+          >
+            Từ chối
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
   const approvedColumns = [
     ...baseColumns,
@@ -228,87 +346,102 @@ function AdminPendingWithdrawalsPage() {
     },
   ];
 
-  const pendingColumns = [
-    ...baseColumns,
-    {
-      key: "actions",
-      title: "Thao tác",
-      render: (row) => (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            loading={actionId === row.id}
-            disabled={Boolean(actionId)}
-            onClick={() => handleReview(row.id, "APPROVED")}
-          >
-            Duyệt
-          </Button>
-          <Button
-            size="sm"
-            variant="danger"
-            disabled={Boolean(actionId)}
-            onClick={() => handleReview(row.id, "REJECTED")}
-          >
-            Từ chối
-          </Button>
-        </div>
-      ),
-    },
-  ];
-
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Admin"
-        title="Yêu cầu duyệt rút tiền"
-        description="Admin duyệt yêu cầu withdrawal của seller và affiliate. Sau khi duyệt, có thể chuyển tiếp payout qua VNPAY sandbox để hoàn tất chi trả."
-        action={
-          <Link
-            to="/admin/commissions"
-            className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 shadow-sm transition hover:bg-slate-50"
-          >
-            Xem payout batches
-          </Link>
-        }
+        eyebrow="Quản trị chi trả"
+        title="Duyệt rút tiền"
+
+
       />
 
       <div className="grid gap-4 md:grid-cols-4">
-        <AdminStatCard label="Yêu cầu chờ duyệt" value={pendingWithdrawals.length.toLocaleString("vi-VN")} meta="Yêu cầu đang chờ admin review" tone="amber" />
-        <AdminStatCard label="Yêu cầu affiliate" value={pendingSummary.affiliateCount.toLocaleString("vi-VN")} meta="Rút tiền từ ví affiliate" tone="cyan" />
-        <AdminStatCard label="Tổng tiền chờ duyệt" value={formatCompactCurrency(pendingSummary.totalAmount)} tooltip={formatFullCurrency(pendingSummary.totalAmount)} meta={`${pendingSummary.sellerCount.toLocaleString("vi-VN")} yêu cầu từ seller`} tone="emerald" />
-        <AdminStatCard label="Tổng tiền đã duyệt thực tế" value={formatCompactCurrency(approvedSummary.approvedAmount)} tooltip={formatFullCurrency(approvedSummary.approvedAmount)} meta={`${approvedSummary.approvedCount.toLocaleString("vi-VN")} yêu cầu đã duyệt | Affiliate ${approvedSummary.affiliateApprovedCount.toLocaleString("vi-VN")} | Seller ${approvedSummary.sellerApprovedCount.toLocaleString("vi-VN")}`} tone="rose" />
+        <AdminStatCard
+          label="Tổng yêu cầu đang chờ duyệt"
+          value={pendingWithdrawals.length.toLocaleString("vi-VN")}
+
+          tone="amber"
+        />
+        <AdminStatCard
+          label="Tổng tiền đang chờ duyệt"
+          value={formatCompactCurrency(pendingSummary.totalAmount)}
+          tooltip={formatFullCurrency(pendingSummary.totalAmount)}
+
+          tone="cyan"
+        />
+        <AdminStatCard
+          label="Yêu cầu của seller"
+          value={pendingSummary.sellerCount.toLocaleString("vi-VN")}
+
+          tone="rose"
+        />
+        <AdminStatCard
+          label="Yêu cầu của affiliate"
+          value={pendingSummary.affiliateCount.toLocaleString("vi-VN")}
+
+          tone="emerald"
+        />
       </div>
 
-      {loading ? <EmptyState title="Đang tải yêu cầu rút tiền" description="Hệ thống đang lấy dữ liệu withdrawal của admin từ backend." /> : null}
-      {!loading && error ? <EmptyState title="Không tải được yêu cầu rút tiền" description={error} /> : null}
+      {loading ? (
+        <EmptyState
+          title="Đang tải yêu cầu rút tiền"
+          description="Hệ thống đang lấy dữ liệu duyệt rút tiền từ backend."
+        />
+      ) : null}
+
+      {!loading && error ? (
+        <EmptyState title="Không tải được yêu cầu rút tiền" description={error} />
+      ) : null}
+
       {!loading && !error ? (
         <>
           <section className="space-y-4">
             <div className="rounded-[2rem] border border-slate-200 bg-white/95 p-6 shadow-sm">
               <p className="text-xs uppercase tracking-[0.3em] text-sky-700">Chờ duyệt</p>
               <h2 className="mt-2 text-2xl font-semibold text-slate-900">Danh sách chờ duyệt</h2>
-              <p className="mt-3 text-sm leading-7 text-slate-600">Admin có thể duyệt hoặc từ chối ngay trên bảng này.</p>
+              <p className="mt-3 text-sm leading-7 text-slate-600">
+                Admin có thể duyệt hoặc từ chối ngay trên bảng này. Danh sách được sắp theo thời gian gửi mới nhất trước.
+              </p>
             </div>
+
             <DataTable
               columns={pendingColumns}
-              rows={pendingWithdrawals}
+              rows={paginatedPendingWithdrawals}
               emptyTitle="Không có yêu cầu đang chờ duyệt"
-              emptyDescription="Hàng đợi pending hiện đang trống, nhưng bên dưới vẫn hiển thị các yêu cầu đã duyệt."
+              emptyDescription="Hàng đợi chờ duyệt hiện đang trống, nhưng bên dưới vẫn hiển thị các yêu cầu đã duyệt."
             />
+
+            {sortedPendingWithdrawals.length > ROWS_PER_PAGE ? (
+              <Pagination
+                page={currentPendingPage}
+                totalPages={pendingTotalPages}
+                onPageChange={setPendingPage}
+              />
+            ) : null}
           </section>
 
           <section className="space-y-4">
             <div className="rounded-[2rem] border border-slate-200 bg-white/95 p-6 shadow-sm">
               <p className="text-xs uppercase tracking-[0.3em] text-emerald-700">Đã duyệt</p>
               <h2 className="mt-2 text-2xl font-semibold text-slate-900">Danh sách đã duyệt</h2>
-              <p className="mt-3 text-sm leading-7 text-slate-600">Các yêu cầu đã duyệt có thể được tạo payout batch và chuyển sang VNPAY sandbox để xác nhận chi trả thật.</p>
+
             </div>
+
             <DataTable
               columns={approvedColumns}
-              rows={approvedWithdrawals}
+              rows={paginatedApprovedWithdrawals}
               emptyTitle="Chưa có yêu cầu đã duyệt"
-              emptyDescription="Khi admin duyệt request rút tiền, danh sách này sẽ hiện ngay tại đây."
+              emptyDescription="Khi admin duyệt yêu cầu rút tiền, danh sách này sẽ hiển thị ngay tại đây."
             />
+
+            {sortedApprovedWithdrawals.length > ROWS_PER_PAGE ? (
+              <Pagination
+                page={currentApprovedPage}
+                totalPages={approvedTotalPages}
+                onPageChange={setApprovedPage}
+              />
+            ) : null}
           </section>
         </>
       ) : null}

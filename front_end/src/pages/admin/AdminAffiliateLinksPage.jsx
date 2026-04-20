@@ -1,16 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { getAdminAffiliateLinks, revokeAdminAffiliateLink, unrevokeAdminAffiliateLink } from "../../api/adminApi";
+import {
+  getAdminAffiliateLinks,
+  revokeAdminAffiliateLink,
+  unrevokeAdminAffiliateLink,
+} from "../../api/adminApi";
 import FilterBar from "../../components/admin/FilterBar";
 import LoadingSkeleton from "../../components/admin/LoadingSkeleton";
 import Button from "../../components/common/Button";
 import DataTable from "../../components/common/DataTable";
 import EmptyState from "../../components/common/EmptyState";
 import PageHeader from "../../components/common/PageHeader";
+import Pagination from "../../components/common/Pagination";
 import StatusBadge from "../../components/common/StatusBadge";
 import { useToast } from "../../hooks/useToast";
 import { mapAdminAffiliateLinkDto } from "../../lib/adminMappers";
 import { formatDateTime } from "../../lib/format";
+
+const LINKS_PER_PAGE = 8;
 
 function AdminAffiliateLinksPage() {
   const toast = useToast();
@@ -22,6 +29,7 @@ function AdminAffiliateLinksPage() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [selectedLinkId, setSelectedLinkId] = useState(null);
   const [submittingId, setSubmittingId] = useState("");
+  const [page, setPage] = useState(1);
   const requestedLinkId = searchParams.get("linkId");
 
   useEffect(() => {
@@ -35,13 +43,15 @@ function AdminAffiliateLinksPage() {
         if (active) {
           const mapped = (response || []).map(mapAdminAffiliateLinkDto);
           const initialLink =
-            (requestedLinkId && mapped.find((item) => String(item.id) === String(requestedLinkId))) || mapped[0] || null;
+            (requestedLinkId && mapped.find((item) => String(item.id) === String(requestedLinkId))) ||
+            mapped[0] ||
+            null;
           setLinks(mapped);
           setSelectedLinkId(initialLink ? String(initialLink.id) : null);
         }
       } catch (loadError) {
         if (active) {
-          setError(loadError.response?.data?.message || "Khong tai duoc danh sach affiliate link.");
+          setError(loadError.response?.data?.message || "Không tải được danh sách link affiliate.");
         }
       } finally {
         if (active) {
@@ -56,18 +66,20 @@ function AdminAffiliateLinksPage() {
     };
   }, [requestedLinkId]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter]);
+
   const filteredLinks = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
+
     return links.filter((link) => {
       const matchesSearch =
         !normalizedSearch ||
-        [
-          link.shortCode,
-          link.affiliateName,
-          link.affiliateEmail,
-          link.productName,
-          link.shopName,
-        ].join(" ").toLowerCase().includes(normalizedSearch);
+        [link.shortCode, link.affiliateName, link.affiliateEmail, link.productName, link.shopName]
+          .join(" ")
+          .toLowerCase()
+          .includes(normalizedSearch);
       const matchesStatus = statusFilter === "ALL" || link.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
@@ -95,6 +107,13 @@ function AdminAffiliateLinksPage() {
     }
   }, [links, requestedLinkId]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredLinks.length / LINKS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedLinks = useMemo(() => {
+    const startIndex = (currentPage - 1) * LINKS_PER_PAGE;
+    return filteredLinks.slice(startIndex, startIndex + LINKS_PER_PAGE);
+  }, [currentPage, filteredLinks]);
+
   const selectedLink = useMemo(
     () => filteredLinks.find((item) => String(item.id) === String(selectedLinkId)) || filteredLinks[0] || null,
     [filteredLinks, selectedLinkId],
@@ -104,14 +123,12 @@ function AdminAffiliateLinksPage() {
     return filteredLinks.reduce(
       (result, link) => {
         result.total += 1;
-        result.clicks += link.clickCount;
-        result.orders += link.orderCount;
         if (link.status === "REVOKED") {
           result.revoked += 1;
         }
         return result;
       },
-      { total: 0, clicks: 0, orders: 0, revoked: 0 },
+      { total: 0, revoked: 0 },
     );
   }, [filteredLinks]);
 
@@ -126,13 +143,14 @@ function AdminAffiliateLinksPage() {
 
   async function handleRevokeLink(link) {
     if (link.status === "REVOKED") {
-      toast.error("Link nay da bi vo hieu hoa.");
+      toast.error("Link này đã bị vô hiệu hóa.");
       return;
     }
 
     const shouldRevoke = window.confirm(
-      `Admin se vo hieu hoa link ${link.shortCode}. Sau khi khoa, affiliate se khong dung duoc link nay va khong tu mo lai neu link bi admin khoa.`,
+      `Admin sẽ vô hiệu hóa link ${link.shortCode}. Sau khi khóa, affiliate sẽ không dùng được link này và không tự mở lại nếu link bị admin khóa.`,
     );
+
     if (!shouldRevoke) {
       return;
     }
@@ -143,9 +161,9 @@ function AdminAffiliateLinksPage() {
       const mapped = mapAdminAffiliateLinkDto(revoked);
       setLinks((current) => current.map((item) => (String(item.id) === String(link.id) ? mapped : item)));
       syncSelectedLink(link.id);
-      toast.success("Da khoa affiliate link.");
+      toast.success("Đã khóa link affiliate.");
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong khoa duoc affiliate link.");
+      toast.error(submitError.response?.data?.message || "Không khóa được link affiliate.");
     } finally {
       setSubmittingId("");
     }
@@ -153,13 +171,14 @@ function AdminAffiliateLinksPage() {
 
   async function handleUnrevokeLink(link) {
     if (link.status !== "REVOKED") {
-      toast.error("Link nay dang hoat dong.");
+      toast.error("Link này đang hoạt động.");
       return;
     }
 
     const shouldUnrevoke = window.confirm(
-      `Admin se mo khoa link ${link.shortCode}. Sau khi mo khoa, link se co hieu luc tro lai va tiep tuc ghi nhan click moi.`,
+      `Admin sẽ mở khóa link ${link.shortCode}. Sau khi mở khóa, link sẽ có hiệu lực trở lại và tiếp tục ghi nhận click mới.`,
     );
+
     if (!shouldUnrevoke) {
       return;
     }
@@ -170,9 +189,9 @@ function AdminAffiliateLinksPage() {
       const mapped = mapAdminAffiliateLinkDto(restored);
       setLinks((current) => current.map((item) => (String(item.id) === String(link.id) ? mapped : item)));
       syncSelectedLink(link.id);
-      toast.success("Da mo khoa affiliate link.");
+      toast.success("Đã mở khóa link affiliate.");
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong mo khoa duoc affiliate link.");
+      toast.error(submitError.response?.data?.message || "Không mở khóa được link affiliate.");
     } finally {
       setSubmittingId("");
     }
@@ -183,138 +202,158 @@ function AdminAffiliateLinksPage() {
   }
 
   if (error) {
-    return <EmptyState title="Khong tai duoc affiliate link" description={error} />;
+    return <EmptyState title="Không tải được link affiliate" description={error} />;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Affiliate links"
-        title="Quan ly link cua affiliate"
+        eyebrow="Link affiliate"
+        title="Link của affiliate"
         description={
           requestedLinkId
-            ? "Trang nay dang mo truc tiep tu canh bao fraud alert. Admin co the xem dung link dang bi canh bao va khoa ngay tai day."
-            : "Admin co the xem link tiep thi cua tung tai khoan affiliate va khoa link bat ky. Link bi admin khoa se vo hieu hoa va affiliate khong tu mo lai duoc."
+            ? "Trang này đang mở trực tiếp từ cảnh báo gian lận. Admin có thể xem đúng link đang bị cảnh báo và khóa ngay tại đây."
+            : " "
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="Tong link" value={summary.total} hint="Theo bo loc hien tai" />
-        <SummaryCard label="Tong click" value={summary.clicks} hint="Cong tu toan bo link dang loc" />
-        <SummaryCard label="Tong don" value={summary.orders} hint="Cong tu order attribution" />
-        <SummaryCard label="Da khoa" value={summary.revoked} hint="Trang thai REVOKED" />
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
+        <SummaryCard label="Tổng link" value={summary.total} />
+        <SummaryCard label="Đã khóa" value={summary.revoked} />
       </div>
 
       <FilterBar
         searchValue={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Tim theo ma link, affiliate, email, san pham hoac shop"
+        searchPlaceholder="Tìm theo mã link, affiliate, email, sản phẩm hoặc shop"
         filters={[
           {
             key: "status",
-            label: "Trang thai",
+
             value: statusFilter,
             onChange: setStatusFilter,
             options: [
-              { label: "Tat ca", value: "ALL" },
-              { label: "ACTIVE", value: "ACTIVE" },
-              { label: "REVOKED", value: "REVOKED" },
+              { label: "Tất cả", value: "ALL" },
+              { label: "Đang hoạt động", value: "ACTIVE" },
+              { label: "Đã thu hồi", value: "REVOKED" },
             ],
           },
         ]}
       />
 
       <div className="grid gap-6 xl:grid-cols-[1.12fr_0.88fr]">
-        <DataTable
-          columns={[
-            { key: "shortCode", title: "Ma link" },
-            { key: "affiliateName", title: "Affiliate" },
-            { key: "productName", title: "San pham" },
-            { key: "shopName", title: "Shop" },
-            { key: "clickCount", title: "Click" },
-            { key: "orderCount", title: "Don" },
-            { key: "status", title: "Trang thai", render: (row) => <StatusBadge status={row.statusDisplay} /> },
-            {
-              key: "actions",
-              title: "Tac vu",
-              render: (row) => (
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="secondary" onClick={() => syncSelectedLink(row.id)}>
-                    Xem
-                  </Button>
-                  {row.status === "REVOKED" ? (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      loading={submittingId === String(row.id)}
-                      onClick={() => handleUnrevokeLink(row)}
-                    >
-                      Mo khoa
+        <div className="space-y-4">
+          <DataTable
+            columns={[
+              { key: "shortCode", title: "Mã link" },
+              { key: "affiliateName", title: "Affiliate" },
+              { key: "productName", title: "Sản phẩm" },
+              { key: "shopName", title: "Shop" },
+              { key: "clickCount", title: "Click" },
+              { key: "orderCount", title: "Đơn" },
+              {
+                key: "status",
+                title: "Trạng thái",
+                render: (row) => <StatusBadge status={row.statusDisplay} />,
+              },
+              {
+                key: "actions",
+                title: "Tác vụ",
+                render: (row) => (
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="secondary" onClick={() => syncSelectedLink(row.id)}>
+                      Xem
                     </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      loading={submittingId === String(row.id)}
-                      onClick={() => handleRevokeLink(row)}
-                    >
-                      Khoa link
-                    </Button>
-                  )}
-                </div>
-              ),
-            },
-          ]}
-          rows={filteredLinks}
-          keyField="id"
-          emptyTitle="Khong co affiliate link"
-          emptyDescription="Khong co affiliate link nao khop voi bo loc hien tai."
-        />
+                    {row.status === "REVOKED" ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        loading={submittingId === String(row.id)}
+                        onClick={() => handleUnrevokeLink(row)}
+                      >
+                        Mở khóa
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        loading={submittingId === String(row.id)}
+                        onClick={() => handleRevokeLink(row)}
+                      >
+                        Khóa link
+                      </Button>
+                    )}
+                  </div>
+                ),
+              },
+            ]}
+            rows={paginatedLinks}
+            keyField="id"
+            emptyTitle="Không có link affiliate"
+            emptyDescription="Không có link affiliate nào khớp với bộ lọc hiện tại."
+          />
+
+          {filteredLinks.length > LINKS_PER_PAGE ? (
+            <Pagination page={currentPage} totalPages={totalPages} onPageChange={setPage} />
+          ) : null}
+        </div>
 
         <div className="space-y-6">
           {selectedLink ? (
             <>
               <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
                 <div className="aspect-[4/3] overflow-hidden bg-slate-100">
-                  <img src={selectedLink.productImage} alt={selectedLink.productName} className="h-full w-full object-cover" />
+                  <img
+                    src={selectedLink.productImage}
+                    alt={selectedLink.productName}
+                    className="h-full w-full object-cover"
+                  />
                 </div>
+
                 <div className="space-y-4 p-6">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="text-xs uppercase tracking-[0.28em] text-sky-700">Link chi tiet</p>
+                      <p className="text-xs uppercase tracking-[0.28em] text-sky-700">Chi tiết link</p>
                       <h3 className="mt-2 text-xl font-semibold text-slate-900">{selectedLink.shortCode}</h3>
                     </div>
                     <StatusBadge status={selectedLink.statusDisplay} />
                   </div>
+
                   <div className="space-y-2 text-sm text-slate-600">
                     <p>Affiliate: {selectedLink.affiliateName}</p>
                     <p>Email: {selectedLink.affiliateEmail}</p>
-                    <p>San pham: {selectedLink.productName}</p>
+                    <p>Sản phẩm: {selectedLink.productName}</p>
                     <p>Shop: {selectedLink.shopName}</p>
-                    <p>Click: {selectedLink.clickCount} | Don: {selectedLink.orderCount}</p>
-                    <p>Hoa hong: {selectedLink.commissionValue}%</p>
-                    <p>Ton kho hien tai: {selectedLink.stock}</p>
-                    <p>Ngay tao: {formatDateTime(selectedLink.createdAt)}</p>
-                    {selectedLink.revokedAt ? <p>Ngay khoa: {formatDateTime(selectedLink.revokedAt)}</p> : null}
-                    {selectedLink.status === "REVOKED" ? <p>Khoa boi: {selectedLink.revokedByLabel}</p> : null}
+                    <p>
+                      Click: {selectedLink.clickCount} | Đơn: {selectedLink.orderCount}
+                    </p>
+                    <p>Hoa hồng: {selectedLink.commissionValue}%</p>
+                    <p>Tồn kho hiện tại: {selectedLink.stock}</p>
+                    <p>Ngày tạo: {formatDateTime(selectedLink.createdAt)}</p>
+                    {selectedLink.revokedAt ? <p>Ngày khóa: {formatDateTime(selectedLink.revokedAt)}</p> : null}
+                    {selectedLink.status === "REVOKED" ? <p>Khóa bởi: {selectedLink.revokedByLabel}</p> : null}
                   </div>
+
                   {requestedLinkId && String(selectedLink.id) === String(requestedLinkId) ? (
                     <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-800">
-                      Link nay duoc mo truc tiep tu canh bao fraud alert de admin co the review va khoa ngay.
+                      Link này được mở trực tiếp từ cảnh báo gian lận để admin có thể review và khóa ngay.
                     </div>
                   ) : null}
+
                   {selectedLink.status === "REVOKED" ? (
                     <div className="rounded-[1.5rem] bg-rose-50 p-4 text-sm leading-7 text-rose-700">
-                      Link nay da bi vo hieu hoa. Khi admin khoa link, affiliate se khong the tu tao lai de mo lai link nay.
+                      Link này đã bị vô hiệu hóa. Khi admin khóa link, affiliate sẽ không thể tự tạo lại để mở lại
+                      link này.
                     </div>
                   ) : null}
+
                   {selectedLink.status === "REVOKED" ? (
                     <Button
                       variant="secondary"
                       loading={submittingId === String(selectedLink.id)}
                       onClick={() => handleUnrevokeLink(selectedLink)}
                     >
-                      Mo khoa link nay
+                      Mở khóa link này
                     </Button>
                   ) : (
                     <Button
@@ -322,19 +361,22 @@ function AdminAffiliateLinksPage() {
                       loading={submittingId === String(selectedLink.id)}
                       onClick={() => handleRevokeLink(selectedLink)}
                     >
-                      Khoa link nay
+                      Khóa link này
                     </Button>
                   )}
                 </div>
               </div>
 
               <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-                <h3 className="text-xl font-semibold text-slate-900">Nguyen tac quyen</h3>
+                <h3 className="text-xl font-semibold text-slate-900">Nguyên tắc quyền</h3>
                 <div className="mt-4 space-y-3 text-sm leading-7 text-slate-600">
-                  <p>Affiliate co the tu khoa link cua minh, va link se vo hieu hoa ngay.</p>
-                  <p>Admin co the khoa link cua bat ky affiliate nao trong he thong.</p>
-                  <p>Admin cung co the mo khoa lai link da bi khoa de khoi phuc hieu luc tiep thi.</p>
-                  <p>Neu admin da khoa link, affiliate khong duoc phep mo lai bang thao tac tao link moi. Quyen admin cao hon affiliate.</p>
+                  <p>Affiliate có thể tự khóa link của mình, và link sẽ vô hiệu hóa ngay.</p>
+                  <p>Admin có thể khóa link của bất kỳ affiliate nào trong hệ thống.</p>
+                  <p>Admin cũng có thể mở khóa lại link đã bị khóa để khôi phục hiệu lực tiếp thị.</p>
+                  <p>
+                    Nếu admin đã khóa link, affiliate không được phép mở lại bằng thao tác tạo link mới. Quyền admin
+                    cao hơn affiliate.
+                  </p>
                 </div>
               </div>
             </>
