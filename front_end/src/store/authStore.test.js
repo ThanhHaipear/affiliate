@@ -52,6 +52,27 @@ describe("authStore", () => {
     expect(useAuthStore.getState().activeDashboardRole).toBe("customer");
   });
 
+  it("prioritizes customer dashboard on login when customer capability is available", () => {
+    useAuthStore.getState().login({
+      accessToken: "access-1",
+      refreshToken: "refresh-1",
+      currentUser: {
+        id: "user-1",
+        email: "hybrid@example.com",
+        phone: "0909",
+        status: "ACTIVE",
+        roles: ["affiliate", "customer"],
+        profile: {
+          hasCustomerCapability: true,
+          hasAffiliateCapability: true,
+        },
+      },
+      roles: ["affiliate", "customer"],
+    });
+
+    expect(useAuthStore.getState().activeDashboardRole).toBe("customer");
+  });
+
   it("logout clears auth state", () => {
     useAuthStore.setState({
       accessToken: "access-1",

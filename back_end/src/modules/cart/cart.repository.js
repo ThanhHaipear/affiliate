@@ -112,6 +112,29 @@ function buildCartItemIdentityWhere(cartId, variantId, attribution) {
   };
 }
 
+function getInventoryAvailableStock(inventory = null) {
+  if (!inventory) {
+    return 0;
+  }
+
+  return Math.max(0, Number(inventory.quantity || 0) - Number(inventory.reservedQuantity || 0));
+}
+
+async function getCartVariantQuantity(tx, cartId, variantId, excludeItemId = null) {
+  const items = await tx.cartItem.findMany({
+    where: {
+      cartId,
+      variantId,
+      ...(excludeItemId ? { id: { not: BigInt(excludeItemId) } } : {}),
+    },
+    select: {
+      quantity: true,
+    },
+  });
+
+  return items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+}
+
 exports.getCart = async (accountId) => {
   let cart = await prisma.cart.findFirst({
     where: { accountId },
@@ -119,7 +142,15 @@ exports.getCart = async (accountId) => {
       items: {
         orderBy: { createdAt: "desc" },
         include: {
-          product: true,
+          product: {
+            include: {
+              images: {
+                orderBy: { sortOrder: "asc" },
+              },
+              seller: true,
+              affiliateSetting: true,
+            },
+          },
           variant: { include: { inventory: true } },
           affiliateLink: true,
           attributionSession: true,
@@ -170,9 +201,17 @@ exports.addItem = async (accountId, payload) =>
       throw new Error("Quantity must be greater than 0");
     }
 
+    const availableStock = getInventoryAvailableStock(variant.inventory);
+    const currentVariantQuantityInCart = await getCartVariantQuantity(tx, cart.id, payload.variantId);
+    const nextVariantQuantityInCart = currentVariantQuantityInCart + Number(payload.quantity || 0);
+
+    if (nextVariantQuantityInCart > availableStock) {
+      throw new Error(`Only ${availableStock} items are available in stock`);
+    }
+
     const nextQuantity = (existing?.quantity || 0) + payload.quantity;
-    if (Number(variant.inventory.quantity) < nextQuantity) {
-      throw new Error(`Only ${Number(variant.inventory.quantity)} items are available in stock`);
+    if (nextQuantity > availableStock) {
+      throw new Error(`Only ${availableStock} items are available in stock`);
     }
 
     if (existing) {
@@ -213,9 +252,12 @@ exports.updateItemQuantity = async (accountId, itemId, quantity) =>
     if (!item) throw new Error("Cart item not found");
     if (quantity < 1) throw new Error("Quantity must be greater than 0");
 
-    const totalStock = Number(item.variant.inventory?.quantity || 0);
-    if (totalStock < quantity) {
-      throw new Error(`Only ${totalStock} items are available in stock`);
+    const availableStock = getInventoryAvailableStock(item.variant.inventory);
+    const otherVariantQuantityInCart = await getCartVariantQuantity(tx, cart.id, item.variantId, item.id);
+    const nextVariantQuantityInCart = otherVariantQuantityInCart + Number(quantity || 0);
+
+    if (nextVariantQuantityInCart > availableStock) {
+      throw new Error(`Only ${availableStock} items are available in stock`);
     }
 
     return tx.cartItem.update({

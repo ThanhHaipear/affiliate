@@ -34,10 +34,7 @@ function OrderDetailPage() {
       try {
         setLoading(true);
         setError("");
-        const [orderResponse, ordersResponse] = await Promise.all([
-          getCustomerOrderDetail(orderId),
-          getCustomerOrders(),
-        ]);
+        const [orderResponse, ordersResponse] = await Promise.all([getCustomerOrderDetail(orderId), getCustomerOrders()]);
         if (!active) {
           return;
         }
@@ -46,7 +43,7 @@ function OrderDetailPage() {
         setAllOrders((ordersResponse || []).map(mapOrderDto));
       } catch (loadError) {
         if (active) {
-          setError(loadError.response?.data?.message || "Khong tai duoc chi tiet don hang.");
+          setError(loadError.response?.data?.message || "Không tải được chi tiết đơn hàng.");
         }
       } finally {
         if (active) {
@@ -73,11 +70,11 @@ function OrderDetailPage() {
   const groupedTotalAmount = groupedOrders.reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
   if (loading) {
-    return <EmptyState title="Dang tai chi tiet don" description="He thong dang doc don hang tu database." />;
+    return <EmptyState title="Đang tải chi tiết đơn" description="Hệ thống đang đọc đơn hàng từ database." />;
   }
 
   if (error || !order) {
-    return <EmptyState title="Khong tim thay don hang" description={error || "Don hang khong ton tai."} />;
+    return <EmptyState title="Không tìm thấy đơn hàng" description={error || "Đơn hàng không tồn tại."} />;
   }
 
   function openReviewModal(item) {
@@ -89,7 +86,7 @@ function OrderDetailPage() {
       hasPurchased: true,
       hasReviewed: Boolean(item?.hasReviewed),
       canReview: !item?.hasReviewed,
-      reason: item?.hasReviewed ? "San pham nay trong don da duoc danh gia roi." : null,
+      reason: item?.hasReviewed ? "Sản phẩm này trong đơn đã được đánh giá rồi." : null,
     });
   }
 
@@ -128,13 +125,13 @@ function OrderDetailPage() {
         hasPurchased: true,
         hasReviewed: true,
         canReview: false,
-        reason: "San pham nay trong don da duoc danh gia roi.",
+        reason: "Sản phẩm này trong đơn đã được đánh giá rồi.",
       });
       setReviewComment("");
       setReviewRating("5");
-      toast.success("Da gui danh gia san pham.");
+      toast.success("Đã gửi đánh giá sản phẩm.");
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong gui duoc danh gia.");
+      toast.error(submitError.response?.data?.message || "Không gửi được đánh giá.");
     } finally {
       setReviewSubmitting(false);
     }
@@ -143,15 +140,15 @@ function OrderDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Khach hang"
-        title={`Chi tiet don ${order.code}`}
-        description="Xem thong tin seller-order nay. Cac thao tac cap cum nhu thanh toan, doi phuong thuc thanh toan, huy va hoan tien duoc thuc hien tai trang Don hang cua toi."
+        eyebrow="Khách hàng"
+        title={`Chi tiết đơn ${order.code}`}
+
         action={
           <div className="flex gap-3">
             <Link to="/products">
-              <Button variant="secondary">Mua lai</Button>
+              <Button variant="secondary">Mua lại</Button>
             </Link>
-            <Button variant="outline">Lien he ho tro</Button>
+            <Button variant="outline">Liên hệ hỗ trợ</Button>
           </div>
         }
       />
@@ -164,47 +161,55 @@ function OrderDetailPage() {
               {latestRefundRequest ? <StatusBadge status={latestRefundRequest.status} /> : null}
             </div>
             <div className="mt-5 grid gap-4 md:grid-cols-2">
-              <InfoRow label="Ma cum checkout" value={order.code} />
-              <InfoRow label="Tong tien ca cum" value={<MoneyText value={groupedTotalAmount} className="font-semibold text-slate-900" />} />
-              <InfoRow label="Ngay dat" value={formatDateTime(order.created_at)} />
-              <InfoRow label="Tong thanh toan" value={<MoneyText value={order.amount} className="font-semibold text-slate-900" />} />
-              <InfoRow label="Nguoi nhan" value={order.raw?.shippingRecipientName || order.raw?.buyerName || "--"} />
-              <InfoRow label="So dien thoai" value={order.raw?.shippingPhone || order.raw?.buyerPhone || "--"} />
-              <InfoRow label="Email" value={order.raw?.buyerEmail || "--"} />
-              <InfoRow label="Phuong thuc thanh toan" value={payment?.method || "--"} />
-              <InfoRow label="Phuong thuc giao hang" value={order.raw?.shippingMethod || "--"} />
+              <InfoRow label="Mã cụm checkout" value={order.code} />
               <InfoRow
-                label="Dia chi giao hang"
-                value={[
-                  order.raw?.shippingDetail,
-                  order.raw?.shippingWard,
-                  order.raw?.shippingDistrict,
-                  order.raw?.shippingProvince,
-                ]
-                  .filter(Boolean)
-                  .join(", ") || "--"}
+                label="Tổng tiền cả cụm"
+                value={<MoneyText value={groupedTotalAmount} className="font-semibold text-slate-900" />}
+              />
+              <InfoRow label="Ngày đặt" value={formatDateTime(order.created_at)} />
+              <InfoRow
+                label="Tổng thanh toán"
+                value={<MoneyText value={order.amount} className="font-semibold text-slate-900" />}
+              />
+              <InfoRow label="Người nhận" value={order.raw?.shippingRecipientName || order.raw?.buyerName || "--"} />
+              <InfoRow label="Số điện thoại" value={order.raw?.shippingPhone || order.raw?.buyerPhone || "--"} />
+              <InfoRow label="Email" value={order.raw?.buyerEmail || "--"} />
+              <InfoRow label="Phương thức thanh toán" value={payment?.method || "--"} />
+              <InfoRow label="Phương thức giao hàng" value={order.raw?.shippingMethod || "--"} />
+              <InfoRow
+                label="Địa chỉ giao hàng"
+                value={
+                  [
+                    order.raw?.shippingDetail,
+                    order.raw?.shippingWard,
+                    order.raw?.shippingDistrict,
+                    order.raw?.shippingProvince,
+                  ]
+                    .filter(Boolean)
+                    .join(", ") || "--"
+                }
               />
             </div>
           </div>
           {latestRefundRequest ? (
             <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="text-xl font-semibold text-slate-900">Yeu cau huy/hoan tien</h3>
+              <h3 className="text-xl font-semibold text-slate-900">Yêu cầu hủy/hoàn tiền</h3>
               <p className="mt-4 text-sm leading-7 text-slate-600">
-                Trang thai: <span className="font-semibold text-slate-900">{latestRefundRequest.status}</span>
+                Trạng thái: <span className="font-semibold text-slate-900">{latestRefundRequest.status}</span>
               </p>
-              <p className="mt-2 text-sm leading-7 text-slate-600">
-                Ly do: {latestRefundRequest.reason || "--"}
-              </p>
+              <p className="mt-2 text-sm leading-7 text-slate-600">Lý do: {latestRefundRequest.reason || "--"}</p>
             </div>
           ) : null}
           <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 className="text-xl font-semibold text-slate-900">Cac seller-order trong cum</h3>
+            <h3 className="text-xl font-semibold text-slate-900">Các seller-order trong cụm</h3>
             <div className="mt-5 space-y-3">
               {groupedOrders.map((item) => (
                 <div key={item.id} className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
                   <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">{item.raw?.seller?.shopName || `Shop #${item.seller_id || item.id}`}</p>
+                      <p className="text-sm font-semibold text-slate-900">
+                        {item.raw?.seller?.shopName || `Shop #${item.seller_id || item.id}`}
+                      </p>
                       <p className="mt-1 text-sm text-slate-500">Seller-order #{item.id}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -212,7 +217,7 @@ function OrderDetailPage() {
                       <StatusBadge status={item.payment_status} />
                       <Link to={`/dashboard/customer/orders/${item.id}`}>
                         <Button size="sm" variant={String(item.id) === String(order.id) ? "primary" : "secondary"}>
-                          {String(item.id) === String(order.id) ? "Dang xem" : "Mo seller-order"}
+                          {String(item.id) === String(order.id) ? "Đang xem" : "Mở seller-order"}
                         </Button>
                       </Link>
                     </div>
@@ -222,21 +227,21 @@ function OrderDetailPage() {
             </div>
           </div>
           <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 className="text-xl font-semibold text-slate-900">San pham trong don</h3>
+            <h3 className="text-xl font-semibold text-slate-900">Sản phẩm trong đơn</h3>
             <div className="mt-5 space-y-4">
               {displayItems.map((item) => (
                 <div key={item.groupKey} className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <p className="font-semibold text-slate-900">{item.productName}</p>
-                      <p className="mt-1 text-sm text-slate-500">So luong: {item.quantity}</p>
-                      {item.variantLabel ? <p className="mt-1 text-sm text-slate-500">Phan loai: {item.variantLabel}</p> : null}
+                      <p className="mt-1 text-sm text-slate-500">Số lượng: {item.quantity}</p>
+                      {item.variantLabel ? <p className="mt-1 text-sm text-slate-500">Phân loại: {item.variantLabel}</p> : null}
                     </div>
                     <div className="flex flex-col items-end gap-2">
                       <MoneyText value={item.lineTotal || 0} className="font-semibold text-slate-900" />
                       {order.order_status === "COMPLETED" ? (
                         <Button size="sm" onClick={() => openReviewModal(item)}>
-                          {item.hasReviewed ? "Da danh gia" : "Danh gia"}
+                          {item.hasReviewed ? "Đã đánh giá" : "Đánh giá"}
                         </Button>
                       ) : null}
                     </div>
@@ -254,23 +259,23 @@ function OrderDetailPage() {
             }}
           />
           <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 className="text-xl font-semibold text-slate-900">Ghi chu giao hang</h3>
+            <h3 className="text-xl font-semibold text-slate-900">Ghi chú giao hàng</h3>
             <p className="mt-4 text-sm leading-7 text-slate-600">
-              Don hang da luu snapshot dia chi giao hang tai thoi diem dat mua, nen ban van xem lai duoc ngay ca khi thay doi so dia chi sau nay.
+              Đơn hàng đã lưu snapshot địa chỉ giao hàng tại thời điểm đặt mua, nên bạn vẫn xem lại được ngay cả khi thay đổi sổ địa chỉ sau này.
             </p>
           </div>
         </div>
       </div>
       <Modal
         open={reviewModalOpen}
-        title={reviewItem ? `Danh gia ${reviewItem.productName || `San pham #${reviewItem.productId}`}` : "Danh gia san pham"}
-        description="Moi san pham trong mot don hoan tat chi duoc danh gia mot lan."
+        title={reviewItem ? `Đánh giá ${reviewItem.productName || `Sản phẩm #${reviewItem.productId}`}` : "Đánh giá sản phẩm"}
+        description="Mỗi sản phẩm trong một đơn hoàn tất chỉ được đánh giá một lần."
         onClose={closeReviewModal}
         footer={
           reviewEligibility?.canReview ? (
             <div className="flex justify-end">
               <Button onClick={handleSubmitReview} loading={reviewSubmitting}>
-                Gui danh gia
+                Gửi đánh giá
               </Button>
             </div>
           ) : null
@@ -294,12 +299,12 @@ function OrderDetailPage() {
               onChange={(event) => setReviewComment(event.target.value)}
               rows={4}
               className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none"
-              placeholder="Chia se cam nhan cua ban ve san pham"
+              placeholder="Chia sẻ cảm nhận của bạn về sản phẩm"
             />
           </div>
         ) : (
           <div className="rounded-[1.5rem] bg-slate-800/80 p-4 text-sm leading-7 text-slate-300">
-            {reviewEligibility?.reason || "San pham nay hien chua the danh gia."}
+            {reviewEligibility?.reason || "Sản phẩm này hiện chưa thể đánh giá."}
           </div>
         )}
       </Modal>

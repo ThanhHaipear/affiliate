@@ -4,6 +4,7 @@ import Button from "../common/Button";
 import Input from "../common/Input";
 import { useAuth } from "../../hooks/useAuth";
 import { getInitials } from "../../lib/utils";
+import { resolveDashboardRole } from "../../store/authStore";
 
 const navItems = [
   { label: "Trang ch\u1ee7", to: "/" },
@@ -14,8 +15,8 @@ const navItems = [
   { label: "Li\u00ean h\u1ec7", to: "/contact" },
 ];
 
-function resolveAccountTarget(roles = [], activeDashboardRole = null) {
-  const preferredRole = activeDashboardRole && roles.includes(activeDashboardRole) ? activeDashboardRole : roles[0] || null;
+function resolveAccountTarget(currentUser = null, roles = [], activeDashboardRole = null) {
+  const preferredRole = resolveDashboardRole(currentUser, roles, activeDashboardRole);
 
   if (preferredRole === "admin") {
     return "/admin/dashboard";
@@ -39,8 +40,8 @@ function StorefrontHeader() {
   const [keyword, setKeyword] = useState("");
 
   const accountTarget = useMemo(
-    () => resolveAccountTarget(roles, activeDashboardRole),
-    [roles, activeDashboardRole],
+    () => resolveAccountTarget(currentUser, roles, activeDashboardRole),
+    [currentUser, roles, activeDashboardRole],
   );
 
   function handleSearchSubmit(event) {

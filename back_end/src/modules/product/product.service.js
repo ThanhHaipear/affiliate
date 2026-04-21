@@ -17,16 +17,17 @@ const ensureApprovedSeller = (seller) => {
 exports.listProducts = () => productRepository.listApprovedProducts();
 exports.listCategories = () => productRepository.listCategories();
 
-exports.getProduct = async (productId) => {
-  const product = await productRepository.findApprovedProductById(Number(productId));
+const resolveApprovedProductOrThrow = async (productIdentifier) => {
+  const product = await productRepository.findApprovedProductByIdentifier(productIdentifier);
   if (!product) throw new AppError("Product not found", 404);
   return product;
 };
 
+exports.getProduct = async (productId) => resolveApprovedProductOrThrow(productId);
+
 exports.listProductReviews = async (productId, viewer = null) => {
-  const product = await productRepository.findApprovedProductById(Number(productId));
-  if (!product) throw new AppError("Product not found", 404);
-  return productRepository.listProductReviews(Number(productId), viewer);
+  const product = await resolveApprovedProductOrThrow(productId);
+  return productRepository.listProductReviews(Number(product.id), viewer);
 };
 
 exports.createProductReview = async (accountId, productId, payload) => {

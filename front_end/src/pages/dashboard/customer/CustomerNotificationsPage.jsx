@@ -1,18 +1,48 @@
-﻿import { useEffect, useState } from "react";
-import { getNotifications, markAllNotificationsAsRead, markNotificationAsRead } from "../../../api/notificationApi";
+import { useEffect, useMemo, useState } from "react";
+import { getNotifications, markNotificationAsRead } from "../../../api/notificationApi";
 import Button from "../../../components/common/Button";
 import EmptyState from "../../../components/common/EmptyState";
 import PageHeader from "../../../components/common/PageHeader";
-import StatusBadge from "../../../components/common/StatusBadge";
+import Pagination from "../../../components/common/Pagination";
 import { useToast } from "../../../hooks/useToast";
 import { formatDateTime } from "../../../lib/format";
 import { mapNotificationDto } from "../../../lib/apiMappers";
+
+const NOTIFICATIONS_PER_PAGE = 8;
+
+function formatNotificationType(type = "") {
+  const labelMap = {
+    GENERAL: "Thông báo hệ thống",
+    ORDER_CREATED: "Đơn hàng mới",
+    ORDER_PAID: "Đơn hàng đã thanh toán",
+    ORDER_REFUND_REQUESTED: "Yêu cầu hoàn tiền",
+    ORDER_REFUND_REJECTED: "Yêu cầu hoàn tiền bị từ chối",
+    PAYMENT_FAILED: "Thanh toán thất bại",
+    PAYMENT_SUCCESS: "Thanh toán thành công",
+    PRODUCT_HIDDEN_BY_ADMIN: "Sản phẩm bị ẩn",
+    PRODUCT_SHOWN_BY_ADMIN: "Sản phẩm được hiển thị lại",
+    WALLET_CREDITED: "Đã cộng ví",
+    PAID_OUT: "Đã chi trả",
+  };
+
+  return labelMap[type] || String(type || "Thông báo").replace(/_/g, " ");
+}
+
+function getNotificationPriority(item) {
+  return item.unread ? 0 : 1;
+}
+
+function getNotificationTimestamp(item) {
+  return new Date(item.created_at || 0).getTime();
+}
 
 function CustomerNotificationsPage() {
   const toast = useToast();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const [markingAll, setMarkingAll] = useState(false);
 
   useEffect(() => {
     loadNotifications();
@@ -41,17 +71,49 @@ function CustomerNotificationsPage() {
   }
 
   async function handleReadAll() {
+    const unreadIds = items.filter((item) => item.unread).map((item) => item.id);
+
+    if (!unreadIds.length) {
+      toast.success("Tất cả thông báo đã ở trạng thái đã đọc.");
+      return;
+    }
+
     try {
-      await markAllNotificationsAsRead({ audience: "customer" });
+      setMarkingAll(true);
+      await Promise.all(unreadIds.map((id) => markNotificationAsRead(id)));
       setItems((current) => current.map((item) => ({ ...item, unread: false })));
-      toast.success("Đã đánh dấu đã đọc toàn bộ thông báo.");
+      toast.success("Đã đánh dấu đã đọc tất cả thông báo.");
     } catch (submitError) {
       toast.error(submitError.response?.data?.message || "Không cập nhật được thông báo.");
+    } finally {
+      setMarkingAll(false);
     }
   }
 
+  const sortedItems = useMemo(() => {
+    return [...items].sort((left, right) => {
+      const priorityDiff = getNotificationPriority(left) - getNotificationPriority(right);
+      if (priorityDiff !== 0) {
+        return priorityDiff;
+      }
+
+      return getNotificationTimestamp(right) - getNotificationTimestamp(left);
+    });
+  }, [items]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [items.length]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedItems.length / NOTIFICATIONS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * NOTIFICATIONS_PER_PAGE;
+    return sortedItems.slice(startIndex, startIndex + NOTIFICATIONS_PER_PAGE);
+  }, [currentPage, sortedItems]);
+
   if (loading) {
-    return <EmptyState title="Đang tải thông báo" description="Hệ thống đang đọc notifications của customer từ database." />;
+    return <EmptyState title="Đang tải thông báo" description="Hệ thống đang đọc thông báo của khách hàng từ database." />;
   }
 
   if (error) {
@@ -59,37 +121,61 @@ function CustomerNotificationsPage() {
   }
 
   if (!items.length) {
-    return <EmptyState title="Chưa có thông báo" description="Thông báo đơn hàng và ưu đãi cho customer sẽ xuất hiện tại đây." />;
+    return <EmptyState title="Chưa có thông báo" description="Thông báo đơn hàng và cập nhật thanh toán sẽ xuất hiện tại đây." />;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Khách hàng"
-        title="Thông báo customer"
-        description="Theo dõi cập nhật đơn hàng, thanh toán và những thay đổi quan trọng liên quan đến tài khoản mua hàng của bạn."
-        action={<Button variant="secondary" onClick={handleReadAll}>Đánh dấu đã đọc tất cả</Button>}
+        title="Thông báo"
+
+        action={
+          <Button variant="secondary" onClick={handleReadAll} disabled={markingAll}>
+            {markingAll ? "Đang cập nhật..." : "Đánh dấu đã đọc tất cả"}
+          </Button>
+        }
       />
+
       <div className="space-y-4">
-        {items.map((item) => (
-          <div key={item.id} className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-3">
-                  <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-800">{item.type}</span>
-                  {item.unread ? <StatusBadge status="PENDING" /> : <StatusBadge status="APPROVED" />}
+        {paginatedItems.map((item) => (
+          <div
+            key={item.id}
+            className={`rounded-[2rem] border bg-white p-5 shadow-sm transition ${item.unread ? "border-amber-200 shadow-amber-100/60" : "border-slate-200"
+              }`}
+          >
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="max-w-3xl">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${item.unread ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"
+                      }`}
+                  >
+                    {item.unread ? "Chưa đọc" : "Đã đọc"}
+                  </span>
+                  <span className="text-xs uppercase tracking-[0.22em] text-slate-400">
+                    {formatNotificationType(item.type)}
+                  </span>
                 </div>
                 <h3 className="mt-3 text-lg font-semibold text-slate-900">{item.title}</h3>
                 <p className="mt-2 text-sm leading-7 text-slate-600">{item.description}</p>
+                <p className="mt-3 text-xs uppercase tracking-[0.22em] text-slate-400">
+                  {formatDateTime(item.created_at)}
+                </p>
               </div>
-              <div className="flex flex-col items-end gap-3">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{formatDateTime(item.created_at)}</p>
-                {item.unread ? <Button variant="secondary" size="sm" onClick={() => handleRead(item.id)}>Đã đọc</Button> : null}
-              </div>
+              {item.unread ? (
+                <Button variant="secondary" size="sm" onClick={() => handleRead(item.id)}>
+                  Đánh dấu đã đọc
+                </Button>
+              ) : null}
             </div>
           </div>
         ))}
       </div>
+
+      {sortedItems.length > NOTIFICATIONS_PER_PAGE ? (
+        <Pagination page={currentPage} totalPages={totalPages} onPageChange={setPage} />
+      ) : null}
     </div>
   );
 }

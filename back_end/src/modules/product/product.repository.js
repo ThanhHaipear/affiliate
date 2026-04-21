@@ -104,10 +104,17 @@ exports.listCategories = () =>
     orderBy: [{ name: "asc" }],
   });
 
-exports.findApprovedProductById = async (id) => {
+exports.findApprovedProductByIdentifier = async (identifier) => {
+  const rawIdentifier = String(identifier ?? "").trim();
+  if (!rawIdentifier) {
+    return null;
+  }
+
+  const numericId = Number(rawIdentifier);
+  const isNumericId = Number.isInteger(numericId) && numericId > 0;
   const product = await prisma.product.findFirst({
     where: {
-      id,
+      ...(isNumericId ? { id: numericId } : { slug: rawIdentifier }),
       status: "APPROVED",
       sellerHiddenAt: null,
       lockedAt: null,
@@ -133,6 +140,8 @@ exports.findApprovedProductById = async (id) => {
   const [enrichedProduct] = await attachCommerceStats([product]);
   return enrichedProduct;
 };
+
+exports.findApprovedProductById = (id) => exports.findApprovedProductByIdentifier(id);
 
 exports.listProductReviews = async (productId, viewer = null) => {
   const [reviews, summary, viewerOrders] = await Promise.all([

@@ -4,7 +4,6 @@ import { getCustomerAddresses } from "../../../api/customerAddressApi";
 import { createCheckoutOrder, createVnpayPaymentUrl, getCart } from "../../../api/orderApi";
 import Button from "../../../components/common/Button";
 import EmptyState from "../../../components/common/EmptyState";
-import Input from "../../../components/common/Input";
 import MoneyText from "../../../components/common/MoneyText";
 import PageHeader from "../../../components/common/PageHeader";
 import Select from "../../../components/common/Select";
@@ -34,7 +33,11 @@ function CheckoutPage() {
   });
 
   const selectedItemIds = useMemo(
-    () => (searchParams.get("items") || "").split(",").map((value) => value.trim()).filter(Boolean),
+    () =>
+      (searchParams.get("items") || "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
     [searchParams],
   );
 
@@ -55,7 +58,7 @@ function CheckoutPage() {
       setAddresses(nextAddresses);
       setSelectedAddressId(defaultAddress ? String(defaultAddress.id) : "");
     } catch (loadError) {
-      setError(loadError.response?.data?.message || "Khong tai duoc du lieu checkout.");
+      setError(loadError.response?.data?.message || "Không tải được dữ liệu thanh toán.");
     } finally {
       setLoading(false);
     }
@@ -75,6 +78,7 @@ function CheckoutPage() {
   }, [cart.items, selectedItemIds]);
 
   const groupedCheckoutItems = useMemo(() => aggregateDisplayCartItems(checkoutItems), [checkoutItems]);
+
   const shopCount = useMemo(
     () => new Set(checkoutItems.map((item) => String(item.product?.seller_id || item.product?.seller_name || ""))).size,
     [checkoutItems],
@@ -89,6 +93,7 @@ function CheckoutPage() {
     () => Number(form.shippingFee || 0) * Math.max(1, shopCount || 0),
     [form.shippingFee, shopCount],
   );
+
   const multiShopCheckout = shopCount > 1;
 
   const total = useMemo(
@@ -107,12 +112,12 @@ function CheckoutPage() {
 
   async function handleSubmit() {
     if (!selectedAddress) {
-      toast.error("Vui long chon dia chi giao hang truoc khi dat don.");
+      toast.error("Vui lòng chọn địa chỉ giao hàng trước khi đặt đơn.");
       return;
     }
 
     if (!checkoutItems.length) {
-      toast.error("Khong co san pham nao duoc chon de thanh toan.");
+      toast.error("Không có sản phẩm nào được chọn để thanh toán.");
       return;
     }
 
@@ -136,14 +141,14 @@ function CheckoutPage() {
         return;
       }
 
-      toast.success(createdOrders.length > 1 ? "Da tao don hang cho tung shop." : "Da tao don hang tu gio hang.");
+      toast.success(createdOrders.length > 1 ? "Đã tạo đơn hàng cho từng shop." : "Đã tạo đơn hàng từ giỏ hàng.");
       if (primaryOrder) {
         navigate(`/dashboard/customer/orders/${primaryOrder.id}`);
       } else {
         navigate("/dashboard/customer/orders");
       }
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || submitError.message || "Khong tao duoc don hang.");
+      toast.error(submitError.response?.data?.message || submitError.message || "Không tạo được đơn hàng.");
     } finally {
       setSubmitting(false);
     }
@@ -151,30 +156,24 @@ function CheckoutPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Khach hang"
-        title="Thanh toan"
-        description="Chon dia chi giao hang, kiem tra san pham da chon va xac nhan phuong thuc thanh toan truoc khi dat don."
-        action={
-          <Button variant="secondary" onClick={() => navigate("/dashboard/customer/address")}>
-            Quan ly dia chi
-          </Button>
-        }
-      />
-      {loading ? <EmptyState title="Dang tai gio hang" description="He thong dang chuan bi du lieu checkout." /> : null}
-      {!loading && error ? <EmptyState title="Khong the thanh toan" description={error} /> : null}
+      <PageHeader eyebrow="Khách hàng" title="Thanh toán" />
+
+      {loading ? <EmptyState title="Đang tải giỏ hàng" description="Hệ thống đang chuẩn bị dữ liệu thanh toán." /> : null}
+      {!loading && error ? <EmptyState title="Không thể thanh toán" description={error} /> : null}
+
       {!loading && !error ? (
         <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
           <div className="space-y-6">
             <StepSection
               index="01"
-              title="Chon dia chi giao hang"
-              description="Ban co the chon mot trong cac dia chi da luu. Dia chi dang chon se duoc dua vao don hang."
+              title="Chọn địa chỉ giao hàng"
+              description="Bạn có thể chọn một trong các địa chỉ đã lưu. Địa chỉ đang chọn sẽ được dùng cho đơn hàng này."
             >
               {addresses.length ? (
                 <div className="grid gap-4">
                   {addresses.map((address) => {
                     const active = String(address.id) === String(selectedAddressId);
+
                     return (
                       <div
                         key={address.id}
@@ -202,12 +201,12 @@ function CheckoutPage() {
                               <div className="flex flex-col items-end gap-2">
                                 {address.isDefault ? (
                                   <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
-                                    Mac dinh
+                                    Mặc định
                                   </span>
                                 ) : null}
                                 {active ? (
                                   <span className="rounded-full bg-sky-600 px-3 py-1 text-xs font-semibold text-white">
-                                    Dang chon
+                                    Đang chọn
                                   </span>
                                 ) : null}
                               </div>
@@ -218,7 +217,7 @@ function CheckoutPage() {
                                 variant={active ? "secondary" : "primary"}
                                 onClick={() => handleSelectAddress(address.id)}
                               >
-                                {active ? "Dia chi dang chon" : "Chon dia chi nay"}
+                                {active ? "Địa chỉ đang chọn" : "Chọn địa chỉ này"}
                               </Button>
                             </div>
                           </div>
@@ -229,119 +228,119 @@ function CheckoutPage() {
                 </div>
               ) : (
                 <EmptyState
-                  title="Chua co dia chi giao hang"
-                  description="Ban can them it nhat mot dia chi truoc khi dat don hang."
-                  action={<Button onClick={() => navigate("/dashboard/customer/address")}>Them dia chi ngay</Button>}
+                  title="Chưa có địa chỉ giao hàng"
+                  description="Bạn cần thêm ít nhất một địa chỉ trước khi đặt đơn hàng."
+                  action={<Button onClick={() => navigate("/dashboard/customer/address")}>Thêm địa chỉ ngay</Button>}
                 />
               )}
             </StepSection>
 
-            <StepSection
-              index="02"
-              title="Lien he va van chuyen"
-              description="Email, hinh thuc giao hang va thanh toan se di cung don hang da chon."
-            >
+            <StepSection index="02" title="Liên hệ và vận chuyển" description="Chọn phương thức giao hàng và thanh toán phù hợp.">
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="md:col-span-2">
-                  <Input label="Email nhận thông báo" name="buyerEmail" value={form.buyerEmail} onChange={handleChange} />
-                </div>
                 <Select
-                  label="Phuong thuc giao hang"
+                  label="Phương thức giao hàng"
                   name="shippingMethod"
                   value={form.shippingMethod}
                   onChange={handleChange}
                   options={SHIPPING_METHOD_OPTIONS}
                 />
                 <Select
-                  label="Phuong thuc thanh toan"
+                  label="Phương thức thanh toán"
                   name="paymentMethod"
                   value={form.paymentMethod}
                   onChange={handleChange}
                   options={[
-                    { label: "VNPAY sandbox", value: "VNPAY" },
-                    { label: "Thanh toan khi nhan hang", value: "COD" },
+                    { label: "VNPAY", value: "VNPAY" },
+                    { label: "Thanh toán khi nhận hàng", value: "COD" },
                   ]}
                 />
               </div>
+
               {multiShopCheckout ? (
                 <div className="mt-4 rounded-[1.5rem] border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-900">
-                  Don nay dang gom san pham tu {shopCount} shop. Phi ship duoc tinh theo tung shop. Neu ban chon VNPAY, he thong se thanh toan mot lan cho toan bo nhom don hang cung ma checkout.
+                  Đơn này đang gồm sản phẩm từ {shopCount} shop. Phí giao hàng sẽ được tính theo từng shop. Nếu bạn chọn
+                  VNPAY, hệ thống sẽ thanh toán một lần cho toàn bộ nhóm đơn hàng cùng mã checkout.
                 </div>
               ) : null}
             </StepSection>
 
             <StepSection
               index="03"
-              title="San pham da chon"
-              description="Chi cac san pham duoc chon o gio hang moi di tiep sang don hang nay."
+              title="Sản phẩm đã chọn"
+              description="Chỉ các sản phẩm được chọn từ giỏ hàng mới xuất hiện trong đơn thanh toán này."
             >
               <div className="space-y-4">
-                {groupedCheckoutItems.map((group) => (
-                  <div key={group.groupKey} className="rounded-[1.5rem] bg-slate-50 p-4">
-                    <div className="flex items-center gap-4">
-                      <img src={group.product.image} alt={group.product.name} className="h-20 w-20 rounded-[1rem] object-cover" />
-                      <div className="flex-1">
-                        <p className="font-medium text-slate-900">{group.product.name}</p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {group.variant} | Tong x{group.quantity}
-                        </p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          Shop: {group.product.seller_name}
-                        </p>
-                        <p className={`mt-1 text-sm ${group.hasAffiliateAttributed ? "text-emerald-700" : "text-slate-500"}`}>
-                          {group.hasAffiliateAttributed
-                            ? "Block nay co phan direct va/hoac phan gan affiliate."
-                            : "Block nay la don truc tiep."}
-                        </p>
-                      </div>
-                      <MoneyText value={group.lineTotal} />
-                    </div>
-                    <div className="mt-3 space-y-2">
-                      {group.allocations.map((allocation) => (
-                        <div
-                          key={allocation.id}
-                          className="flex items-center justify-between rounded-[1rem] border border-slate-200 bg-white px-3 py-2 text-sm"
-                        >
-                          <span className={allocation.isAffiliateAttributed ? "text-emerald-700" : "text-slate-600"}>
-                            {allocation.label} | x{allocation.quantity}
-                          </span>
-                          <MoneyText value={allocation.lineTotal} />
+                {groupedCheckoutItems.map((group) => {
+                  const productImage = group.product.gallery?.[0] || group.product.image;
+
+                  return (
+                    <div key={group.groupKey} className="rounded-[1.5rem] bg-slate-50 p-4">
+                      <div className="flex items-center gap-4">
+                        <img src={productImage} alt={group.product.name} className="h-20 w-20 rounded-[1rem] object-cover" />
+                        <div className="flex-1">
+                          <p className="font-medium text-slate-900">{group.product.name}</p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {group.variant} | Tổng x{group.quantity}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500">Shop: {group.product.seller_name}</p>
+                          <p className={`mt-1 text-sm ${group.hasAffiliateAttributed ? "text-emerald-700" : "text-slate-500"}`}>
+                            {group.hasAffiliateAttributed
+                              ? "Nhóm này có sản phẩm trực tiếp và/hoặc sản phẩm đi qua affiliate."
+                              : "Nhóm này là đơn trực tiếp."}
+                          </p>
                         </div>
-                      ))}
+                        <MoneyText value={group.lineTotal} />
+                      </div>
+
+                      <div className="mt-3 space-y-2">
+                        {group.allocations.map((allocation) => (
+                          <div
+                            key={allocation.id}
+                            className="flex items-center justify-between rounded-[1rem] border border-slate-200 bg-white px-3 py-2 text-sm"
+                          >
+                            <span className={allocation.isAffiliateAttributed ? "text-emerald-700" : "text-slate-600"}>
+                              {allocation.label} | x{allocation.quantity}
+                            </span>
+                            <MoneyText value={allocation.lineTotal} />
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </StepSection>
           </div>
 
           <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-            <p className="text-xs uppercase tracking-[0.3em] text-cyan-700">Don hang</p>
+            <p className="text-xs uppercase tracking-[0.3em] text-cyan-700">Đơn hàng</p>
             <p className="mt-4 text-3xl font-semibold text-slate-900">
               <MoneyText value={total} />
             </p>
+
             <div className="mt-5 space-y-3 text-sm text-slate-600">
               <div className="flex justify-between">
-                <span>So san pham da chon</span>
+                <span>Số nhóm sản phẩm đã chọn</span>
                 <span>{groupedCheckoutItems.length}</span>
               </div>
               <div className="flex justify-between">
-                <span>Tam tinh</span>
+                <span>Tạm tính</span>
                 <MoneyText value={subtotal} />
               </div>
               <div className="flex justify-between">
-                <span>So shop trong don</span>
+                <span>Số shop trong đơn</span>
                 <span>{Math.max(1, shopCount || 0)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Phi giao hang</span>
+                <span>Phí giao hàng</span>
                 <MoneyText value={shippingTotal} />
               </div>
               <div className="flex justify-between">
-                <span>Giam gia</span>
+                <span>Giảm giá</span>
                 <MoneyText value={form.discountAmount} />
               </div>
             </div>
+
             <div className="mt-5 rounded-[1.5rem] bg-slate-50 p-4 text-sm leading-7 text-slate-600">
               {selectedAddress ? (
                 <>
@@ -352,9 +351,10 @@ function CheckoutPage() {
                   </p>
                 </>
               ) : (
-                "Chua chon dia chi giao hang."
+                "Chưa chọn địa chỉ giao hàng."
               )}
             </div>
+
             <Button
               className="mt-6 w-full"
               size="lg"
@@ -362,7 +362,7 @@ function CheckoutPage() {
               disabled={!checkoutItems.length || !selectedAddress}
               onClick={handleSubmit}
             >
-              {form.paymentMethod === "VNPAY" ? "Sang VNPAY de thanh toan" : "Xac nhan dat hang"}
+              {form.paymentMethod === "VNPAY" ? "Sang VNPAY để thanh toán" : "Xác nhận đặt hàng"}
             </Button>
           </div>
         </div>

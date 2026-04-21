@@ -123,4 +123,4 @@ const useAuthStore = create(
   ),
 );
 
-export { AUTH_STORAGE_KEY, getDashboardCapabilities, useAuthStore };
+export { AUTH_STORAGE_KEY, getDashboardCapabilities, resolveDashboardRole, useAuthStore };

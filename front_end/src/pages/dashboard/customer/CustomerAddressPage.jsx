@@ -128,12 +128,7 @@ function CustomerAddressPage() {
       <PageHeader
         eyebrow="Khách hàng"
         title="Địa chỉ giao hàng"
-        description="Lưu nhiều địa chỉ, chọn địa chỉ mặc định và chỉnh sửa nhanh để dùng ngay khi đặt hàng."
-        action={
-          <Button variant="secondary" onClick={handleCreateNew}>
-            Thêm địa chỉ mới
-          </Button>
-        }
+
       />
       {loading ? <EmptyState title="Đang tải địa chỉ" description="Hệ thống đang lấy danh sách địa chỉ giao hàng của bạn." /> : null}
       {!loading && error ? <EmptyState title="Không tải được địa chỉ" description={error} /> : null}

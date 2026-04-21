@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import Button from "../../components/common/Button";
 import Input from "../../components/common/Input";
 import { useAuth } from "../../hooks/useAuth";
+import { resolveDashboardRole } from "../../store/authStore";
 import { useToast } from "../../hooks/useToast";
 import { loginSchema } from "../../schemas/authSchemas";
 
@@ -37,7 +38,7 @@ function LoginPage() {
 
       const session = await login(payload);
       toast.success("Đăng nhập thành công.");
-      const role = session.roles?.[0];
+      const role = resolveDashboardRole(session.currentUser, session.roles);
 
       if (role) {
         navigate(`/dashboard/${role}`);

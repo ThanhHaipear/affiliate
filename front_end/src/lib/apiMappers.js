@@ -204,6 +204,10 @@ function mapCartItemDto(item = {}) {
     variants: item.product?.variants || (item.variant ? [item.variant] : []),
   });
   const currentAvailableStock = getAvailableInventory(item.variant || {});
+  const productUnavailable =
+    mappedProduct.visibility_status !== "ACTIVE" ||
+    mappedProduct.approval_status !== "APPROVED";
+  const isUnavailable = productUnavailable || currentAvailableStock <= 0;
 
   return {
     id: item.id,
@@ -216,7 +220,8 @@ function mapCartItemDto(item = {}) {
     attributionSessionId: item.attributionSessionId ?? item.attributionSession?.id ?? null,
     isAffiliateAttributed: Boolean(item.affiliateId || item.affiliateLinkId || item.attributionSessionId),
     currentAvailableStock,
-    hasStockConflict: toNumber(item.quantity) > currentAvailableStock,
+    hasStockConflict: isUnavailable || toNumber(item.quantity) > currentAvailableStock,
+    isUnavailable,
     product: mappedProduct,
     raw: item,
   };
@@ -253,13 +258,14 @@ function aggregateDisplayCartItems(items = []) {
       isAffiliateAttributed: item.isAffiliateAttributed,
       currentAvailableStock: item.currentAvailableStock,
       hasStockConflict: item.hasStockConflict,
+      isUnavailable: item.isUnavailable,
       unitPrice: item.product.salePrice || item.product.price,
       lineTotal: (item.product.salePrice || item.product.price) * item.quantity,
       createdAt: item.raw?.createdAt || null,
       updatedAt: item.raw?.updatedAt || null,
       label: item.isAffiliateAttributed
-        ? `Qua affiliate${item.affiliateName ? ` ${item.affiliateName}` : item.affiliateId ? ` #${item.affiliateId}` : ""}`
-        : "Don truc tiep",
+        ? `Thông qua affiliate${item.affiliateName ? ` ${item.affiliateName}` : item.affiliateId ? ` #${item.affiliateId}` : ""}`
+        : "Đơn trực tiếp",
       raw: item,
     };
 
@@ -267,6 +273,7 @@ function aggregateDisplayCartItems(items = []) {
       groups.set(key, {
         id: key,
         groupKey: key,
+        displayOrder: groups.size,
         product: item.product,
         variant: item.variant,
         variantId: item.variantId,
@@ -275,6 +282,7 @@ function aggregateDisplayCartItems(items = []) {
         hasAffiliateAttributed: item.isAffiliateAttributed,
         currentAvailableStock: item.currentAvailableStock,
         hasStockConflict: item.hasStockConflict,
+        isUnavailable: item.isUnavailable,
         itemIds: [String(item.id)],
         allocations: [allocation],
         latestActivityAt: allocation.updatedAt || allocation.createdAt || null,
@@ -287,6 +295,7 @@ function aggregateDisplayCartItems(items = []) {
     existing.hasAffiliateAttributed = existing.hasAffiliateAttributed || item.isAffiliateAttributed;
     existing.currentAvailableStock = Math.min(existing.currentAvailableStock, item.currentAvailableStock);
     existing.hasStockConflict = existing.hasStockConflict || item.hasStockConflict;
+    existing.isUnavailable = existing.isUnavailable || item.isUnavailable;
     existing.itemIds.push(String(item.id));
     existing.allocations.push(allocation);
     const candidateActivityAt = allocation.updatedAt || allocation.createdAt || null;
@@ -306,9 +315,11 @@ function aggregateDisplayCartItems(items = []) {
       }),
     }))
     .sort((left, right) => {
-      const leftTime = new Date(left.latestActivityAt || 0).getTime();
-      const rightTime = new Date(right.latestActivityAt || 0).getTime();
-      return rightTime - leftTime;
+      if (left.isUnavailable !== right.isUnavailable) {
+        return left.isUnavailable ? 1 : -1;
+      }
+
+      return left.displayOrder - right.displayOrder;
     });
 }
 

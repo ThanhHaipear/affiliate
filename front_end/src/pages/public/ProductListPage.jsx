@@ -1,12 +1,15 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import EmptyState from "../../components/common/EmptyState";
 import FilterSidebar from "../../components/common/FilterSidebar";
+import Pagination from "../../components/common/Pagination";
 import ProductCard from "../../components/product/ProductCard";
 import ProductFilter from "../../components/product/ProductFilter";
 import SectionIntro from "../../components/storefront/SectionIntro";
 import { getProducts } from "../../api/productApi";
 import { mapProductDto } from "../../lib/apiMappers";
+
+const PRODUCTS_PER_PAGE = 9;
 
 function ProductListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -16,20 +19,30 @@ function ProductListPage() {
   const [search, setSearch] = useState(searchParams.get("search") || "");
   const [sort, setSort] = useState("latest");
   const [category, setCategory] = useState("ALL");
+  const [page, setPage] = useState(() => Math.max(1, Number(searchParams.get("page") || 1)));
 
   useEffect(() => {
     setSearch(searchParams.get("search") || "");
+    setPage(Math.max(1, Number(searchParams.get("page") || 1)));
   }, [searchParams]);
 
   useEffect(() => {
     const nextParams = new URLSearchParams(searchParams);
+
     if (search.trim()) {
       nextParams.set("search", search.trim());
     } else {
       nextParams.delete("search");
     }
+
+    if (page > 1) {
+      nextParams.set("page", String(page));
+    } else {
+      nextParams.delete("page");
+    }
+
     setSearchParams(nextParams, { replace: true });
-  }, [search, searchParams, setSearchParams]);
+  }, [page, search, searchParams, setSearchParams]);
 
   useEffect(() => {
     let active = true;
@@ -66,6 +79,7 @@ function ProductListPage() {
     () => [...new Set(products.map((product) => product.category).filter(Boolean))],
     [products],
   );
+
   const sellers = useMemo(
     () => [...new Set(products.map((product) => product.seller_name).filter(Boolean))],
     [products],
@@ -92,6 +106,38 @@ function ProductListPage() {
 
     return next;
   }, [category, products, search, sort]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE));
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  const paginatedProducts = useMemo(() => {
+    const start = (page - 1) * PRODUCTS_PER_PAGE;
+    return filteredProducts.slice(start, start + PRODUCTS_PER_PAGE);
+  }, [filteredProducts, page]);
+
+  function handleSearchChange(value) {
+    setPage(1);
+    setSearch(value);
+  }
+
+  function handleSortChange(value) {
+    setPage(1);
+    setSort(value);
+  }
+
+  function handleCategoryChange(value) {
+    setPage(1);
+    setCategory(value);
+  }
+
+  function handlePageChange(nextPage) {
+    setPage(Math.min(Math.max(1, nextPage), totalPages));
+  }
 
   return (
     <div className="space-y-8">
@@ -120,19 +166,22 @@ function ProductListPage() {
             sort={sort}
             category={category}
             categories={categories}
-            onSearchChange={setSearch}
-            onSortChange={setSort}
-            onCategoryChange={setCategory}
+            onSearchChange={handleSearchChange}
+            onSortChange={handleSortChange}
+            onCategoryChange={handleCategoryChange}
           />
 
           {loading ? <EmptyState title="Đang tải sản phẩm" description="Hệ thống đang lấy danh sách sản phẩm từ backend." /> : null}
           {!loading && error ? <EmptyState title="Không tải được sản phẩm" description={error} /> : null}
           {!loading && !error && filteredProducts.length ? (
-            <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3">
-              {filteredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
+            <>
+              <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+                {paginatedProducts.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+              <Pagination page={page} totalPages={totalPages} onPageChange={handlePageChange} />
+            </>
           ) : null}
           {!loading && !error && !filteredProducts.length ? (
             <EmptyState

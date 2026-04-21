@@ -82,10 +82,12 @@ function getGroupActions(group) {
 
   const canPayWithVnpay =
     group.orders.length > 0 &&
-    group.orders.every((order, index) =>
-      order.order_status === "PENDING_PAYMENT" &&
-      ["VNPAY", "CARD"].includes(payments[index]?.method) &&
-      payments[index]?.status === "PENDING");
+    group.orders.every(
+      (order, index) =>
+        order.order_status === "PENDING_PAYMENT" &&
+        ["VNPAY", "CARD"].includes(payments[index]?.method) &&
+        payments[index]?.status === "PENDING",
+    );
 
   const canSwitchToCod =
     group.orders.length > 0 &&
@@ -94,18 +96,22 @@ function getGroupActions(group) {
 
   const canDirectCancel =
     group.orders.length > 0 &&
-    group.orders.every((order, index) =>
-      order.order_status === "PENDING_PAYMENT" &&
-      payments[index]?.status === "PENDING" &&
-      payments[index]?.method === "COD");
+    group.orders.every(
+      (order, index) =>
+        order.order_status === "PENDING_PAYMENT" &&
+        payments[index]?.status === "PENDING" &&
+        payments[index]?.method === "COD",
+    );
 
   const canRequestRefundCancel =
     group.orders.length > 0 &&
-    group.orders.every((order, index) =>
-      order.order_status === "PAID" &&
-      ["VNPAY", "CARD"].includes(payments[index]?.method) &&
-      payments[index]?.status === "PAID" &&
-      !order.raw?.sellerConfirmedReceivedMoney) &&
+    group.orders.every(
+      (order, index) =>
+        order.order_status === "PAID" &&
+        ["VNPAY", "CARD"].includes(payments[index]?.method) &&
+        payments[index]?.status === "PAID" &&
+        !order.raw?.sellerConfirmedReceivedMoney,
+    ) &&
     !hasPendingRefundRequest;
 
   return {
@@ -173,7 +179,7 @@ function MyOrdersPage() {
         setOrders((response || []).map(mapOrderDto));
       } catch (loadError) {
         if (active) {
-          setError(loadError.response?.data?.message || "Khong tai duoc lich su don hang.");
+          setError(loadError.response?.data?.message || "Không tải được lịch sử đơn hàng.");
         }
       } finally {
         if (active) {
@@ -202,10 +208,10 @@ function MyOrdersPage() {
 
   const summary = useMemo(
     () => [
-      { label: "Tong cum don", value: `${groupedOrders.length}` },
-      { label: "Seller-order hoan tat", value: `${orders.filter(isDeliveredOrder).length}` },
-      { label: "Seller-order dang xu ly", value: `${orders.filter(isProcessingOrder).length}` },
-      { label: "Seller-order hoan tien/huy", value: `${orders.filter(isFailedOrder).length}` },
+      { label: "Tổng cụm đơn", value: `${groupedOrders.length}` },
+      { label: "Seller-order hoàn tất", value: `${orders.filter(isDeliveredOrder).length}` },
+      { label: "Seller-order đang xử lý", value: `${orders.filter(isProcessingOrder).length}` },
+      { label: "Seller-order hoàn tiền/hủy", value: `${orders.filter(isFailedOrder).length}` },
     ],
     [groupedOrders, orders],
   );
@@ -218,11 +224,11 @@ function MyOrdersPage() {
   const selectedItem = reviewItems.find((item) => String(item.id) === String(selectedOrderItemId));
   const selectedEligibility = selectedItem
     ? {
-        hasPurchased: true,
-        hasReviewed: Boolean(selectedItem.productReview),
-        canReview: !selectedItem.productReview,
-        reason: selectedItem.productReview ? "Lan mua nay da duoc danh gia roi." : null,
-      }
+      hasPurchased: true,
+      hasReviewed: Boolean(selectedItem.productReview),
+      canReview: !selectedItem.productReview,
+      reason: selectedItem.productReview ? "Lần mua này đã được đánh giá rồi." : null,
+    }
     : null;
 
   function openReviewModal(order) {
@@ -268,9 +274,9 @@ function MyOrdersPage() {
       }));
       setReviewComment("");
       setReviewRating("5");
-      toast.success("Da gui danh gia san pham.");
+      toast.success("Đã gửi đánh giá sản phẩm.");
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong gui duoc danh gia.");
+      toast.error(submitError.response?.data?.message || "Không gửi được đánh giá.");
     } finally {
       setReviewSubmitting(false);
     }
@@ -288,7 +294,7 @@ function MyOrdersPage() {
       const response = await createVnpayPaymentUrl(primaryOrder.id, {});
       window.location.href = response.paymentUrl;
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong tao duoc phien thanh toan VNPAY cho cum don.");
+      toast.error(submitError.response?.data?.message || "Không tạo được phiên thanh toán VNPAY cho cụm đơn.");
     } finally {
       setPayingGroupCode("");
     }
@@ -300,9 +306,9 @@ function MyOrdersPage() {
       const primaryOrder = group.orders?.[0];
       await changeOrderPaymentMethod(primaryOrder.id, { paymentMethod: "COD" });
       await reloadOrders();
-      toast.success("Da chuyen phuong thuc thanh toan sang COD cho toan bo cum don.");
+      toast.success("Đã chuyển phương thức thanh toán sang COD cho toàn bộ cụm đơn.");
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong doi duoc phuong thuc thanh toan cua cum don.");
+      toast.error(submitError.response?.data?.message || "Không đổi được phương thức thanh toán của cụm đơn.");
     } finally {
       setSwitchingGroupCode("");
     }
@@ -327,11 +333,11 @@ function MyOrdersPage() {
       setCancelGroup(null);
       toast.success(
         canRequestRefundCancel
-          ? "Da gui yeu cau hoan tien cho toan bo cum don."
-          : "Da huy toan bo cum don chua thanh toan.",
+          ? "Đã gửi yêu cầu hoàn tiền cho toàn bộ cụm đơn."
+          : "Đã hủy toàn bộ cụm đơn chưa thanh toán.",
       );
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong xu ly duoc cum don.");
+      toast.error(submitError.response?.data?.message || "Không xử lý được cụm đơn.");
     } finally {
       setCancellingGroupCode("");
     }
@@ -355,11 +361,11 @@ function MyOrdersPage() {
       setActionOrder(null);
       toast.success(
         canRefundOrder
-          ? "Da gui yeu cau hoan tien cho seller-order nay."
-          : "Da huy seller-order COD chua thanh toan.",
+          ? "Đã gửi yêu cầu hoàn tiền cho seller-order này."
+          : "Đã hủy seller-order COD chưa thanh toán.",
       );
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Khong xu ly duoc seller-order nay.");
+      toast.error(submitError.response?.data?.message || "Không xử lý được seller-order này.");
     } finally {
       setActingOrderId("");
     }
@@ -368,12 +374,12 @@ function MyOrdersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Khach hang"
-        title="Lich su mua hang"
-        description="Moi cum don duoc nhom theo cung ma checkout. Ben trong moi cum, tung seller co trang thai va tien thanh toan rieng."
+        eyebrow="Khách hàng"
+        title="Đơn hàng của tôi"
+
       />
-      {loading ? <EmptyState title="Dang tai don hang" description="He thong dang lay danh sach don hang tu backend." /> : null}
-      {!loading && error ? <EmptyState title="Khong tai duoc don hang" description={error} /> : null}
+      {loading ? <EmptyState title="Đang tải đơn hàng" description="Hệ thống đang lấy danh sách đơn hàng từ backend." /> : null}
+      {!loading && error ? <EmptyState title="Không tải được đơn hàng" description={error} /> : null}
       {!loading && !error ? (
         <>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -392,142 +398,139 @@ function MyOrdersPage() {
 
                 return (
                   <section key={group.orderCode} className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-                  <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.28em] text-cyan-700">Cum checkout</p>
-                      <h2 className="mt-2 text-2xl font-semibold text-slate-900">{group.orderCode}</h2>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700">
-                          {group.sellerCount} seller
-                        </span>
-                        {group.completedCount ? (
-                          <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm text-emerald-800">
-                            {group.completedCount} da hoan tat
+                    <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.28em] text-cyan-700">Cụm checkout</p>
+                        <h2 className="mt-2 text-2xl font-semibold text-slate-900">{group.orderCode}</h2>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700">
+                            {group.sellerCount} seller
                           </span>
-                        ) : null}
-                        {group.processingCount ? (
-                          <span className="rounded-full bg-cyan-50 px-3 py-1 text-sm text-cyan-800">
-                            {group.processingCount} dang xu ly
-                          </span>
-                        ) : null}
-                        {group.failedCount ? (
-                          <span className="rounded-full bg-orange-50 px-3 py-1 text-sm text-orange-800">
-                            {group.failedCount} huy/hoan tien
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2 lg:min-w-[22rem]">
-                      <div className="rounded-[1.25rem] bg-slate-50 p-4">
-                        <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Ngay tao cum</p>
-                        <p className="mt-2 font-medium text-slate-900">{formatDateTime(group.createdAt)}</p>
-                      </div>
-                      <div className="rounded-[1.25rem] bg-slate-50 p-4">
-                        <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Tong tien ca cum</p>
-                        <p className="mt-2 font-medium text-slate-900">
-                          <MoneyText value={group.totalAmount} />
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 flex flex-wrap gap-3">
-                    {actions.canPayWithVnpay ? (
-                      <Button
-                        loading={payingGroupCode === group.orderCode}
-                        onClick={() => handlePayGroupWithVnpay(group)}
-                      >
-                        Thanh toan ca cum VNPAY
-                      </Button>
-                    ) : null}
-                    {actions.canSwitchToCod ? (
-                      <Button
-                        variant="secondary"
-                        loading={switchingGroupCode === group.orderCode}
-                        onClick={() => handleSwitchGroupToCod(group)}
-                      >
-                        Chuyen ca cum sang COD
-                      </Button>
-                    ) : null}
-                    {actions.canCancelGroup ? (
-                      <Button variant="danger" onClick={() => setCancelGroup(group)}>
-                        {actions.canRequestRefundCancel ? "Hoan tien ca cum don" : "Huy ca cum don"}
-                      </Button>
-                    ) : null}
-                    <Link to="/products">
-                      <Button variant="secondary">Mua lai</Button>
-                    </Link>
-                    <Button variant="outline">Lien he ho tro</Button>
-                  </div>
-
-                  <div className="mt-5 space-y-4">
-                    {group.orders.map((order) => {
-                      const sellerActions = getSellerOrderActions(order);
-
-                      return (
-                      <article key={order.id} className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
-                        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                          <div className="space-y-3">
-                            <div>
-                              <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Seller</p>
-                              <p className="mt-1 text-lg font-semibold text-slate-900">{order.seller_name}</p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              <StatusBadge status={order.order_status} />
-                              <StatusBadge status={order.payment_status} />
-                            </div>
-                          </div>
-
-                          <div className="grid gap-3 text-sm text-slate-600 sm:grid-cols-3 xl:min-w-[34rem]">
-                            <div className="rounded-[1rem] bg-white p-3">
-                              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Ma seller-order</p>
-                              <p className="mt-2 font-medium text-slate-900">#{order.id}</p>
-                            </div>
-                            <div className="rounded-[1rem] bg-white p-3">
-                              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Ngay tao</p>
-                              <p className="mt-2 font-medium text-slate-900">{formatDateTime(order.created_at)}</p>
-                            </div>
-                            <div className="rounded-[1rem] bg-white p-3">
-                              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Tong tien seller</p>
-                              <p className="mt-2 font-medium text-slate-900">
-                                <MoneyText value={order.amount} />
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          <Link to={`/dashboard/customer/orders/${order.id}`}>
-                            <Button variant="secondary" size="sm">
-                              Xem chi tiet seller-order
-                            </Button>
-                          </Link>
-                          {sellerActions.canCancelOrder ? (
-                            <Button size="sm" variant="danger" onClick={() => setActionOrder(order)}>
-                              Huy don seller nay
-                            </Button>
+                          {group.completedCount ? (
+                            <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm text-emerald-800">
+                              {group.completedCount} đã hoàn tất
+                            </span>
                           ) : null}
-                          {sellerActions.canRefundOrder ? (
-                            <Button size="sm" variant="danger" onClick={() => setActionOrder(order)}>
-                              Hoan tien seller nay
-                            </Button>
+                          {group.processingCount ? (
+                            <span className="rounded-full bg-cyan-50 px-3 py-1 text-sm text-cyan-800">
+                              {group.processingCount} đang xử lý
+                            </span>
                           ) : null}
-                          {isDeliveredOrder(order) ? (
-                            <Button size="sm" onClick={() => openReviewModal(order)}>
-                              Danh gia san pham cua seller nay
-                            </Button>
+                          {group.failedCount ? (
+                            <span className="rounded-full bg-orange-50 px-3 py-1 text-sm text-orange-800">
+                              {group.failedCount} hủy/hoàn tiền
+                            </span>
                           ) : null}
                         </div>
-                        {sellerActions.hasPendingRefundRequest ? (
-                          <p className="mt-3 text-sm text-orange-700">
-                            Seller-order nay dang co yeu cau hoan tien cho admin duyet.
+                      </div>
+
+                      <div className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2 lg:min-w-[22rem]">
+                        <div className="rounded-[1.25rem] bg-slate-50 p-4">
+                          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Ngày tạo cụm</p>
+                          <p className="mt-2 font-medium text-slate-900">{formatDateTime(group.createdAt)}</p>
+                        </div>
+                        <div className="rounded-[1.25rem] bg-slate-50 p-4">
+                          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Tổng tiền cả cụm</p>
+                          <p className="mt-2 font-medium text-slate-900">
+                            <MoneyText value={group.totalAmount} />
                           </p>
-                        ) : null}
-                      </article>
-                      );
-                    })}
-                  </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 flex flex-wrap gap-3">
+                      {actions.canPayWithVnpay ? (
+                        <Button loading={payingGroupCode === group.orderCode} onClick={() => handlePayGroupWithVnpay(group)}>
+                          Thanh toán cả cụm qua VNPAY
+                        </Button>
+                      ) : null}
+                      {actions.canSwitchToCod ? (
+                        <Button
+                          variant="secondary"
+                          loading={switchingGroupCode === group.orderCode}
+                          onClick={() => handleSwitchGroupToCod(group)}
+                        >
+                          Chuyển cả cụm sang COD
+                        </Button>
+                      ) : null}
+                      {actions.canCancelGroup ? (
+                        <Button variant="danger" onClick={() => setCancelGroup(group)}>
+                          {actions.canRequestRefundCancel ? "Hoàn tiền cả cụm đơn" : "Hủy cả cụm đơn"}
+                        </Button>
+                      ) : null}
+                      <Link to="/products">
+                        <Button variant="secondary">Mua lại</Button>
+                      </Link>
+                      <Button variant="outline">Liên hệ hỗ trợ</Button>
+                    </div>
+
+                    <div className="mt-5 space-y-4">
+                      {group.orders.map((order) => {
+                        const sellerActions = getSellerOrderActions(order);
+
+                        return (
+                          <article key={order.id} className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+                            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                              <div className="space-y-3">
+                                <div>
+                                  <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Seller</p>
+                                  <p className="mt-1 text-lg font-semibold text-slate-900">{order.seller_name}</p>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  <StatusBadge status={order.order_status} />
+                                  <StatusBadge status={order.payment_status} />
+                                </div>
+                              </div>
+
+                              <div className="grid gap-3 text-sm text-slate-600 sm:grid-cols-3 xl:min-w-[34rem]">
+                                <div className="rounded-[1rem] bg-white p-3">
+                                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Mã seller-order</p>
+                                  <p className="mt-2 font-medium text-slate-900">#{order.id}</p>
+                                </div>
+                                <div className="rounded-[1rem] bg-white p-3">
+                                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Ngày tạo</p>
+                                  <p className="mt-2 font-medium text-slate-900">{formatDateTime(order.created_at)}</p>
+                                </div>
+                                <div className="rounded-[1rem] bg-white p-3">
+                                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Tổng tiền seller</p>
+                                  <p className="mt-2 font-medium text-slate-900">
+                                    <MoneyText value={order.amount} />
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              <Link to={`/dashboard/customer/orders/${order.id}`}>
+                                <Button variant="secondary" size="sm">
+                                  Xem chi tiết seller-order
+                                </Button>
+                              </Link>
+                              {sellerActions.canCancelOrder ? (
+                                <Button size="sm" variant="danger" onClick={() => setActionOrder(order)}>
+                                  Hủy seller-order này
+                                </Button>
+                              ) : null}
+                              {sellerActions.canRefundOrder ? (
+                                <Button size="sm" variant="danger" onClick={() => setActionOrder(order)}>
+                                  Hoàn tiền seller-order này
+                                </Button>
+                              ) : null}
+                              {isDeliveredOrder(order) ? (
+                                <Button size="sm" onClick={() => openReviewModal(order)}>
+                                  Đánh giá sản phẩm của seller này
+                                </Button>
+                              ) : null}
+                            </div>
+                            {sellerActions.hasPendingRefundRequest ? (
+                              <p className="mt-3 text-sm text-orange-700">
+                                Seller-order này đang có yêu cầu hoàn tiền chờ admin duyệt.
+                              </p>
+                            ) : null}
+                          </article>
+                        );
+                      })}
+                    </div>
                   </section>
                 );
               })}
@@ -537,8 +540,8 @@ function MyOrdersPage() {
             </div>
           ) : (
             <EmptyState
-              title="Chua co don hang"
-              description="Khi ban dat hang, he thong se nhom cac seller-order cung mot lan checkout vao day theo orderCode."
+              title="Chưa có đơn hàng"
+              description="Khi bạn đặt hàng, hệ thống sẽ nhóm các seller-order cùng một lần checkout vào đây theo mã đơn."
             />
           )}
 
@@ -560,15 +563,15 @@ function MyOrdersPage() {
           />
           <ConfirmModal
             open={Boolean(cancelGroup)}
-            title={cancelGroup && getGroupActions(cancelGroup).canRequestRefundCancel ? "Hoan tien cum don" : "Huy cum don"}
+            title={cancelGroup && getGroupActions(cancelGroup).canRequestRefundCancel ? "Hoàn tiền cụm đơn" : "Hủy cụm đơn"}
             description={
               cancelGroup
                 ? getGroupActions(cancelGroup).canRequestRefundCancel
-                  ? "Cum don nay da duoc thanh toan online. He thong se gui yeu cau hoan tien cho toan bo cum don de admin duyet."
-                  : "Cum don COD nay dang cho thanh toan. Neu huy, he thong se dong toan bo cum don."
+                  ? "Cụm đơn này đã được thanh toán online. Hệ thống sẽ gửi yêu cầu hoàn tiền cho toàn bộ cụm đơn để admin duyệt."
+                  : "Cụm đơn COD này đang chờ thanh toán. Nếu hủy, hệ thống sẽ đóng toàn bộ cụm đơn."
                 : ""
             }
-            confirmLabel={cancelGroup && getGroupActions(cancelGroup).canRequestRefundCancel ? "Xac nhan hoan tien" : "Xac nhan huy"}
+            confirmLabel={cancelGroup && getGroupActions(cancelGroup).canRequestRefundCancel ? "Xác nhận hoàn tiền" : "Xác nhận hủy"}
             confirmVariant="danger"
             loading={Boolean(cancelGroup) && cancellingGroupCode === cancelGroup.orderCode}
             onClose={() => setCancelGroup(null)}
@@ -576,15 +579,15 @@ function MyOrdersPage() {
           />
           <ConfirmModal
             open={Boolean(actionOrder)}
-            title={actionOrder && getSellerOrderActions(actionOrder).canRefundOrder ? "Hoan tien seller-order" : "Huy seller-order"}
+            title={actionOrder && getSellerOrderActions(actionOrder).canRefundOrder ? "Hoàn tiền seller-order" : "Hủy seller-order"}
             description={
               actionOrder
                 ? getSellerOrderActions(actionOrder).canRefundOrder
-                  ? "Seller-order nay da duoc thanh toan online. He thong se gui yeu cau hoan tien cho phan don cua seller nay de admin duyet."
-                  : "Seller-order COD nay dang cho thanh toan. Neu huy, he thong se dong rieng phan don cua seller nay."
+                  ? "Seller-order này đã được thanh toán online. Hệ thống sẽ gửi yêu cầu hoàn tiền cho phần đơn của seller này để admin duyệt."
+                  : "Seller-order COD này đang chờ thanh toán. Nếu hủy, hệ thống sẽ đóng riêng phần đơn của seller này."
                 : ""
             }
-            confirmLabel={actionOrder && getSellerOrderActions(actionOrder).canRefundOrder ? "Xac nhan hoan tien" : "Xac nhan huy"}
+            confirmLabel={actionOrder && getSellerOrderActions(actionOrder).canRefundOrder ? "Xác nhận hoàn tiền" : "Xác nhận hủy"}
             confirmVariant="danger"
             loading={Boolean(actionOrder) && actingOrderId === String(actionOrder.id)}
             onClose={() => setActionOrder(null)}
@@ -617,25 +620,25 @@ function ReviewOrderModal({
   return (
     <Modal
       open={open}
-      title={order ? `Danh gia seller-order ${order.code} / #${order.id}` : "Danh gia san pham"}
-      description="Moi lan mua hop le trong don hoan tat duoc danh gia mot lan."
+      title={order ? `Đánh giá seller-order ${order.code} / #${order.id}` : "Đánh giá sản phẩm"}
+      description="Mỗi lần mua hợp lệ trong đơn hoàn tất được đánh giá một lần."
       onClose={onClose}
       footer={
         selectedEligibility?.canReview ? (
           <div className="flex justify-end">
             <Button onClick={onSubmit} loading={reviewSubmitting}>
-              Gui danh gia
+              Gửi đánh giá
             </Button>
           </div>
         ) : null
       }
     >
       {loading ? (
-        <p className="text-sm leading-7 text-slate-300">Dang kiem tra dieu kien danh gia cho cac san pham trong don.</p>
+        <p className="text-sm leading-7 text-slate-300">Đang kiểm tra điều kiện đánh giá cho các sản phẩm trong đơn.</p>
       ) : items.length ? (
         <div className="space-y-4">
           <div className="space-y-2">
-            <p className="text-sm font-medium text-white">Chon lan mua</p>
+            <p className="text-sm font-medium text-white">Chọn lần mua</p>
             <select
               value={selectedOrderItemId}
               onChange={(event) => onOrderItemChange(event.target.value)}
@@ -643,15 +646,16 @@ function ReviewOrderModal({
             >
               {items.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {(item.productNameSnapshot || `San pham #${item.productId}`)} - lan mua #{item.id} - {item.productReview ? "Da danh gia" : "Co the danh gia"}
+                  {(item.productNameSnapshot || `Sản phẩm #${item.productId}`)} - lần mua #{item.id} -{" "}
+                  {item.productReview ? "Đã đánh giá" : "Có thể đánh giá"}
                 </option>
               ))}
             </select>
           </div>
           {selectedItem ? (
             <div className="rounded-[1.5rem] border border-slate-800 bg-slate-950/70 p-4">
-              <p className="text-sm font-medium text-white">{selectedItem.productNameSnapshot || `San pham #${selectedItem.productId}`}</p>
-              <p className="mt-2 text-sm text-slate-400">So luong: {selectedItem.quantity}</p>
+              <p className="text-sm font-medium text-white">{selectedItem.productNameSnapshot || `Sản phẩm #${selectedItem.productId}`}</p>
+              <p className="mt-2 text-sm text-slate-400">Số lượng: {selectedItem.quantity}</p>
             </div>
           ) : null}
           {selectedEligibility?.canReview ? (
@@ -672,17 +676,17 @@ function ReviewOrderModal({
                 onChange={(event) => onCommentChange(event.target.value)}
                 rows={4}
                 className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none"
-                placeholder="Chia se cam nhan cua ban ve san pham"
+                placeholder="Chia sẻ cảm nhận của bạn về sản phẩm"
               />
             </div>
           ) : (
             <div className="rounded-[1.5rem] bg-slate-800/80 p-4 text-sm leading-7 text-slate-300">
-              {selectedEligibility?.reason || "San pham nay hien chua the danh gia."}
+              {selectedEligibility?.reason || "Sản phẩm này hiện chưa thể đánh giá."}
             </div>
           )}
         </div>
       ) : (
-        <p className="text-sm leading-7 text-slate-300">Don nay chua co san pham hop le de danh gia.</p>
+        <p className="text-sm leading-7 text-slate-300">Đơn này chưa có sản phẩm hợp lệ để đánh giá.</p>
       )}
     </Modal>
   );

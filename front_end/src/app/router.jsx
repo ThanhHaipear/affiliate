@@ -9,7 +9,7 @@ import {
   useParams,
 } from "react-router-dom";
 import { AuthGuard, GuestGuard, RoleGuard } from "../lib/guards";
-import { useAuthStore } from "../store/authStore";
+import { resolveDashboardRole, useAuthStore } from "../store/authStore";
 import DashboardLayout from "../components/layout/DashboardLayout";
 import MainLayout from "../components/layout/MainLayout";
 import UnauthorizedPage from "../pages/shared/UnauthorizedPage";
@@ -117,9 +117,10 @@ function AuthLayout() {
 }
 
 function DashboardRedirect() {
+  const currentUser = useAuthStore((state) => state.currentUser);
   const roles = useAuthStore((state) => state.roles);
   const activeDashboardRole = useAuthStore((state) => state.activeDashboardRole);
-  const primaryRole = activeDashboardRole && roles.includes(activeDashboardRole) ? activeDashboardRole : roles[0];
+  const primaryRole = resolveDashboardRole(currentUser, roles, activeDashboardRole);
 
   if (!primaryRole) {
     return <Navigate to="/unauthorized" replace />;
