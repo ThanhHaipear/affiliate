@@ -5,6 +5,7 @@ import Select from "../common/Select";
 function FilterBar({
   searchValue,
   onSearchChange,
+  searchLabel = "Tìm kiếm",
   searchPlaceholder = "Tìm kiếm",
   filters = [],
   primaryAction,
@@ -13,6 +14,7 @@ function FilterBar({
     <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-4">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_repeat(2,minmax(180px,1fr))_auto]">
         <Input
+          label={searchLabel}
           aria-label={searchPlaceholder}
           placeholder={searchPlaceholder}
           value={searchValue}

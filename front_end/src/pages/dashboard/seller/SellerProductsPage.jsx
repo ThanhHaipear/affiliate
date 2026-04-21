@@ -131,7 +131,7 @@ function SellerProductsPage() {
       <PageHeader
         eyebrow="Seller"
         title="Quản lý sản phẩm"
-        description="Danh sách sản phẩm của shop được đọc trực tiếp từ hệ thống. Bạn có thể lọc, tìm kiếm, xem chi tiết và ẩn hoặc hiện từng sản phẩm."
+
         action={
           <Link to="/dashboard/seller/products/create">
             <Button>Thêm sản phẩm</Button>

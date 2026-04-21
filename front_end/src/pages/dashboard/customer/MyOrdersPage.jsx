@@ -23,6 +23,13 @@ import { mapOrderDto } from "../../../lib/apiMappers";
 const DELIVERED_ORDER_STATUSES = ["COMPLETED"];
 const FAILED_ORDER_STATUSES = ["REFUNDED", "CANCELLED"];
 const ORDER_GROUPS_PER_PAGE = 8;
+const ORDER_FILTER_OPTIONS = [
+  { label: "Tất cả", value: "ALL" },
+  { label: "Có thể đánh giá", value: "REVIEWABLE" },
+  { label: "Đã hủy/Đã hoàn tiền", value: "FAILED" },
+  { label: "Chờ duyệt hủy/hoàn tiền", value: "PENDING_REFUND_REVIEW" },
+  { label: "Chờ xác nhận hoàn tất đơn", value: "AWAITING_COMPLETION_CONFIRM" },
+];
 
 function isDeliveredOrder(order) {
   return DELIVERED_ORDER_STATUSES.includes(order.order_status);
@@ -34,6 +41,71 @@ function isFailedOrder(order) {
 
 function isProcessingOrder(order) {
   return !isDeliveredOrder(order) && !isFailedOrder(order);
+}
+
+function hasPendingReview(order) {
+  if (!isDeliveredOrder(order)) {
+    return false;
+  }
+
+  return (order.raw?.items || []).some((item) => item.productId && !item.productReview);
+}
+
+function getGroupSortPriority(group) {
+  const hasActiveOrders = group.processingCount > 0;
+  const hasPendingReviews = !hasActiveOrders && group.orders.some(hasPendingReview);
+  const allFailed = group.failedCount === group.orders.length;
+
+  if (hasActiveOrders) {
+    return 0;
+  }
+
+  if (hasPendingReviews) {
+    return 1;
+  }
+
+  if (allFailed) {
+    return 3;
+  }
+
+  return 2;
+}
+
+function groupHasPendingReview(group) {
+  return group.orders.some(hasPendingReview);
+}
+
+function groupHasPendingRefundReview(group) {
+  return group.orders.some((order) => (order.raw?.refunds || []).some((refund) => refund.status === "PENDING"));
+}
+
+function groupIsAwaitingCompletionConfirm(group) {
+  return group.orders.some(
+    (order) =>
+      order.order_status === "PAID" &&
+      !order.raw?.sellerConfirmedReceivedMoney &&
+      !(order.raw?.refunds || []).some((refund) => refund.status === "PENDING"),
+  );
+}
+
+function groupMatchesFilter(group, filter) {
+  if (filter === "REVIEWABLE") {
+    return groupHasPendingReview(group);
+  }
+
+  if (filter === "FAILED") {
+    return group.failedCount > 0;
+  }
+
+  if (filter === "PENDING_REFUND_REVIEW") {
+    return groupHasPendingRefundReview(group);
+  }
+
+  if (filter === "AWAITING_COMPLETION_CONFIRM") {
+    return groupIsAwaitingCompletionConfirm(group);
+  }
+
+  return true;
 }
 
 function groupOrdersByCode(orders = []) {
@@ -73,7 +145,14 @@ function groupOrdersByCode(orders = []) {
       processingCount: group.orders.filter(isProcessingOrder).length,
       orders: [...group.orders].sort((left, right) => new Date(right.created_at || 0) - new Date(left.created_at || 0)),
     }))
-    .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0));
+    .sort((left, right) => {
+      const priorityDiff = getGroupSortPriority(left) - getGroupSortPriority(right);
+      if (priorityDiff !== 0) {
+        return priorityDiff;
+      }
+
+      return new Date(right.createdAt || 0) - new Date(left.createdAt || 0);
+    });
 }
 
 function getGroupActions(group) {
@@ -157,6 +236,7 @@ function MyOrdersPage() {
   const [reviewRating, setReviewRating] = useState("5");
   const [reviewComment, setReviewComment] = useState("");
   const [page, setPage] = useState(1);
+  const [activeFilter, setActiveFilter] = useState("ALL");
   const [payingGroupCode, setPayingGroupCode] = useState("");
   const [switchingGroupCode, setSwitchingGroupCode] = useState("");
   const [cancellingGroupCode, setCancellingGroupCode] = useState("");
@@ -196,22 +276,26 @@ function MyOrdersPage() {
   }, []);
 
   const groupedOrders = useMemo(() => groupOrdersByCode(orders), [orders]);
-  const totalPages = Math.max(1, Math.ceil(groupedOrders.length / ORDER_GROUPS_PER_PAGE));
+  const filteredGroupedOrders = useMemo(
+    () => groupedOrders.filter((group) => groupMatchesFilter(group, activeFilter)),
+    [activeFilter, groupedOrders],
+  );
+  const totalPages = Math.max(1, Math.ceil(filteredGroupedOrders.length / ORDER_GROUPS_PER_PAGE));
   const paginatedGroupedOrders = useMemo(() => {
     const startIndex = (page - 1) * ORDER_GROUPS_PER_PAGE;
-    return groupedOrders.slice(startIndex, startIndex + ORDER_GROUPS_PER_PAGE);
-  }, [groupedOrders, page]);
+    return filteredGroupedOrders.slice(startIndex, startIndex + ORDER_GROUPS_PER_PAGE);
+  }, [filteredGroupedOrders, page]);
 
   useEffect(() => {
-    setPage((current) => Math.min(current, Math.max(1, Math.ceil(groupedOrders.length / ORDER_GROUPS_PER_PAGE))));
-  }, [groupedOrders]);
+    setPage((current) => Math.min(current, Math.max(1, Math.ceil(filteredGroupedOrders.length / ORDER_GROUPS_PER_PAGE))));
+  }, [filteredGroupedOrders]);
 
   const summary = useMemo(
     () => [
       { label: "Tổng cụm đơn", value: `${groupedOrders.length}` },
-      { label: "Seller-order hoàn tất", value: `${orders.filter(isDeliveredOrder).length}` },
-      { label: "Seller-order đang xử lý", value: `${orders.filter(isProcessingOrder).length}` },
-      { label: "Seller-order hoàn tiền/hủy", value: `${orders.filter(isFailedOrder).length}` },
+      { label: "Đơn đã hoàn tất", value: `${orders.filter(isDeliveredOrder).length}` },
+      { label: "Đơn đang xử lý", value: `${orders.filter(isProcessingOrder).length}` },
+      { label: "Đơn đã hủy", value: `${orders.filter(isFailedOrder).length}` },
     ],
     [groupedOrders, orders],
   );
@@ -391,7 +475,23 @@ function MyOrdersPage() {
             ))}
           </div>
 
-          {groupedOrders.length ? (
+          <div className="flex flex-wrap gap-3">
+            {ORDER_FILTER_OPTIONS.map((option) => (
+              <Button
+                key={option.value}
+                variant={activeFilter === option.value ? "primary" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setActiveFilter(option.value);
+                  setPage(1);
+                }}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </div>
+
+          {filteredGroupedOrders.length ? (
             <div className="space-y-5">
               {paginatedGroupedOrders.map((group) => {
                 const actions = getGroupActions(group);
@@ -400,7 +500,7 @@ function MyOrdersPage() {
                   <section key={group.orderCode} className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 lg:flex-row lg:items-start lg:justify-between">
                       <div>
-                        <p className="text-xs uppercase tracking-[0.28em] text-cyan-700">Cụm checkout</p>
+                        <p className="text-xs uppercase tracking-[0.28em] text-cyan-700">Cụm đơn</p>
                         <h2 className="mt-2 text-2xl font-semibold text-slate-900">{group.orderCode}</h2>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <span className="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700">
@@ -426,11 +526,11 @@ function MyOrdersPage() {
 
                       <div className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2 lg:min-w-[22rem]">
                         <div className="rounded-[1.25rem] bg-slate-50 p-4">
-                          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Ngày tạo cụm</p>
+                          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Ngày mua</p>
                           <p className="mt-2 font-medium text-slate-900">{formatDateTime(group.createdAt)}</p>
                         </div>
                         <div className="rounded-[1.25rem] bg-slate-50 p-4">
-                          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Tổng tiền cả cụm</p>
+                          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Tổng tiền</p>
                           <p className="mt-2 font-medium text-slate-900">
                             <MoneyText value={group.totalAmount} />
                           </p>
@@ -534,14 +634,18 @@ function MyOrdersPage() {
                   </section>
                 );
               })}
-              {groupedOrders.length > ORDER_GROUPS_PER_PAGE ? (
+              {filteredGroupedOrders.length > ORDER_GROUPS_PER_PAGE ? (
                 <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
               ) : null}
             </div>
           ) : (
             <EmptyState
-              title="Chưa có đơn hàng"
-              description="Khi bạn đặt hàng, hệ thống sẽ nhóm các seller-order cùng một lần checkout vào đây theo mã đơn."
+              title={activeFilter === "ALL" ? "Chưa có đơn hàng" : "Không có đơn phù hợp bộ lọc"}
+              description={
+                activeFilter === "ALL"
+                  ? "Khi bạn đặt hàng, hệ thống sẽ nhóm các seller-order cùng một lần checkout vào đây theo mã đơn."
+                  : "Thử chuyển sang bộ lọc khác để xem thêm các cụm đơn."
+              }
             />
           )}
 
