@@ -44,6 +44,10 @@ function ProductDetailPage() {
   const [quantity, setQuantity] = useState("1");
 
   useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [productId]);
+
+  useEffect(() => {
     let active = true;
 
     async function loadProduct() {

@@ -4,9 +4,12 @@ import DataTable from "../../../components/common/DataTable";
 import EmptyState from "../../../components/common/EmptyState";
 import MoneyText from "../../../components/common/MoneyText";
 import PageHeader from "../../../components/common/PageHeader";
+import Pagination from "../../../components/common/Pagination";
 import StatusBadge from "../../../components/common/StatusBadge";
 import { formatCurrency } from "../../../lib/format";
 import { mapCommissionDto } from "../../../lib/apiMappers";
+
+const COMMISSIONS_PER_PAGE = 8;
 
 function getConditionText(row) {
   if (row.order_status === "CANCELLED") {
@@ -22,6 +25,16 @@ function getConditionText(row) {
   }
 
   return row.reason || "Đủ điều kiện ghi nhận hoa hồng.";
+}
+
+function getCommissionTime(row) {
+  return new Date(
+    row?.raw?.walletCreditedAt ||
+    row?.raw?.fraudCheckedAt ||
+    row?.raw?.createdAt ||
+    row?.raw?.order?.createdAt ||
+    0,
+  ).getTime();
 }
 
 function MetricCard({ label, value, tone = "sky", hint }) {
@@ -45,6 +58,7 @@ function AffiliateCommissionsPage({ commissions: initialCommissions }) {
   const [commissions, setCommissions] = useState(initialCommissions || []);
   const [loading, setLoading] = useState(!initialCommissions);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     if (initialCommissions) {
@@ -87,6 +101,30 @@ function AffiliateCommissionsPage({ commissions: initialCommissions }) {
     [commissions],
   );
 
+  const sortedRows = useMemo(() => {
+    return [...rows].sort((left, right) => {
+      const leftPending = left.status === "PENDING" ? 1 : 0;
+      const rightPending = right.status === "PENDING" ? 1 : 0;
+
+      if (leftPending !== rightPending) {
+        return rightPending - leftPending;
+      }
+
+      return getCommissionTime(right) - getCommissionTime(left);
+    });
+  }, [rows]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [commissions.length]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / COMMISSIONS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedRows = useMemo(() => {
+    const startIndex = (currentPage - 1) * COMMISSIONS_PER_PAGE;
+    return sortedRows.slice(startIndex, startIndex + COMMISSIONS_PER_PAGE);
+  }, [currentPage, sortedRows]);
+
   const pendingAmount = rows.reduce((sum, item) => sum + Number(item.pending_amount || 0), 0);
   const approvedAmount = rows.reduce((sum, item) => sum + Number(item.actual_amount || 0), 0);
   const pendingCount = rows.filter((item) => Number(item.pending_amount || 0) > 0).length;
@@ -94,16 +132,31 @@ function AffiliateCommissionsPage({ commissions: initialCommissions }) {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Affiliate"
+        eyebrow="Tiếp thị liên kết"
         title="Bảng theo dõi hoa hồng"
-        description="Theo dõi hoa hồng theo từng đơn và số tiền thực nhận sau khi seller xác nhận đã thu tiền."
+        description="Theo dõi các đơn tạo hoa hồng, phần đang tạm giữ và số tiền thực nhận sau khi seller xác nhận đã nhận tiền."
       />
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-        <MetricCard label="Tạm tính" value={formatCurrency(pendingAmount)} tone="amber" hint="Tổng hoa hồng đang chờ mở khóa." />
-        <MetricCard label="Đã duyệt" value={formatCurrency(approvedAmount)} tone="emerald" hint="Chỉ tính sau khi seller xác nhận nhận tiền." />
-        <MetricCard label="Đơn chưa mở khóa" value={pendingCount} tone="slate" hint="Các đơn này chưa đủ điều kiện ghi nhận thực nhận." />
+        <MetricCard
+          label="Tạm tính"
+          value={formatCurrency(pendingAmount)}
+          tone="amber"
+          hint="Khoản hoa hồng đang chờ seller xác nhận đã nhận tiền."
+        />
+        <MetricCard
+          label="Đã ghi nhận"
+          value={formatCurrency(approvedAmount)}
+          tone="emerald"
+          hint="Khoản hoa hồng đã đủ điều kiện và được tính vào ví affiliate."
+        />
+        <MetricCard
+          label="Đơn chưa hoàn tất"
+          value={pendingCount}
+          tone="slate"
+          hint="Ưu tiên hiển thị các đơn còn đang chờ xử lý ở đầu danh sách."
+        />
       </div>
-      {loading ? <EmptyState title="Đang tải hoa hồng" description="Hệ thống đang lấy bảng commission từ backend." /> : null}
+      {loading ? <EmptyState title="Đang tải hoa hồng" description="Hệ thống đang lấy dữ liệu hoa hồng từ máy chủ." /> : null}
       {!loading && error ? <EmptyState title="Không tải được hoa hồng" description={error} /> : null}
       {!loading && !error ? (
         <div className="rounded-[2rem] border border-slate-200 bg-white p-3 shadow-sm shadow-slate-200/70">
@@ -112,12 +165,6 @@ function AffiliateCommissionsPage({ commissions: initialCommissions }) {
             columns={[
               { key: "order_code", title: "Đơn hàng" },
               { key: "product_name", title: "Sản phẩm" },
-              { key: "order_amount", title: "Tổng tiền", render: (row) => <MoneyText value={row.order_amount} /> },
-              {
-                key: "affiliate_commission_amount",
-                title: "Hoa hồng affiliate",
-                render: (row) => <MoneyText value={row.affiliate_commission_amount} />,
-              },
               { key: "pending_amount", title: "Tạm tính", render: (row) => <MoneyText value={row.pending_amount} /> },
               {
                 key: "actual_amount",
@@ -136,9 +183,12 @@ function AffiliateCommissionsPage({ commissions: initialCommissions }) {
                 render: (row) => <span className="text-sm leading-7 text-slate-600">{getConditionText(row)}</span>,
               },
             ]}
-            rows={rows}
+            rows={paginatedRows}
           />
         </div>
+      ) : null}
+      {!loading && !error && sortedRows.length > COMMISSIONS_PER_PAGE ? (
+        <Pagination page={currentPage} totalPages={totalPages} onPageChange={setPage} />
       ) : null}
     </div>
   );

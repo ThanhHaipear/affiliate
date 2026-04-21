@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { copyText } from "../../lib/clipboard";
 import Button from "./Button";
 
-function CopyBox({ value, label = "Link affiliate" }) {
+function CopyBox({ value, label = "Link affiliate", actions = null }) {
   const [copied, setCopied] = useState(false);
   const inputRef = useRef(null);
 
@@ -40,7 +40,8 @@ function CopyBox({ value, label = "Link affiliate" }) {
           onFocus={handleSelect}
           className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-200"
         />
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-3">
+          {actions}
           <Button variant="secondary" onClick={handleCopy}>
             {copied ? "Đã sao chép" : "Sao chép link"}
           </Button>

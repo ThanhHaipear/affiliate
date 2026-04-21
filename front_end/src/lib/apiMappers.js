@@ -3,6 +3,46 @@ function toNumber(value) {
   return Number.isFinite(normalized) ? normalized : 0;
 }
 
+function translateCommissionReason(reason = "", { orderStatus, sellerConfirmed, status } = {}) {
+  const normalizedReason = String(reason || "").trim();
+
+  if (!normalizedReason) {
+    if (orderStatus === "CANCELLED") {
+      return "Đơn hàng đã bị hủy nên không đủ điều kiện nhận hoa hồng.";
+    }
+
+    if (orderStatus === "REFUNDED") {
+      return "Đơn hàng đã được hoàn tiền nên không đủ điều kiện nhận hoa hồng.";
+    }
+
+    if (!sellerConfirmed && status === "PENDING") {
+      return "Hoa hồng đang tạm giữ và chờ seller xác nhận đã nhận tiền.";
+    }
+
+    if (["APPROVED", "WALLET_CREDITED", "PAID_OUT"].includes(status)) {
+      return "Hoa hồng đã đủ điều kiện và được ghi nhận vào ví affiliate.";
+    }
+
+    return "";
+  }
+
+  const lowerReason = normalizedReason.toLowerCase();
+
+  if (lowerReason.includes("pending commission recorded at checkout")) {
+    return "Hoa hồng tạm tính đã được ghi nhận khi khách hoàn tất thanh toán.";
+  }
+
+  if (lowerReason.includes("credited") && lowerReason.includes("wallet")) {
+    return "Hoa hồng đã được cộng vào ví affiliate.";
+  }
+
+  if (lowerReason.includes("rejected")) {
+    return "Hoa hồng đã bị từ chối.";
+  }
+
+  return normalizedReason;
+}
+
 function getAccountDisplayName(account = {}) {
   return (
     account?.adminProfile?.fullName ||
@@ -149,7 +189,11 @@ function mapCommissionDto(commission = {}) {
     seller_confirmed_received_money: sellerConfirmed,
     order_status: orderStatus,
     status: commissionStatus,
-    reason: commission.rejectReason || commission.note || "",
+    reason: translateCommissionReason(commission.rejectReason || commission.note || "", {
+      orderStatus,
+      sellerConfirmed,
+      status: commissionStatus,
+    }),
     raw: commission,
   };
 }
@@ -350,10 +394,10 @@ function mapNotificationDto(notification = {}) {
   return {
     id: notification.id,
     title: notification.title || "Thông báo",
-    description: notification.content || "",
+    description: notification.content || notification.description || "",
     type: notification.type || "GENERAL",
-    unread: !Boolean(notification.isRead),
-    created_at: notification.createdAt || null,
+    unread: typeof notification.isRead === "boolean" ? !notification.isRead : !Boolean(notification.read),
+    created_at: notification.createdAt || notification.created_at || null,
     raw: notification,
   };
 }

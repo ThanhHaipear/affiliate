@@ -59,8 +59,8 @@ function AffiliateWithdrawalsPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Affiliate"
-        title="Rút tiền affiliate"
-        description="Hiển thị số dư ví, tài khoản nhận tiền mặc định, giới hạn min/max và gửi yêu cầu rút tiền trên cùng một màn hình."
+        title="Ví và rút tiền"
+
         action={(
           <Link
             to="/dashboard/affiliate/profile"

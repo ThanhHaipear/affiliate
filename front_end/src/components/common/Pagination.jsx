@@ -6,7 +6,7 @@ function Pagination({
   onPageChange,
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
+    <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
       <span>
         Trang {page} / {totalPages}
       </span>

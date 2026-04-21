@@ -1,4 +1,5 @@
 import { screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import AffiliateCommissionsPage from "./AffiliateCommissionsPage";
 import { renderWithProviders } from "../../../test/test-utils";
 
@@ -17,6 +18,7 @@ describe("AffiliateCommissionsPage", () => {
       seller_confirmed_received_money: true,
       order_status: "COMPLETED",
       reason: "Credited",
+      raw: { createdAt: "2026-01-01T00:00:00.000Z" },
     },
     {
       id: "2",
@@ -31,6 +33,7 @@ describe("AffiliateCommissionsPage", () => {
       seller_confirmed_received_money: false,
       order_status: "PROCESSING",
       reason: "Pending",
+      raw: { createdAt: "2026-01-03T00:00:00.000Z" },
     },
     {
       id: "3",
@@ -45,6 +48,7 @@ describe("AffiliateCommissionsPage", () => {
       seller_confirmed_received_money: false,
       order_status: "CANCELLED",
       reason: "Cancelled",
+      raw: { createdAt: "2026-01-04T00:00:00.000Z" },
     },
     {
       id: "4",
@@ -59,6 +63,7 @@ describe("AffiliateCommissionsPage", () => {
       seller_confirmed_received_money: false,
       order_status: "REFUNDED",
       reason: "Refunded",
+      raw: { createdAt: "2026-01-02T00:00:00.000Z" },
     },
   ];
 
@@ -68,8 +73,8 @@ describe("AffiliateCommissionsPage", () => {
     const creditedRow = screen.getByText("OD-1").closest("tr");
     const pendingRow = screen.getByText("OD-2").closest("tr");
 
-    expect(within(creditedRow).getAllByText(/100\.000/)).toHaveLength(3);
-    expect(within(pendingRow).getAllByText(/200\.000/)).toHaveLength(2);
+    expect(within(creditedRow).getAllByText(/100\.000/)).toHaveLength(2);
+    expect(within(pendingRow).getAllByText(/200\.000/)).toHaveLength(1);
   });
 
   it("shows actual commission only when seller confirmed money", () => {
@@ -78,15 +83,16 @@ describe("AffiliateCommissionsPage", () => {
     const creditedRow = screen.getByText("OD-1").closest("tr");
     const pendingRow = screen.getByText("OD-2").closest("tr");
 
-    expect(within(creditedRow).getAllByText(/100\.000/)).toHaveLength(3);
-    expect(within(pendingRow).getByText(/Chua du dieu kien/i)).toBeInTheDocument();
+    expect(within(creditedRow).getAllByText(/100\.000/)).toHaveLength(2);
+    expect(within(pendingRow).getByText(/Chưa đủ điều kiện/i)).toBeInTheDocument();
   });
 
   it("does not show platform fee metric and column", () => {
     renderWithProviders(<AffiliateCommissionsPage commissions={commissions} />);
 
-    expect(screen.queryByText(/Phi nen tang/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/Hoa hồng affiliate/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Phí nền tảng/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Hoa hồng affiliate/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Tổng tiền/i)).not.toBeInTheDocument();
   });
 
   it("shows not eligible message for cancelled order", () => {
@@ -103,5 +109,44 @@ describe("AffiliateCommissionsPage", () => {
     expect(
       screen.getByText(/Không đủ điều kiện nhận hoa hồng vì đơn hàng đã được hoàn tiền/i),
     ).toBeInTheDocument();
+  });
+
+  it("sorts pending status to the top before other rows", () => {
+    renderWithProviders(<AffiliateCommissionsPage commissions={commissions} />);
+
+    const bodyRows = screen.getAllByRole("row").slice(1);
+    expect(within(bodyRows[0]).getByText("OD-2")).toBeInTheDocument();
+  });
+
+  it("paginates commissions with 8 batches per page", async () => {
+    const user = userEvent.setup();
+    const paginatedCommissions = Array.from({ length: 9 }, (_, index) => ({
+      id: String(index + 1),
+      order_code: `OD-${index + 1}`,
+      product_name: `Product ${index + 1}`,
+      order_amount: 100000 * (index + 1),
+      platform_fee_amount: 10000,
+      affiliate_commission_amount: 20000,
+      pending_amount: index === 8 ? 10000 : 0,
+      actual_amount: index === 8 ? 0 : 20000,
+      status: index === 8 ? "PENDING" : "WALLET_CREDITED",
+      seller_confirmed_received_money: index !== 8,
+      order_status: "COMPLETED",
+      reason: "",
+      raw: { createdAt: `2026-01-${String(index + 1).padStart(2, "0")}T00:00:00.000Z` },
+    }));
+
+    renderWithProviders(<AffiliateCommissionsPage commissions={paginatedCommissions} />);
+
+    expect(screen.getByText("Trang 1 / 2")).toBeInTheDocument();
+    expect(screen.getByText("OD-9")).toBeInTheDocument();
+    expect(screen.getByText("OD-8")).toBeInTheDocument();
+    expect(screen.queryByText("OD-1")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Sau" }));
+
+    expect(screen.getByText("Trang 2 / 2")).toBeInTheDocument();
+    expect(screen.getByText("OD-1")).toBeInTheDocument();
+    expect(screen.queryByText("OD-8")).not.toBeInTheDocument();
   });
 });
