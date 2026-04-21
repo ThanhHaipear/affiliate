@@ -166,7 +166,7 @@ function PublicShopPage() {
       <SectionIntro
         eyebrow="Shop"
         title={shopName}
-        description={`Khám phá ${shopProducts.length} sản phẩm của shop, tìm nhanh theo tên hoặc danh mục và thêm vào giỏ hàng như bình thường.`}
+        description={`Cùng khám phá ${shopProducts.length} sản phẩm của shop nào!`}
       />
 
       <div className="grid gap-6 xl:grid-cols-[300px_1fr]">
