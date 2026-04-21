@@ -6,43 +6,85 @@ import Pagination from "../../components/common/Pagination";
 import ProductCard from "../../components/product/ProductCard";
 import ProductFilter from "../../components/product/ProductFilter";
 import SectionIntro from "../../components/storefront/SectionIntro";
-import { getProducts } from "../../api/productApi";
+import { getProductCategories, getProducts } from "../../api/productApi";
 import { mapProductDto } from "../../lib/apiMappers";
+import { useAuthStore } from "../../store/authStore";
 
 const PRODUCTS_PER_PAGE = 9;
+const DEFAULT_SORT = "latest";
+const DEFAULT_CATEGORY = "ALL";
+
+function normalizeCategoryValue(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+}
 
 function ProductListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const roles = useAuthStore((state) => state.roles);
   const [products, setProducts] = useState([]);
+  const [categoryOptions, setCategoryOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState(searchParams.get("search") || "");
-  const [sort, setSort] = useState("latest");
-  const [category, setCategory] = useState("ALL");
+  const [sort, setSort] = useState(searchParams.get("sort") || DEFAULT_SORT);
+  const [category, setCategory] = useState(searchParams.get("category") || DEFAULT_CATEGORY);
   const [page, setPage] = useState(() => Math.max(1, Number(searchParams.get("page") || 1)));
+  const canSortByCommission = roles.includes("affiliate") || currentUser?.profile?.affiliateStatus === "APPROVED";
 
   useEffect(() => {
     setSearch(searchParams.get("search") || "");
+    setSort(searchParams.get("sort") || DEFAULT_SORT);
+    setCategory(searchParams.get("category") || DEFAULT_CATEGORY);
     setPage(Math.max(1, Number(searchParams.get("page") || 1)));
   }, [searchParams]);
 
   useEffect(() => {
-    const nextParams = new URLSearchParams(searchParams);
+    if (sort === "commission-desc" && !canSortByCommission) {
+      setSort(DEFAULT_SORT);
+    }
+  }, [canSortByCommission, sort]);
+
+  useEffect(() => {
+    if (category === DEFAULT_CATEGORY || !categoryOptions.length) {
+      return;
+    }
+
+    const normalizedCurrentCategory = normalizeCategoryValue(category);
+    const matchedCategory = categoryOptions.find((item) =>
+      [item.value, item.slug, item.name, item.id].some(
+        (candidate) => normalizeCategoryValue(candidate) === normalizedCurrentCategory,
+      ),
+    );
+
+    if (matchedCategory && matchedCategory.value !== category) {
+      setCategory(matchedCategory.value);
+    }
+  }, [category, categoryOptions]);
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams();
 
     if (search.trim()) {
       nextParams.set("search", search.trim());
-    } else {
-      nextParams.delete("search");
+    }
+
+    if (category !== DEFAULT_CATEGORY) {
+      nextParams.set("category", category);
+    }
+
+    if (sort !== DEFAULT_SORT) {
+      nextParams.set("sort", sort);
     }
 
     if (page > 1) {
       nextParams.set("page", String(page));
-    } else {
-      nextParams.delete("page");
     }
 
     setSearchParams(nextParams, { replace: true });
-  }, [page, search, searchParams, setSearchParams]);
+  }, [category, page, search, setSearchParams, sort]);
 
   useEffect(() => {
     let active = true;
@@ -51,12 +93,21 @@ function ProductListPage() {
       try {
         setLoading(true);
         setError("");
-        const response = await getProducts();
+        const [productsResponse, categoriesResponse] = await Promise.all([getProducts(), getProductCategories()]);
         if (!active) {
           return;
         }
 
-        setProducts((response || []).map(mapProductDto));
+        setProducts((productsResponse || []).map(mapProductDto));
+        setCategoryOptions(
+          (categoriesResponse || []).map((item) => ({
+            id: item.id,
+            name: item.name,
+            slug: item.slug,
+            value: item.slug || item.name || String(item.id),
+            label: item.name,
+          })),
+        );
       } catch (loadError) {
         if (active) {
           setError(loadError.response?.data?.message || "Không tải được danh sách sản phẩm.");
@@ -75,11 +126,6 @@ function ProductListPage() {
     };
   }, []);
 
-  const categories = useMemo(
-    () => [...new Set(products.map((product) => product.category).filter(Boolean))],
-    [products],
-  );
-
   const sellers = useMemo(
     () => [...new Set(products.map((product) => product.seller_name).filter(Boolean))],
     [products],
@@ -87,11 +133,29 @@ function ProductListPage() {
 
   const filteredProducts = useMemo(() => {
     const keyword = search.trim().toLowerCase();
+    const normalizedSelectedCategory = normalizeCategoryValue(category);
+    const selectedCategoryOption =
+      category === DEFAULT_CATEGORY
+        ? null
+        : categoryOptions.find((item) =>
+            [item.value, item.slug, item.name, item.id].some(
+              (candidate) => normalizeCategoryValue(candidate) === normalizedSelectedCategory,
+            ),
+          );
+    const acceptedCategoryValues = selectedCategoryOption
+      ? [selectedCategoryOption.value, selectedCategoryOption.slug, selectedCategoryOption.name, selectedCategoryOption.id]
+          .map(normalizeCategoryValue)
+          .filter(Boolean)
+      : [];
     const next = products.filter((product) => {
       const matchedKeyword =
         !keyword ||
         [product.name, product.seller_name, product.category].join(" ").toLowerCase().includes(keyword);
-      const matchedCategory = category === "ALL" || product.category === category;
+      const matchedCategory =
+        category === DEFAULT_CATEGORY ||
+        [product.category_slug, product.category, product.category_id]
+          .map(normalizeCategoryValue)
+          .some((candidate) => acceptedCategoryValues.includes(candidate) || candidate === normalizedSelectedCategory);
 
       return matchedKeyword && matchedCategory;
     });
@@ -100,12 +164,12 @@ function ProductListPage() {
       next.sort((a, b) => (a.salePrice || a.price) - (b.salePrice || b.price));
     } else if (sort === "price-desc") {
       next.sort((a, b) => (b.salePrice || b.price) - (a.salePrice || a.price));
-    } else if (sort === "commission-desc") {
+    } else if (sort === "commission-desc" && canSortByCommission) {
       next.sort((a, b) => b.commission_value - a.commission_value);
     }
 
     return next;
-  }, [category, products, search, sort]);
+  }, [canSortByCommission, category, categoryOptions, products, search, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE));
 
@@ -165,7 +229,8 @@ function ProductListPage() {
             search={search}
             sort={sort}
             category={category}
-            categories={categories}
+            categories={categoryOptions}
+            canSortByCommission={canSortByCommission}
             onSearchChange={handleSearchChange}
             onSortChange={handleSortChange}
             onCategoryChange={handleCategoryChange}

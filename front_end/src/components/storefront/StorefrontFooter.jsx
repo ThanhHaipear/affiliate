@@ -8,13 +8,12 @@ function StorefrontFooter() {
           <p className="text-xs uppercase tracking-[0.3em] text-cyan-700">Affiliate Commerce</p>
           <h3 className="mt-3 text-lg font-semibold text-slate-900">Nền tảng mua hàng và tiếp thị liên kết</h3>
           <p className="mt-3 leading-7">
-            Kết nối người mua, người bán và affiliate trong một trải nghiệm rõ ràng, minh bạch và sẵn
-            sàng nối backend thật.
+            Kết nối người mua, người bán và affiliate trong một trải nghiệm rõ ràng, minh bạch.
           </p>
           <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
             <span className="rounded-full bg-slate-100 px-3 py-2">Người bán được duyệt</span>
             <span className="rounded-full bg-slate-100 px-3 py-2">Affiliate được duyệt</span>
-            <span className="rounded-full bg-slate-100 px-3 py-2">Phí nền tảng 5%</span>
+            <span className="rounded-full bg-slate-100 px-3 py-2">Phí nền tảng thấp</span>
           </div>
         </div>
         <div>

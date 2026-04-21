@@ -6,10 +6,27 @@ function ProductFilter({
   sort,
   category = "ALL",
   categories = [],
+  canSortByCommission = false,
   onSearchChange,
   onSortChange,
   onCategoryChange,
 }) {
+  const sortOptions = [
+    { label: "Mới nhất", value: "latest" },
+    { label: "Giá tăng dần", value: "price-asc" },
+    { label: "Giá giảm dần", value: "price-desc" },
+  ];
+  const categoryOptions = [
+    { label: "Tất cả danh mục", value: "ALL" },
+    ...categories.map((item) =>
+      typeof item === "string" ? { label: item, value: item } : { label: item.label || item.name, value: item.value || item.slug || item.name },
+    ),
+  ];
+
+  if (canSortByCommission) {
+    sortOptions.push({ label: "Hoa hồng cao nhất", value: "commission-desc" });
+  }
+
   return (
     <div className="grid gap-4 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2 xl:grid-cols-3">
       <Input
@@ -22,21 +39,13 @@ function ProductFilter({
         label="Danh mục"
         value={category}
         onChange={(event) => onCategoryChange?.(event.target.value)}
-        options={[
-          { label: "Tất cả danh mục", value: "ALL" },
-          ...categories.map((item) => ({ label: item, value: item })),
-        ]}
+        options={categoryOptions}
       />
       <Select
         label="Sắp xếp"
         value={sort}
         onChange={(event) => onSortChange?.(event.target.value)}
-        options={[
-          { label: "Mới nhất", value: "latest" },
-          { label: "Giá tăng dần", value: "price-asc" },
-          { label: "Giá giảm dần", value: "price-desc" },
-          { label: "Hoa hồng cao nhất", value: "commission-desc" },
-        ]}
+        options={sortOptions}
       />
     </div>
   );

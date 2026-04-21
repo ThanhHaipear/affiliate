@@ -86,6 +86,7 @@ exports.listApprovedProducts = async () => {
       variants: { include: { inventory: true } },
       affiliateSetting: true,
       seller: true,
+      category: true,
     },
     orderBy: { createdAt: "desc" },
   });

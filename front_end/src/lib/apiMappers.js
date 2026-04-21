@@ -97,6 +97,8 @@ function mapProductDto(product = {}) {
     name: product.name || "Unnamed product",
     description: product.description || "",
     category: product.category?.name || "General",
+    category_id: product.category?.id ?? product.categoryId ?? null,
+    category_slug: product.category?.slug || null,
     image: product.images?.[0]?.url || "https://placehold.co/1200x800?text=Product",
     price: toNumber(product.basePrice ?? primaryVariant.price),
     stock: sumVariantInventory(product.variants),

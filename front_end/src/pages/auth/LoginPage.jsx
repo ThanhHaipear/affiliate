@@ -16,6 +16,8 @@ function LoginPage() {
     register,
     handleSubmit,
     watch,
+    setError,
+    clearErrors,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(loginSchema),
@@ -31,6 +33,7 @@ function LoginPage() {
 
   const onSubmit = async (values) => {
     try {
+      clearErrors("password");
       const payload = {
         email: values.email,
         password: values.password,
@@ -46,9 +49,16 @@ function LoginPage() {
         navigate("/dashboard");
       }
     } catch (error) {
-      const message = error.response?.data?.message || "Đăng nhập thất bại.";
       const status = error.response?.status;
-      const normalizedMessage = String(message).toLowerCase();
+      const rawMessage = error.response?.data?.message || "Đăng nhập thất bại.";
+      const normalizedMessage = String(rawMessage).toLowerCase();
+      const isInvalidCredentials =
+        status === 401 &&
+        (normalizedMessage.includes("invalid credentials") ||
+          normalizedMessage.includes("incorrect password") ||
+          normalizedMessage.includes("sai mật khẩu") ||
+          normalizedMessage.includes("sai mat khau"));
+      const message = isInvalidCredentials ? "Email hoặc mật khẩu không đúng." : rawMessage;
 
       if (
         status === 403 &&
@@ -61,6 +71,13 @@ function LoginPage() {
           },
         });
         return;
+      }
+
+      if (isInvalidCredentials) {
+        setError("password", {
+          type: "server",
+          message,
+        });
       }
 
       toast.error(message);

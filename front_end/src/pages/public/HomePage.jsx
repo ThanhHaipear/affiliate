@@ -9,6 +9,9 @@ import FAQAccordion from "../../components/storefront/FAQAccordion";
 import SectionIntro from "../../components/storefront/SectionIntro";
 import { mapProductDto } from "../../lib/apiMappers";
 
+const TOP_SHOPS_LIMIT = 3;
+const FEATURED_PRODUCTS_LIMIT = 4;
+
 function HomePage() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +47,19 @@ function HomePage() {
     };
   }, []);
 
-  const featuredProducts = useMemo(() => products.slice(0, 4), [products]);
+  const featuredProducts = useMemo(
+    () =>
+      [...products]
+        .sort((left, right) => {
+          if ((right.sold || 0) !== (left.sold || 0)) {
+            return (right.sold || 0) - (left.sold || 0);
+          }
+
+          return (right.review_count || 0) - (left.review_count || 0);
+        })
+        .slice(0, FEATURED_PRODUCTS_LIMIT),
+    [products],
+  );
   const heroBannerProducts = useMemo(() => products.slice(0, 3), [products]);
 
   const categories = useMemo(() => {
@@ -74,7 +89,15 @@ function HomePage() {
       shops.set(product.seller_name, existing);
     });
 
-    return [...shops.values()].sort((a, b) => b.productCount - a.productCount).slice(0, 3);
+    return [...shops.values()]
+      .sort((a, b) => {
+        if (b.productCount !== a.productCount) {
+          return b.productCount - a.productCount;
+        }
+
+        return a.name.localeCompare(b.name, "vi");
+      })
+      .slice(0, TOP_SHOPS_LIMIT);
   }, [products]);
 
   const faqItems = useMemo(
@@ -226,8 +249,8 @@ function HomePage() {
           <section className="space-y-6">
             <SectionIntro
               eyebrow="Nền tảng"
-              title="Một marketplace trung gian giúp seller, affiliate và buyer làm việc rõ ràng hơn"
-              description="Seller tự đặt hoa hồng theo sản phẩm, admin kiểm duyệt seller, affiliate và sản phẩm, và hệ thống chỉ ghi nhận commission sau khi seller xác nhận đã nhận tiền."
+              title="Một marketplace trung gian giúp Seller, Affiliate và Customer làm việc rõ ràng hơn"
+              description="Seller tự đặt hoa hồng theo sản phẩm. Admin kiểm duyệt seller, affiliate và sản phẩm."
             />
             <div className="grid gap-4 lg:grid-cols-3">
               <RoleCard
@@ -333,14 +356,13 @@ function HomePage() {
           <section className="space-y-6">
             <SectionIntro
               eyebrow="Top shop"
-              title="Shop được người mua tin dùng"
-              description="Tổng hợp từ shop có nhiều sản phẩm và khả năng quảng bá tốt."
+              title="Có nhiều sản phẩm"
+
             />
             <div className="grid gap-4 md:grid-cols-3">
               {topShops.map((shop) => (
                 <div key={shop.id} className="rounded-[2rem] border border-slate-300 bg-white p-5 shadow-sm">
-                  <p className="text-xs uppercase tracking-[0.28em] text-slate-400">{shop.specialty}</p>
-                  <h3 className="mt-3 text-xl font-semibold text-slate-900">{shop.name}</h3>
+                  <h3 className="text-xl font-semibold text-slate-900">{shop.name}</h3>
                   <p className="mt-3 text-sm leading-7 text-slate-600">{shop.productCount} sản phẩm đang hiển thị trong marketplace.</p>
                 </div>
               ))}
@@ -350,8 +372,8 @@ function HomePage() {
           <section className="space-y-6">
             <SectionIntro
               eyebrow="Feedback"
-              title="Seller, affiliate và buyer nhìn thấy gì ở nền tảng này"
-              description="Một lớp testimonial ngắn gọn để tăng mức độ tin tưởng trên trang chủ."
+              title="Seller, affiliate và buyer nhìn thấy gì?"
+
             />
             <div className="grid gap-4 lg:grid-cols-3">
               {testimonials.map((item) => (
@@ -370,8 +392,8 @@ function HomePage() {
             <div className="space-y-6">
               <SectionIntro
                 eyebrow="FAQ"
-                title="Những câu hỏi cần được trả lời ngay từ public site"
-                description="Accordion này phản ánh đúng logic nghiệp vụ: seller và affiliate cần duyệt, commission chỉ ghi nhận sau khi seller xác nhận nhận tiền."
+                title="Những câu hỏi thường gặp"
+
               />
               <FAQAccordion items={faqItems} />
             </div>
