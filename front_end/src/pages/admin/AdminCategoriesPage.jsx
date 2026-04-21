@@ -5,9 +5,11 @@ import DataTable from "../../components/common/DataTable";
 import EmptyState from "../../components/common/EmptyState";
 import Input from "../../components/common/Input";
 import PageHeader from "../../components/common/PageHeader";
-import Select from "../../components/common/Select";
+import Pagination from "../../components/common/Pagination";
 import { useToast } from "../../hooks/useToast";
 import { formatDateTime } from "../../lib/format";
+
+const CATEGORIES_PER_PAGE = 3;
 
 function AdminCategoriesPage() {
   const toast = useToast();
@@ -15,9 +17,9 @@ function AdminCategoriesPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
   const [form, setForm] = useState({
     name: "",
-    parentId: "",
   });
 
   useEffect(() => {
@@ -50,10 +52,10 @@ function AdminCategoriesPage() {
       setSubmitting(true);
       await createAdminCategory({
         name: normalizedName,
-        parentId: form.parentId ? Number(form.parentId) : null,
+        parentId: null,
       });
       toast.success("Đã thêm danh mục mới.");
-      setForm({ name: "", parentId: "" });
+      setForm({ name: "" });
       await loadCategories();
     } catch (submitError) {
       toast.error(submitError.response?.data?.message || "Không tạo được danh mục.");
@@ -62,27 +64,27 @@ function AdminCategoriesPage() {
     }
   }
 
-  const parentOptions = useMemo(() => {
-    return [
-      { label: "Không có danh mục cha", value: "" },
-      ...categories.map((category) => ({
-        label: category.name,
-        value: String(category.id),
-      })),
-    ];
-  }, [categories]);
-
   const rows = useMemo(() => {
     return categories.map((category) => ({
       id: String(category.id),
       name: category.name,
       slug: category.slug || "--",
-      parentName: category.parent?.name || "Danh mục gốc",
       childCount: category.children?.length || 0,
       productCount: category._count?.products || 0,
       createdAt: category.createdAt || null,
     }));
   }, [categories]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [rows.length]);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / CATEGORIES_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedRows = useMemo(() => {
+    const startIndex = (currentPage - 1) * CATEGORIES_PER_PAGE;
+    return rows.slice(startIndex, startIndex + CATEGORIES_PER_PAGE);
+  }, [currentPage, rows]);
 
   if (loading) {
     return (
@@ -119,12 +121,6 @@ function AdminCategoriesPage() {
               onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
               placeholder="Nhập tên danh mục"
             />
-            <Select
-              label="Danh mục cha"
-              value={form.parentId}
-              onChange={(event) => setForm((current) => ({ ...current, parentId: event.target.value }))}
-              options={parentOptions}
-            />
             <Button type="submit" loading={submitting}>
               Thêm danh mục
             </Button>
@@ -137,11 +133,10 @@ function AdminCategoriesPage() {
             Danh sách này hiển thị tất cả danh mục hiện có trong cơ sở dữ liệu.
           </p>
 
-          <div className="mt-5">
+          <div className="mt-5 space-y-4">
             <DataTable
               columns={[
                 { key: "name", title: "Tên danh mục" },
-                { key: "parentName", title: "Danh mục cha" },
                 { key: "productCount", title: "Số sản phẩm" },
                 { key: "childCount", title: "Danh mục con" },
                 { key: "slug", title: "Slug" },
@@ -151,10 +146,14 @@ function AdminCategoriesPage() {
                   render: (row) => formatDateTime(row.createdAt),
                 },
               ]}
-              rows={rows}
+              rows={paginatedRows}
               emptyTitle="Chưa có danh mục"
               emptyDescription="Khi bạn tạo danh mục mới, dữ liệu sẽ xuất hiện tại đây."
             />
+
+            {rows.length > CATEGORIES_PER_PAGE ? (
+              <Pagination page={currentPage} totalPages={totalPages} onPageChange={setPage} />
+            ) : null}
           </div>
         </div>
       </div>

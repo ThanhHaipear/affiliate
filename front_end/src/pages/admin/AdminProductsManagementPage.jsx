@@ -96,12 +96,12 @@ function AdminProductsManagementPage() {
         if (product.visibility_status === "ACTIVE") {
           result.visible += 1;
         }
-        if (product.admin_hidden) {
-          result.hiddenByAdmin += 1;
+        if (product.admin_hidden || product.seller_hidden) {
+          result.hidden += 1;
         }
         return result;
       },
-      { total: 0, approved: 0, visible: 0, hiddenByAdmin: 0 },
+      { total: 0, approved: 0, visible: 0, hidden: 0 },
     );
   }, [filteredProducts]);
 
@@ -157,7 +157,7 @@ function AdminProductsManagementPage() {
         <SummaryCard label="Tổng sản phẩm" value={summary.total} />
         <SummaryCard label="Đã duyệt" value={summary.approved} />
         <SummaryCard label="Đang có" value={summary.visible} />
-        <SummaryCard label="Bị ẩn" value={summary.hiddenByAdmin} />
+        <SummaryCard label="Bị ẩn" value={summary.hidden} />
       </div>
 
       <FilterBar

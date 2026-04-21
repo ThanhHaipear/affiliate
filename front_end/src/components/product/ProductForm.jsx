@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Button from "../common/Button";
 import FileUploadField from "../common/FileUploadField";
 import Input from "../common/Input";
@@ -21,6 +21,17 @@ function normalizeInitialValues(defaultValues, stockMin) {
   );
 }
 
+function moveArrayItem(items, fromIndex, toIndex) {
+  if (toIndex < 0 || toIndex >= items.length) {
+    return items;
+  }
+
+  const nextItems = [...items];
+  const [movedItem] = nextItems.splice(fromIndex, 1);
+  nextItems.splice(toIndex, 0, movedItem);
+  return nextItems;
+}
+
 function ProductForm({
   defaultValues,
   onSubmit,
@@ -39,12 +50,17 @@ function ProductForm({
   const [errors, setErrors] = useState({});
   const [imageFiles, setImageFiles] = useState([]);
   const [imagePreviews, setImagePreviews] = useState(initialValues.imageUrls || []);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     setValues(initialValues);
     setErrors({});
     setImageFiles([]);
     setImagePreviews(initialValues.imageUrls || []);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   }, [initialValues]);
 
   useEffect(() => {
@@ -94,13 +110,57 @@ function ProductForm({
     });
   }
 
+  function handleImageChange(event) {
+    setImageFiles(Array.from(event.target.files || []));
+  }
+
+  function resetImageInput() {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+
+  function handleRemoveImage(indexToRemove) {
+    if (imageFiles.length) {
+      const nextFiles = imageFiles.filter((_, index) => index !== indexToRemove);
+      setImageFiles(nextFiles);
+
+      if (!nextFiles.length) {
+        resetImageInput();
+      }
+
+      return;
+    }
+
+    setImagePreviews((currentPreviews) => currentPreviews.filter((_, index) => index !== indexToRemove));
+    setValues((currentValues) => ({
+      ...currentValues,
+      imageUrls: (currentValues.imageUrls || []).filter((_, index) => index !== indexToRemove),
+    }));
+  }
+
+  function handleMoveImage(indexToMove, direction) {
+    const nextIndex = direction === "up" ? indexToMove - 1 : indexToMove + 1;
+
+    if (imageFiles.length) {
+      setImageFiles((currentFiles) => moveArrayItem(currentFiles, indexToMove, nextIndex));
+      return;
+    }
+
+    setImagePreviews((currentPreviews) => moveArrayItem(currentPreviews, indexToMove, nextIndex));
+    setValues((currentValues) => ({
+      ...currentValues,
+      imageUrls: moveArrayItem(currentValues.imageUrls || [], indexToMove, nextIndex),
+    }));
+  }
+
   async function handleFormSubmit(event) {
     event.preventDefault();
 
     const payload = {
       ...values,
       commission_type: "PERCENT",
-      imageUrls: initialValues.imageUrls || [],
+      imageUrls: values.imageUrls || [],
       imageFiles,
     };
 
@@ -109,7 +169,10 @@ function ProductForm({
     if (!validationResult.success) {
       const fieldErrors = validationResult.error.flatten().fieldErrors;
       const normalizedErrors = Object.fromEntries(
-        Object.entries(fieldErrors).map(([field, messages]) => [field, messages?.[0] || "Dữ liệu không hợp lệ."]),
+        Object.entries(fieldErrors).map(([field, messages]) => [
+          field,
+          messages?.[0] || "Dữ liệu không hợp lệ.",
+        ]),
       );
 
       setErrors(normalizedErrors);
@@ -124,7 +187,7 @@ function ProductForm({
   const validationMessages = Object.values(errors).filter(Boolean);
 
   return (
-    <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6">
+    <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
       <form className="grid gap-4 md:grid-cols-2" onSubmit={handleFormSubmit} noValidate>
         {validationMessages.length ? (
           <div className="md:col-span-2 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
@@ -210,10 +273,11 @@ function ProductForm({
 
         <div className="md:col-span-2 space-y-3">
           <FileUploadField
+            ref={fileInputRef}
             label="Ảnh sản phẩm"
-            hint="Có thể chọn nhiều ảnh. Nếu chọn ảnh mới khi sửa, danh sách ảnh cũ sẽ được thay bằng bộ ảnh mới."
+            hint="Có thể chọn nhiều ảnh. Nếu chọn nhầm, bạn có thể xóa từng ảnh hoặc đổi thứ tự trước khi lưu."
             multiple
-            onChange={(event) => setImageFiles(Array.from(event.target.files || []))}
+            onChange={handleImageChange}
           />
 
           {imagePreviews.length ? (
@@ -228,11 +292,38 @@ function ProductForm({
                     alt={`Ảnh sản phẩm ${index + 1}`}
                     className="h-40 w-full object-cover"
                   />
+                  <div className="flex items-center justify-end gap-3 border-t border-slate-200 px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        className="text-sm font-medium text-sky-600 transition hover:text-sky-700 disabled:cursor-not-allowed disabled:text-slate-300"
+                        onClick={() => handleMoveImage(index, "up")}
+                        disabled={index === 0}
+                      >
+                        Lên
+                      </button>
+                      <button
+                        type="button"
+                        className="text-sm font-medium text-sky-600 transition hover:text-sky-700 disabled:cursor-not-allowed disabled:text-slate-300"
+                        onClick={() => handleMoveImage(index, "down")}
+                        disabled={index === imagePreviews.length - 1}
+                      >
+                        Xuống
+                      </button>
+                      <button
+                        type="button"
+                        className="text-sm font-medium text-rose-600 transition hover:text-rose-700"
+                        onClick={() => handleRemoveImage(index)}
+                      >
+                        Xóa ảnh
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-slate-500">Chưa có ảnh sản phẩm.</p>
+            <p className="text-sm font-medium text-slate-600">Chưa có ảnh sản phẩm.</p>
           )}
         </div>
 
