@@ -172,7 +172,7 @@ function HomePage() {
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-sky-800">Tổng quan sản phẩm</p>
               <h1 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight text-slate-950 sm:text-5xl">
-                Xem nhanh sản phẩm nổi bật, danh mục và shop đang hiển thị trên marketplace.
+                Xem nhanh sản phẩm nổi bật, danh mục và shop đang hiển thị trên .
               </h1>
               <p className="mt-5 max-w-2xl text-base leading-8 text-slate-700">
                 Khung này tập trung vào hàng hóa đang bán thực tế. Người mua có thể quét nhanh ảnh banner,
@@ -194,7 +194,7 @@ function HomePage() {
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <Link to="/products">
-                    <Button size="lg" className="bg-emerald-600 text-white hover:bg-emerald-700">Xem marketplace</Button>
+                    <Button size="lg" className="bg-emerald-600 text-white hover:bg-emerald-700">Sản phẩm</Button>
                   </Link>
                   <Link to="/login">
                     <Button size="lg" variant="secondary" className="border-slate-300 bg-white text-slate-900 hover:bg-slate-100">

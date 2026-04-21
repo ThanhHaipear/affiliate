@@ -62,7 +62,7 @@ function StorefrontHeader() {
               </div>
               <div>
                 <p className="text-xs uppercase tracking-[0.32em] text-sky-700">Affiliate Commerce</p>
-                <h1 className="text-lg font-semibold text-slate-900">{"S\u00e0n giao d\u1ecbch + B\u1ea3ng \u0111i\u1ec1u khi\u1ec3n"}</h1>
+
               </div>
             </Link>
             <button
