@@ -335,7 +335,18 @@ function CartPage() {
                         </div>
 
                         <div className="min-w-0">
-                          <p className="text-sm text-cyan-700">{group.product.seller_name}</p>
+                          <p className="text-sm text-cyan-700">
+                            {group.product.seller_id ? (
+                              <Link
+                                to={`/shops/${group.product.seller_id}`}
+                                className="transition hover:text-sky-800 hover:underline"
+                              >
+                                {group.product.seller_name}
+                              </Link>
+                            ) : (
+                              group.product.seller_name
+                            )}
+                          </p>
                           <h3 className="mt-1 text-xl font-semibold text-slate-900">{group.product.name}</h3>
                           <p className="mt-2 text-sm text-slate-500">Phân loại: {group.variant}</p>
 

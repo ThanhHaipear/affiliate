@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { createAffiliateLink } from "../../api/affiliateApi";
 import { updateCartItem } from "../../api/orderApi";
 import { createProductReview, getProductDetail, getProductReviews } from "../../api/productApi";
@@ -439,7 +439,21 @@ function ProductDetailPage() {
             </div>
           ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
-            <InfoTile label="Shop" value={product.seller_name} />
+            <InfoTile
+              label="Shop"
+              value={
+                product.seller_id ? (
+                  <Link
+                    to={`/shops/${product.seller_id}`}
+                    className="text-sky-700 transition hover:text-sky-800 hover:underline"
+                  >
+                    {product.seller_name}
+                  </Link>
+                ) : (
+                  product.seller_name
+                )
+              }
+            />
             <InfoTile label="Danh mục" value={product.category} />
             <InfoTile label="Tồn kho" value={`${product.stock}`} />
             {isAffiliate ? (

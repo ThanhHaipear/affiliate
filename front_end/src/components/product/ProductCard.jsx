@@ -5,9 +5,8 @@ import MoneyText from "../common/MoneyText";
 import { formatStatusLabel } from "../../lib/format";
 import { isWishlisted, toggleWishlist } from "../../lib/wishlist";
 
-function ProductCard({ product, actionLabel, onAction }) {
+function ProductCard({ product, actionLabel, onAction, showAffiliateInfo = false }) {
   const [wishlisted, setWishlisted] = useState(() => isWishlisted(product.id));
-  const showAffiliateInfo = Boolean(actionLabel);
   const stock = Number(product.stock || 0);
   const isOutOfStock = stock <= 0;
   const soldCount = Number(product.sold || 0);
@@ -91,7 +90,17 @@ function ProductCard({ product, actionLabel, onAction }) {
             ) : null}
           </div>
           <p className="mt-3">
-            Shop: <span className="font-medium text-slate-900">{product.seller_name}</span>
+            Shop:{" "}
+            {product.seller_id ? (
+              <Link
+                to={`/shops/${product.seller_id}`}
+                className="font-medium text-sky-700 transition hover:text-sky-800 hover:underline"
+              >
+                {product.seller_name}
+              </Link>
+            ) : (
+              <span className="font-medium text-slate-900">{product.seller_name}</span>
+            )}
           </p>
           <p className={`mt-1 text-xs font-medium ${isOutOfStock ? "text-rose-600" : "text-emerald-600"}`}>
             {isOutOfStock ? "Sản phẩm hiện đã hết hàng" : `Còn ${stock} sản phẩm có thể mua`}

@@ -117,11 +117,7 @@ function AffiliateMarketplacePage({ products: initialProducts }) {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Affiliate"
-        title="Sản phẩm tiếp thị"
-
-      />
+      <PageHeader eyebrow="Affiliate" title="Sản phẩm tiếp thị" />
 
       <div className="grid gap-4 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-[1fr_220px]">
         <Input
@@ -163,6 +159,7 @@ function AffiliateMarketplacePage({ products: initialProducts }) {
                   <ProductCard
                     key={product.id}
                     product={product}
+                    showAffiliateInfo
                     actionLabel="Lấy link tiếp thị"
                     onAction={handleCreateLink}
                   />

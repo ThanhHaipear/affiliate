@@ -73,7 +73,18 @@ function CustomerWishlistPage() {
               <div className="flex-1">
                 <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">Yêu thích</span>
                 <h3 className="mt-3 text-xl font-semibold text-slate-900">{item.name}</h3>
-                <p className="mt-2 text-sm text-slate-500">{item.seller_name}</p>
+                <p className="mt-2 text-sm text-slate-500">
+                  {item.seller_id ? (
+                    <Link
+                      to={`/shops/${item.seller_id}`}
+                      className="text-sky-700 transition hover:text-sky-800 hover:underline"
+                    >
+                      {item.seller_name}
+                    </Link>
+                  ) : (
+                    item.seller_name
+                  )}
+                </p>
                 <div className="mt-3 flex items-center gap-3">
                   <MoneyText value={item.price} className="text-xl font-semibold text-slate-900" />
                 </div>

@@ -18,6 +18,7 @@ import VnpayReturnPage from "../pages/shared/VnpayReturnPage";
 import HomePage from "../pages/public/HomePage";
 import ProductListPage from "../pages/public/ProductListPage";
 import ProductDetailPage from "../pages/public/ProductDetailPage";
+import PublicShopPage from "../pages/public/PublicShopPage";
 import AboutPage from "../pages/public/AboutPage";
 import PolicyPage from "../pages/public/PolicyPage";
 import ContactPage from "../pages/public/ContactPage";
@@ -183,6 +184,7 @@ const routes = [
           { index: true, element: <HomePage /> },
           { path: "products", element: <ProductListPage /> },
           { path: "products/:productId", element: <ProductDetailPage /> },
+          { path: "shops/:sellerId", element: <PublicShopPage /> },
           { path: "about", element: <AboutPage /> },
           { path: "policy", element: <PolicyPage /> },
           { path: "policies", element: <PolicyPage /> },
