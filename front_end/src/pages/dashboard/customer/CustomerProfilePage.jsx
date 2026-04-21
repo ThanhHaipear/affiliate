@@ -111,10 +111,6 @@ function CustomerProfilePage() {
     };
   }, [setUser]);
 
-  const totalSpent = useMemo(
-    () => orders.reduce((sum, order) => sum + Number(order.amount || 0), 0),
-    [orders],
-  );
   const orderSummary = useMemo(() => {
     const deliveredOrders = orders.filter(isDeliveredOrder).length;
     const processingOrders = orders.filter(isProcessingOrder).length;
@@ -127,7 +123,16 @@ function CustomerProfilePage() {
       failedOrders,
     };
   }, [orders]);
-  const recentOrders = useMemo(() => orders.slice(0, 4), [orders]);
+  const recentOrders = useMemo(() => orders.slice(0, 3), [orders]);
+  const summaryCards = useMemo(
+    () => [
+      { label: "Tổng đơn hàng", value: `${orderSummary.totalOrders}` },
+      { label: "Đơn đã hoàn tất", value: `${orderSummary.deliveredOrders}` },
+      { label: "Đơn đang xử lý", value: `${orderSummary.processingOrders}` },
+      { label: "Đơn hoàn tiền/hủy", value: `${orderSummary.failedOrders}` },
+    ],
+    [orderSummary],
+  );
 
   const onSubmit = async (values) => {
     try {
@@ -152,7 +157,7 @@ function CustomerProfilePage() {
       <PageHeader
         eyebrow="Khách hàng"
         title={`Xin chào ${currentUser?.profile?.fullName || "khách hàng"}`}
-        description="Tổng quan tài khoản, thống kê đơn mua, thao tác nhanh và đơn gần đây theo phong cách account area của ecommerce."
+
       />
       {loading ? <EmptyState title="Đang tải tổng quan" description="Hệ thống đang tổng hợp dữ liệu đơn hàng và thông tin tài khoản." /> : null}
       {!loading ? (
@@ -166,10 +171,10 @@ function CustomerProfilePage() {
             <div className="rounded-[2rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-6 shadow-sm">
               <p className="text-xs uppercase tracking-[0.28em] text-cyan-700">Tổng quan tài khoản</p>
               <h3 className="mt-3 text-3xl font-semibold text-slate-900">
-                Quản lý mua hàng và đơn hàng từ một khu vực thống nhất.
+                Quản lý mua hàng và đơn hàng.
               </h3>
               <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
-                Customer chỉ thấy dữ liệu cần cho mua hàng và theo dõi trạng thái đơn. Không hiển thị dữ liệu nội bộ như commission hay vận hành hệ thống.
+                Theo dõi nhanh tình trạng đơn hàng, tổng chi tiêu và truy cập các thao tác mua sắm thường dùng.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link to="/cart">
@@ -182,6 +187,16 @@ function CustomerProfilePage() {
                   <Button variant="outline">Xem lịch sử đơn</Button>
                 </Link>
               </div>
+              <div className="mt-6 grid gap-3 md:grid-cols-2">
+                {summaryCards.map((item) => (
+                  <div key={item.label} className="rounded-[1.5rem] border border-slate-200 bg-white/80 px-4 py-4 shadow-sm">
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-cyan-700">{item.label}</p>
+                    <p className="mt-2 text-3xl font-semibold leading-tight text-slate-900">
+                      {item.value}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
             <ProfileCard
               title="Thông tin tài khoản"
@@ -191,16 +206,6 @@ function CustomerProfilePage() {
                 ["Số điện thoại", currentUser?.phone || "--"],
                 ["Vai trò", (currentUser?.roles || []).join(", ") || "--"],
               ]}
-            />
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <MiniCard label="Tổng đơn hàng" value={`${orderSummary.totalOrders}`} />
-            <MiniCard label="Đơn đã hoàn tất" value={`${orderSummary.deliveredOrders}`} />
-            <MiniCard label="Đơn đang xử lý" value={`${orderSummary.processingOrders}`} />
-            <MiniCard label="Đơn hoàn tiền/hủy" value={`${orderSummary.failedOrders}`} />
-            <MiniCard
-              label="Tổng tiền đã mua"
-              value={<MoneyText value={totalSpent} className="text-3xl font-semibold text-slate-900" />}
             />
           </div>
           <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
@@ -290,11 +295,15 @@ function ProfileCard({ title, rows }) {
   );
 }
 
-function MiniCard({ label, value }) {
+function MiniCard({ label, value, valueClassName = "", className = "" }) {
   return (
-    <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
-      <p className="text-xs uppercase tracking-[0.28em] text-cyan-700">{label}</p>
-      {typeof value === "string" ? <p className="mt-3 text-3xl font-semibold text-slate-900">{value}</p> : <div className="mt-3">{value}</div>}
+    <div className={`rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm ${className}`}>
+      <p className="text-xs uppercase tracking-[0.24em] text-cyan-700">{label}</p>
+      {typeof value === "string" ? (
+        <p className={`mt-3 break-words text-3xl font-semibold leading-tight text-slate-900 ${valueClassName}`}>{value}</p>
+      ) : (
+        <div className="mt-3">{value}</div>
+      )}
     </div>
   );
 }
