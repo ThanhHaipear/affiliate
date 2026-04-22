@@ -7,6 +7,231 @@ import EmptyState from "../../components/common/EmptyState";
 import PageHeader from "../../components/common/PageHeader";
 import { useToast } from "../../hooks/useToast";
 
+const verificationCache = new Map();
+const STORAGE_PREFIX = "affiliate-platform:vnpay-return:";
+const STORAGE_TTL_MS = 10 * 60 * 1000;
+const PENDING_WAIT_TIMEOUT_MS = 15_000;
+const PENDING_WAIT_POLL_MS = 150;
+
+function createDisplayError(message, sourceError) {
+  const error = sourceError instanceof Error ? sourceError : new Error(message);
+  error.displayMessage = message;
+  return error;
+}
+
+function getStorageKey(requestKey) {
+  return `${STORAGE_PREFIX}${requestKey}`;
+}
+
+function getSharedStorage() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window.localStorage;
+}
+
+function readStoredVerification(requestKey) {
+  const storage = getSharedStorage();
+  if (!storage) {
+    return null;
+  }
+
+  try {
+    const raw = storage.getItem(getStorageKey(requestKey));
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    const storedAt = Number(parsed?.storedAt || 0);
+    if (!storedAt || Date.now() - storedAt > STORAGE_TTL_MS) {
+      storage.removeItem(getStorageKey(requestKey));
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredVerification(requestKey, entry) {
+  const storage = getSharedStorage();
+  if (!storage) {
+    return;
+  }
+
+  try {
+    storage.setItem(
+      getStorageKey(requestKey),
+      JSON.stringify({
+        ...entry,
+        storedAt: Date.now(),
+      }),
+    );
+  } catch {
+    // Ignore storage write failures and fall back to in-memory caching.
+  }
+}
+
+function syncStoredVerificationFlags(requestKey, flags) {
+  const stored = readStoredVerification(requestKey);
+  if (!stored) {
+    return;
+  }
+
+  writeStoredVerification(requestKey, {
+    ...stored,
+    ...flags,
+  });
+}
+
+function hydrateVerificationCache(requestKey) {
+  const cached = verificationCache.get(requestKey);
+  if (cached) {
+    return cached;
+  }
+
+  const stored = readStoredVerification(requestKey);
+  if (!stored) {
+    return null;
+  }
+
+  if (stored.status === "fulfilled") {
+    const entry = {
+      status: "fulfilled",
+      value: stored.value,
+      successToastShown: Boolean(stored.successToastShown),
+      failureToastShown: Boolean(stored.failureToastShown),
+    };
+    verificationCache.set(requestKey, entry);
+    return entry;
+  }
+
+  if (stored.status === "rejected") {
+    const error = createDisplayError(stored.errorMessage || "Không xác minh được kết quả VNPAY.");
+    const entry = {
+      status: "rejected",
+      error,
+      successToastShown: Boolean(stored.successToastShown),
+      failureToastShown: Boolean(stored.failureToastShown),
+    };
+    verificationCache.set(requestKey, entry);
+    return entry;
+  }
+
+  return null;
+}
+
+function delay(duration) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, duration);
+  });
+}
+
+async function waitForStoredVerification(requestKey) {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < PENDING_WAIT_TIMEOUT_MS) {
+    const stored = readStoredVerification(requestKey);
+
+    if (!stored) {
+      return null;
+    }
+
+    if (stored.status === "fulfilled" || stored.status === "rejected") {
+      verificationCache.delete(requestKey);
+      return hydrateVerificationCache(requestKey);
+    }
+
+    await delay(PENDING_WAIT_POLL_MS);
+  }
+
+  return null;
+}
+
+async function resolveVerificationOnce(requestKey, requestFactory) {
+  const hydrated = hydrateVerificationCache(requestKey);
+  if (hydrated?.status === "fulfilled") {
+    return hydrated.value;
+  }
+
+  if (hydrated?.status === "rejected") {
+    throw hydrated.error;
+  }
+
+  const stored = readStoredVerification(requestKey);
+  if (stored?.status === "pending") {
+    const resolvedEntry = await waitForStoredVerification(requestKey);
+
+    if (resolvedEntry?.status === "fulfilled") {
+      return resolvedEntry.value;
+    }
+
+    if (resolvedEntry?.status === "rejected") {
+      throw resolvedEntry.error;
+    }
+  }
+
+  const cached = verificationCache.get(requestKey);
+  if (cached?.promise) {
+    return cached.promise;
+  }
+
+  const promise = requestFactory()
+    .then((value) => {
+      const nextEntry = {
+        ...verificationCache.get(requestKey),
+        status: "fulfilled",
+        value,
+        promise: null,
+      };
+      verificationCache.set(requestKey, nextEntry);
+      writeStoredVerification(requestKey, {
+        status: "fulfilled",
+        value,
+        successToastShown: Boolean(nextEntry.successToastShown),
+        failureToastShown: Boolean(nextEntry.failureToastShown),
+      });
+      return value;
+    })
+    .catch((error) => {
+      const message =
+        error.displayMessage || error.response?.data?.message || "Không xác minh được kết quả VNPAY.";
+      const nextError = createDisplayError(message, error);
+      const nextEntry = {
+        ...verificationCache.get(requestKey),
+        status: "rejected",
+        error: nextError,
+        promise: null,
+      };
+      verificationCache.set(requestKey, nextEntry);
+      writeStoredVerification(requestKey, {
+        status: "rejected",
+        errorMessage: message,
+        successToastShown: Boolean(nextEntry.successToastShown),
+        failureToastShown: Boolean(nextEntry.failureToastShown),
+      });
+      throw nextError;
+    });
+
+  const pendingEntry = {
+    status: "pending",
+    promise,
+    successToastShown: false,
+    failureToastShown: false,
+  };
+  verificationCache.set(requestKey, pendingEntry);
+  writeStoredVerification(requestKey, {
+    status: "pending",
+    successToastShown: false,
+    failureToastShown: false,
+  });
+
+  return promise;
+}
+
 function VnpayReturnPage() {
   const location = useLocation();
   const toast = useToast();
@@ -17,16 +242,20 @@ function VnpayReturnPage() {
   const toastRef = useRef(toast);
   const flow = searchParams.get("flow") || "";
   const isPayoutFlow = flow === "payout-batch";
+  const requestKey = `${isPayoutFlow ? "payout" : "order"}:${location.search}`;
 
   const payload = useMemo(() => {
-    const entries = Object.fromEntries(searchParams.entries());
+    const params = new URLSearchParams(location.search);
+    const entries = Object.fromEntries(params.entries());
+
     return Object.keys(entries).reduce((resultObject, key) => {
       if (key.startsWith("vnp_")) {
         resultObject[key] = entries[key];
       }
+
       return resultObject;
     }, {});
-  }, [searchParams]);
+  }, [location.search]);
 
   useEffect(() => {
     toastRef.current = toast;
@@ -44,21 +273,41 @@ function VnpayReturnPage() {
 
       try {
         setLoading(true);
-        const response = isPayoutFlow
-          ? await confirmPayoutBatchVnpayReturn(payload)
-          : await confirmVnpayReturn(payload);
+
+        const response = await resolveVerificationOnce(requestKey, () =>
+          isPayoutFlow ? confirmPayoutBatchVnpayReturn(payload) : confirmVnpayReturn(payload),
+        );
+
         if (!active) {
           return;
         }
 
         setResult(response);
-        if (response.success) {
+
+        const cacheEntry = verificationCache.get(requestKey);
+
+        if (response.success && !cacheEntry?.successToastShown) {
+          const nextEntry = {
+            ...cacheEntry,
+            successToastShown: true,
+          };
+          verificationCache.set(requestKey, nextEntry);
+          syncStoredVerificationFlags(requestKey, { successToastShown: true });
           toastRef.current.success(
             isPayoutFlow
               ? "VNPAY xác nhận chi trả payout batch thành công."
               : "VNPAY xác nhận giao dịch thành công.",
           );
-        } else {
+          return;
+        }
+
+        if (!response.success && !cacheEntry?.failureToastShown) {
+          const nextEntry = {
+            ...cacheEntry,
+            failureToastShown: true,
+          };
+          verificationCache.set(requestKey, nextEntry);
+          syncStoredVerificationFlags(requestKey, { failureToastShown: true });
           toastRef.current.error(
             isPayoutFlow
               ? "VNPAY trả về trạng thái chi trả chưa thành công."
@@ -70,11 +319,29 @@ function VnpayReturnPage() {
           return;
         }
 
-        const message = loadError.response?.data?.message || (isPayoutFlow
-          ? "Không xác minh được kết quả payout VNPAY."
-          : "Không xác minh được kết quả VNPAY.");
+        const message =
+          loadError.displayMessage ||
+          loadError.response?.data?.message ||
+          (isPayoutFlow
+            ? "Không xác minh được kết quả payout VNPAY."
+            : "Không xác minh được kết quả VNPAY.");
+
         setError(message);
-        toastRef.current.error(message);
+
+        const cacheEntry = verificationCache.get(requestKey);
+        if (!cacheEntry?.failureToastShown) {
+          const nextEntry = {
+            ...cacheEntry,
+            failureToastShown: true,
+            error: createDisplayError(message, loadError),
+          };
+          verificationCache.set(requestKey, nextEntry);
+          syncStoredVerificationFlags(requestKey, {
+            failureToastShown: true,
+            errorMessage: message,
+          });
+          toastRef.current.error(message);
+        }
       } finally {
         if (active) {
           setLoading(false);
@@ -87,7 +354,7 @@ function VnpayReturnPage() {
     return () => {
       active = false;
     };
-  }, [isPayoutFlow, location.search, payload]);
+  }, [isPayoutFlow, payload, requestKey]);
 
   if (loading) {
     return (

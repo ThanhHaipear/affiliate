@@ -15,6 +15,7 @@ const REALTIME_EXCLUDED_PATHS = [
   "/api/auth/reset-password",
   "/api/auth/reset-password/verify",
   "/api/auth/change-password",
+  "/api/payout-batches/vnpay-return/confirm",
 ];
 
 exports.successResponse = (res, data, message = 'Success', statusCode = 200) => {

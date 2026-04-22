@@ -10,6 +10,8 @@ const {
 } = require("../../utils/vnpay");
 const payoutRepository = require("./payout.repository");
 
+const payoutReturnConfirmCache = new Map();
+
 exports.listBatches = () => payoutRepository.listBatches();
 exports.createBatch = (adminId, payload) => payoutRepository.createBatch(adminId, payload);
 exports.processBatch = (batchId, adminId, payload) =>
@@ -36,6 +38,39 @@ const ensureVnpayConfigured = () => {
   if (!env.vnpayTmnCode || !env.vnpayHashSecret || !env.vnpayPayoutReturnUrl) {
     throw new AppError("VNPAY payout is not configured", 500);
   }
+};
+
+const buildConfirmCacheKey = (adminId, payload) => {
+  const txnRef = String(payload?.vnp_TxnRef || "").trim();
+  const secureHash = String(payload?.vnp_SecureHash || "").trim();
+  return txnRef && secureHash ? `${adminId}:${txnRef}:${secureHash}` : "";
+};
+
+const getCachedConfirmResult = (cacheKey) => {
+  const cached = payoutReturnConfirmCache.get(cacheKey);
+  if (!cached) {
+    return null;
+  }
+
+  if (cached.promise) {
+    return cached.promise;
+  }
+
+  if (cached.error) {
+    throw cached.error;
+  }
+
+  return cached.value;
+};
+
+const storeResolvedConfirmResult = (cacheKey, value) => {
+  payoutReturnConfirmCache.set(cacheKey, { value });
+  return value;
+};
+
+const storeRejectedConfirmResult = (cacheKey, error) => {
+  payoutReturnConfirmCache.set(cacheKey, { error });
+  throw error;
 };
 
 exports.createVnpayPaymentUrl = async (batchId, adminId, payload, req) => {
@@ -88,6 +123,15 @@ exports.createVnpayPaymentUrl = async (batchId, adminId, payload, req) => {
 };
 
 exports.confirmVnpayReturn = async (adminId, payload) => {
+  const cacheKey = buildConfirmCacheKey(adminId, payload);
+  if (cacheKey) {
+    const cachedResult = getCachedConfirmResult(cacheKey);
+    if (cachedResult) {
+      return cachedResult;
+    }
+  }
+
+  const confirmPromise = (async () => {
   ensureVnpayConfigured();
 
   const verified = verifyResponse(payload, env.vnpayHashSecret);
@@ -139,4 +183,18 @@ exports.confirmVnpayReturn = async (adminId, payload) => {
     status: nextBatch.status,
     message: success ? "Payout batch payment verified" : "Payout batch payment was not successful at VNPAY",
   };
+  })();
+
+  if (!cacheKey) {
+    return confirmPromise;
+  }
+
+  payoutReturnConfirmCache.set(cacheKey, { promise: confirmPromise });
+
+  try {
+    const result = await confirmPromise;
+    return storeResolvedConfirmResult(cacheKey, result);
+  } catch (error) {
+    return storeRejectedConfirmResult(cacheKey, error);
+  }
 };
