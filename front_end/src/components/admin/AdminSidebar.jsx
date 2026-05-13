@@ -1,4 +1,4 @@
-﻿import { NavLink } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { cn } from "../../lib/utils";
 
 const navigationGroups = [
@@ -28,6 +28,7 @@ const navigationGroups = [
       { label: "Duyệt rút tiền", to: "/admin/withdrawals/pending", hint: "Yêu cầu chi trả đang chờ" },
       { label: "Các đợt chi trả", to: "/admin/commissions", hint: "Chi trả affiliate theo batch" },
       { label: "Phát hiện gian lận", to: "/admin/fraud-detection", hint: "Tín hiệu rủi ro" },
+      { label: "Kiến nghị", to: "/admin/appeals", hint: "Xử lý khiếu nại" },
     ],
   },
   {

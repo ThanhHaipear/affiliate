@@ -119,6 +119,9 @@ model Account {
   fraudAlertsProcessed      FraudAlert[]              @relation("FraudAlertProcessedBy")
   affiliateLockedBy         Affiliate[]               @relation("AffiliateLockedBy")
   productReviews            ProductReview[]
+  appeals                   Appeal[]                  @relation("AppealCreator")
+  reviewedAppeals           Appeal[]                  @relation("AppealReviewer")
+  appealMessages            AppealMessage[]
 
   @@index([status, createdAt])
   @@map("accounts")
@@ -492,6 +495,7 @@ model AffiliateLink {
   status              String               @default("ACTIVE") @db.VarChar(255)
   revokedAt           DateTime?            @map("revoked_at") @db.Timestamp(0)
   revokedBy           Int?                 @map("revoked_by")
+  revokeReason        String?              @map("revoke_reason") @db.Text
   createdAt           DateTime?            @map("created_at") @db.Timestamp(0)
   updatedAt           DateTime?            @map("updated_at") @db.Timestamp(0)
   affiliate           Affiliate            @relation(fields: [affiliateId], references: [accountId])
@@ -985,4 +989,39 @@ model FraudAlert {
 
   @@index([processedBy])
   @@map("fraud_alerts")
+}
+
+model Appeal {
+  id          BigInt          @id @default(autoincrement())
+  accountId   Int             @map("account_id")
+  targetType  String          @map("target_type") @db.VarChar(255)
+  targetId    BigInt          @map("target_id")
+  status      String          @default("OPEN") @db.VarChar(255)
+  reviewedBy  Int?            @map("reviewed_by")
+  resolvedAt  DateTime?       @map("resolved_at") @db.Timestamp(0)
+  createdAt   DateTime?       @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime?       @map("updated_at") @db.Timestamp(0)
+  account     Account         @relation("AppealCreator", fields: [accountId], references: [id])
+  reviewer    Account?        @relation("AppealReviewer", fields: [reviewedBy], references: [id])
+  messages    AppealMessage[]
+
+  @@index([accountId])
+  @@index([targetType, targetId])
+  @@index([reviewedBy])
+  @@map("appeals")
+}
+
+model AppealMessage {
+  id        BigInt    @id @default(autoincrement())
+  appealId  BigInt    @map("appeal_id")
+  senderId  Int       @map("sender_id")
+  content   String    @db.Text
+  action    String?   @db.VarChar(255)
+  createdAt DateTime? @map("created_at") @db.Timestamp(0)
+  appeal    Appeal    @relation(fields: [appealId], references: [id])
+  sender    Account   @relation(fields: [senderId], references: [id])
+
+  @@index([appealId])
+  @@index([senderId])
+  @@map("appeal_messages")
 }

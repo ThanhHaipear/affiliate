@@ -168,11 +168,12 @@ exports.setProductVisibility = async (productId, adminId, payload) => {
   }
 };
 
-exports.revokeAffiliateLink = async (linkId, adminId) => {
+exports.revokeAffiliateLink = async (linkId, adminId, payload) => {
   try {
     return await adminRepository.revokeAffiliateLink({
       linkId: Number(linkId),
       adminId,
+      reason: payload?.reason,
     });
   } catch (error) {
     throw new AppError(error.message, 400);

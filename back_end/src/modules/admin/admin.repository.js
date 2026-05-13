@@ -1196,7 +1196,7 @@ exports.setProductVisibility = ({ productId, adminId, visible, reason }) =>
     return updated;
   });
 
-exports.revokeAffiliateLink = ({ linkId, adminId }) =>
+exports.revokeAffiliateLink = ({ linkId, adminId, reason }) =>
   prisma.$transaction(async (tx) => {
     const link = await tx.affiliateLink.findUnique({
       where: { id: BigInt(linkId) },
@@ -1241,6 +1241,7 @@ exports.revokeAffiliateLink = ({ linkId, adminId }) =>
         status: "REVOKED",
         revokedAt: now,
         revokedBy: adminId,
+        revokeReason: reason || "Khóa bởi admin",
         updatedAt: now,
       },
       include: {
@@ -1285,7 +1286,7 @@ exports.revokeAffiliateLink = ({ linkId, adminId }) =>
         action: "ADMIN_REVOKE_AFFILIATE_LINK",
         targetType: "AFFILIATE_LINK",
         targetId: BigInt(linkId),
-        description: `Admin revoked affiliate link ${link.shortCode}`,
+        description: `Admin revoked affiliate link ${link.shortCode}. Reason: ${reason || "N/A"}`,
         createdAt: now,
       },
     });
@@ -1293,8 +1294,8 @@ exports.revokeAffiliateLink = ({ linkId, adminId }) =>
     await tx.notification.create({
       data: {
         accountId: link.affiliateId,
-        title: "Affiliate link disabled by admin",
-        content: `Your affiliate link ${link.shortCode} for product ${link.product?.name || `#${link.productId}`} has been disabled by admin.`,
+        title: "Link affiliate bị khóa bởi admin",
+        content: `Link ${link.shortCode} cho sản phẩm ${link.product?.name || `#${link.productId}`} đã bị admin khóa.\n\nLý do: ${reason || "Không có lý do cụ thể."}`,
         type: "AFFILIATE_LINK_REVOKED_BY_ADMIN",
         targetType: "AFFILIATE_LINK",
         targetId: BigInt(linkId),

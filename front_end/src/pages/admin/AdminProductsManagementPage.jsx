@@ -9,6 +9,8 @@ import EmptyState from "../../components/common/EmptyState";
 import PageHeader from "../../components/common/PageHeader";
 import Pagination from "../../components/common/Pagination";
 import StatusBadge from "../../components/common/StatusBadge";
+import ConfirmModal from "../../components/common/ConfirmModal";
+import Input from "../../components/common/Input";
 import { useToast } from "../../hooks/useToast";
 import { mapProductDto } from "../../lib/apiMappers";
 import { formatCurrency, formatDateTime } from "../../lib/format";
@@ -25,6 +27,8 @@ function AdminProductsManagementPage() {
   const [visibilityStatus, setVisibilityStatus] = useState("ALL");
   const [submittingId, setSubmittingId] = useState("");
   const [page, setPage] = useState(1);
+  const [selectedHideProduct, setSelectedHideProduct] = useState(null);
+  const [hideReason, setHideReason] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -115,18 +119,47 @@ function AdminProductsManagementPage() {
   async function handleToggleVisibility(product) {
     const shouldShowProduct = product.visibility_status !== "ACTIVE";
 
+    if (!shouldShowProduct) {
+      setSelectedHideProduct(product);
+      setHideReason("");
+      return;
+    }
+
     try {
       setSubmittingId(String(product.id));
       const updated = await setAdminProductVisibility(product.id, {
-        visible: shouldShowProduct,
+        visible: true,
       });
 
       setProducts((current) =>
         current.map((item) => (String(item.id) === String(product.id) ? mapProductDto(updated) : item)),
       );
-      toast.success(shouldShowProduct ? "Đã hiện lại sản phẩm." : "Đã ẩn sản phẩm khỏi marketplace.");
+      toast.success("Đã hiện lại sản phẩm.");
     } catch (submitError) {
       toast.error(submitError.response?.data?.message || "Không cập nhật được trạng thái hiển thị sản phẩm.");
+    } finally {
+      setSubmittingId("");
+    }
+  }
+
+  async function handleConfirmHide() {
+    if (!selectedHideProduct) return;
+
+    try {
+      setSubmittingId(String(selectedHideProduct.id));
+      const updated = await setAdminProductVisibility(selectedHideProduct.id, {
+        visible: false,
+        reason: hideReason.trim(),
+      });
+
+      setProducts((current) =>
+        current.map((item) => (String(item.id) === String(selectedHideProduct.id) ? mapProductDto(updated) : item)),
+      );
+      toast.success("Đã ẩn sản phẩm khỏi marketplace.");
+      setSelectedHideProduct(null);
+      setHideReason("");
+    } catch (submitError) {
+      toast.error(submitError.response?.data?.message || "Không ẩn được sản phẩm.");
     } finally {
       setSubmittingId("");
     }
@@ -249,6 +282,28 @@ function AdminProductsManagementPage() {
       {filteredProducts.length > PRODUCTS_PER_PAGE ? (
         <Pagination page={currentPage} totalPages={totalPages} onPageChange={setPage} />
       ) : null}
+
+      <ConfirmModal
+        open={Boolean(selectedHideProduct)}
+        title="Ẩn sản phẩm"
+        description={selectedHideProduct ? `Xác nhận ẩn sản phẩm ${selectedHideProduct.name} khỏi marketplace.` : ""}
+        confirmVariant="danger"
+        confirmLabel="Khóa ngay"
+        disabled={hideReason.trim().length < 5}
+        loading={submittingId === String(selectedHideProduct?.id)}
+        onClose={() => {
+          setSelectedHideProduct(null);
+          setHideReason("");
+        }}
+        onConfirm={handleConfirmHide}
+      >
+        <Input
+          label="Lý do khóa/ẩn (bắt buộc)"
+          value={hideReason}
+          onChange={(event) => setHideReason(event.target.value)}
+          placeholder="Ví dụ: Vi phạm chính sách hàng giả (tối thiểu 5 ký tự)"
+        />
+      </ConfirmModal>
     </div>
   );
 }

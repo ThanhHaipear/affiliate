@@ -17,6 +17,9 @@ exports.productVisibilitySchema = z.object({
   body: z.object({
     visible: z.boolean(),
     reason: z.string().trim().max(500).optional(),
+  }).refine((data) => data.visible || (data.reason && data.reason.length >= 5), {
+    message: "Lý do ẩn sản phẩm bắt buộc (tối thiểu 5 ký tự)",
+    path: ["reason"],
   }),
   params: z.object({
     productId: z.coerce.number().int().positive(),
@@ -86,6 +89,15 @@ exports.affiliateLinksQuerySchema = z.object({
 });
 
 exports.affiliateLinkActionParamsSchema = z.object({
+  params: z.object({
+    linkId: z.coerce.number().int().positive(),
+  }),
+});
+
+exports.revokeLinkSchema = z.object({
+  body: z.object({
+    reason: z.string().trim().min(5, "Lý do khóa link tối thiểu 5 ký tự").max(500),
+  }),
   params: z.object({
     linkId: z.coerce.number().int().positive(),
   }),

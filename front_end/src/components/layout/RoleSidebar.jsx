@@ -5,6 +5,7 @@ import { cn } from "../../lib/utils";
 const roleMenus = {
   admin: [
     { label: "\u0054\u1ed5ng quan", to: "/admin/dashboard" },
+    { label: "Ki\u1ebfn ngh\u1ecb", to: "/admin/appeals" },
     { label: "T\u00e0i kho\u1ea3n", to: "/admin/accounts" },
     { label: "Ng\u01b0\u1eddi b\u00e1n ch\u1edd duy\u1ec7t", to: "/admin/sellers/pending" },
     { label: "Affiliate ch\u1edd duy\u1ec7t", to: "/admin/affiliates/pending" },
@@ -13,8 +14,8 @@ const roleMenus = {
     { label: "Th\u00f4ng b\u00e1o", to: "/admin/notifications" },
     { label: "Duy\u1ec7t r\u00fat ti\u1ec1n", to: "/admin/withdrawals/pending" },
     { label: "Hoa h\u1ed3ng", to: "/admin/commissions" },
-    { label: "Ph\u00e1t hi\u1ec7n gian l\u1eadn", to: "/admin/fraud-detection" },
-    { label: "C\u00e0i \u0111\u1eb7t", to: "/admin/settings" },
+    { label: "\u0050\u0068\u00e1\u0074 \u0068\u0069\u1ec7\u006e \u0067\u0069\u0061\u006e \u006c\u1eadn", to: "/admin/fraud-detection" },
+    { label: "\u0043\u00e0\u0069 \u0111\u1eb7\u0074", to: "/admin/settings" },
   ],
   seller: [
     { label: "T\u1ed5ng quan", to: "/dashboard/seller" },

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { getAffiliateLinks, revokeAffiliateLink, unrevokeAffiliateLink } from "../../../api/affiliateApi";
+import { createAppeal, getMyAppeals, sendAppealMessage } from "../../../api/appealApi";
 import Button from "../../../components/common/Button";
 import CopyBox from "../../../components/common/CopyBox";
 import EmptyState from "../../../components/common/EmptyState";
@@ -26,6 +27,10 @@ function AffiliateLinksPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [page, setPage] = useState(1);
+  const [appealText, setAppealText] = useState("");
+  const [appealLoading, setAppealLoading] = useState(false);
+  const [appealMap, setAppealMap] = useState({});
+  const [appealsLoaded, setAppealsLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -54,6 +59,28 @@ function AffiliateLinksPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (links.length && !appealsLoaded) {
+      loadAppeals();
+    }
+  }, [links.length]);
+
+  async function loadAppeals() {
+    try {
+      const appeals = await getMyAppeals();
+      const map = {};
+      (appeals || []).forEach((a) => {
+        if (a.targetType === "AFFILIATE_LINK") {
+          map[String(a.targetId)] = a;
+        }
+      });
+      setAppealMap(map);
+      setAppealsLoaded(true);
+    } catch {
+      // silently ignore
+    }
+  }
 
   const filteredLinks = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -406,7 +433,86 @@ function AffiliateLinksPage() {
                       {selectedLink.status === "REVOKED" && selectedLink.revoked_by_label ? (
                         <p className="text-sm text-slate-600">Khóa bởi: {selectedLink.revoked_by_label}</p>
                       ) : null}
+                      {selectedLink.status === "REVOKED" && selectedLink.raw?.revokeReason ? (
+                        <div className="rounded-xl bg-rose-100 p-3">
+                          <p className="text-xs font-medium uppercase tracking-wider text-rose-500">Lý do khóa</p>
+                          <p className="mt-1 text-sm text-rose-800">{selectedLink.raw.revokeReason}</p>
+                        </div>
+                      ) : null}
                     </div>
+
+                    {/* Appeal section for admin-revoked links */}
+                    {selectedLink.status === "REVOKED" && selectedLink.revoked_by_admin ? (
+                      <div className="mt-4 space-y-3">
+                        {appealMap[String(selectedLink.id)]?.messages?.length ? (
+                          <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Kiến nghị</p>
+                            <div className="mt-3 max-h-48 space-y-2 overflow-y-auto">
+                              {appealMap[String(selectedLink.id)].messages.map((msg) => {
+                                const isAdmin = msg.sender?.adminProfile;
+                                const senderName = isAdmin
+                                  ? (msg.sender.adminProfile.fullName || "Admin")
+                                  : (msg.sender?.affiliate?.fullName || msg.sender?.email || "Bạn");
+                                return (
+                                  <div key={String(msg.id)} className={`rounded-xl p-3 text-sm ${isAdmin ? "bg-sky-50 text-sky-800" : "bg-white text-slate-700"}`}>
+                                    <p className="text-xs font-medium">{senderName} · {formatDateTime(msg.createdAt)}</p>
+                                    <p className="mt-1">{msg.content}</p>
+                                    {msg.action === "UNLOCK" ? <p className="mt-1 text-xs font-semibold text-emerald-600">✓ Đã mở khóa</p> : null}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {appealMap[String(selectedLink.id)].status === "RESOLVED" ? (
+                              <p className="mt-2 text-xs font-medium text-emerald-600">✓ Kiến nghị đã được giải quyết</p>
+                            ) : null}
+                          </div>
+                        ) : null}
+
+                        {(!appealMap[String(selectedLink.id)] || appealMap[String(selectedLink.id)]?.status === "OPEN") && (
+                          <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50 p-4">
+                            <p className="text-sm font-semibold text-amber-800">Gửi kiến nghị cho admin</p>
+                            <textarea
+                              value={appealText}
+                              onChange={(e) => setAppealText(e.target.value)}
+                              placeholder="Nhập nội dung kiến nghị..."
+                              rows={3}
+                              className="mt-2 w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                            />
+                            <Button
+                              size="sm"
+                              onClick={async () => {
+                                if (!appealText.trim()) return;
+                                try {
+                                  setAppealLoading(true);
+                                  const existing = appealMap[String(selectedLink.id)];
+                                  if (existing && existing.status === "OPEN") {
+                                    const updated = await sendAppealMessage(existing.id, { content: appealText.trim() });
+                                    setAppealMap((prev) => ({ ...prev, [String(selectedLink.id)]: updated }));
+                                  } else {
+                                    const created = await createAppeal({
+                                      targetType: "AFFILIATE_LINK",
+                                      targetId: selectedLink.id,
+                                      content: appealText.trim(),
+                                    });
+                                    setAppealMap((prev) => ({ ...prev, [String(selectedLink.id)]: created }));
+                                  }
+                                  setAppealText("");
+                                  toast.success("Kiến nghị đã được gửi.");
+                                } catch (err) {
+                                  toast.error(err.response?.data?.message || "Không gửi được kiến nghị.");
+                                } finally {
+                                  setAppealLoading(false);
+                                }
+                              }}
+                              loading={appealLoading}
+                              disabled={!appealText.trim()}
+                            >
+                              {appealMap[String(selectedLink.id)] ? "Gửi thêm tin nhắn" : "Gửi kiến nghị"}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
                     <div className="mt-5">
                       <CopyBox
                         value={selectedUrl}

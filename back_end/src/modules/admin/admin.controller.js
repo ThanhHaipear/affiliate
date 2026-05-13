@@ -108,7 +108,7 @@ exports.reviewRefund = asyncHandler(async (req, res) => {
 });
 
 exports.revokeAffiliateLink = asyncHandler(async (req, res) => {
-  const data = await adminService.revokeAffiliateLink(req.params.linkId, req.user.id);
+  const data = await adminService.revokeAffiliateLink(req.params.linkId, req.user.id, req.validated.body);
   successResponse(res, data, "Affiliate link revoked by admin");
 });
 

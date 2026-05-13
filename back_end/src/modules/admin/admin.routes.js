@@ -17,6 +17,7 @@ const {
   fraudAlertsQuerySchema,
   affiliateLinksQuerySchema,
   affiliateLinkActionParamsSchema,
+  revokeLinkSchema,
   platformFeeSchema,
   refundReviewSchema,
   withdrawalConfigSchema,
@@ -46,7 +47,7 @@ router.patch("/affiliates/:affiliateId/review", validate(reviewSchema), controll
 router.patch("/products/:productId/review", validate(reviewSchema), controller.reviewProduct);
 router.patch("/product-affiliate-settings/:settingId/review", validate(reviewSchema), controller.reviewProductAffiliate);
 router.patch("/refunds/:refundId/review", validate(refundReviewSchema), controller.reviewRefund);
-router.patch("/affiliate-links/:linkId/revoke", validate(affiliateLinkActionParamsSchema), controller.revokeAffiliateLink);
+router.patch("/affiliate-links/:linkId/revoke", validate(revokeLinkSchema), controller.revokeAffiliateLink);
 router.patch("/affiliate-links/:linkId/unrevoke", validate(affiliateLinkActionParamsSchema), controller.unrevokeAffiliateLink);
 
 module.exports = router;

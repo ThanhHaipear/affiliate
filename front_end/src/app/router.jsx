@@ -79,6 +79,7 @@ import AdminPendingWithdrawalsPage from "../pages/admin/AdminPendingWithdrawalsP
 import AdminFraudDetectionPage from "../pages/admin/AdminFraudDetectionPage";
 import AdminSettingsPage from "../pages/admin/AdminSettingsPage";
 import AdminNotificationsPage from "../pages/admin/AdminNotificationsPage";
+import AdminAppealsPage from "../pages/admin/AdminAppealsPage";
 
 function AppShell() {
   return (
@@ -339,6 +340,7 @@ const routes = [
           { path: "withdrawals/pending", element: <AdminPendingWithdrawalsPage /> },
           { path: "fraud-detection", element: <AdminFraudDetectionPage /> },
           { path: "settings", element: <AdminSettingsPage /> },
+          { path: "appeals", element: <AdminAppealsPage /> },
         ],
       },
       { path: "cart", element: <Navigate to="/dashboard/customer/cart" replace /> },

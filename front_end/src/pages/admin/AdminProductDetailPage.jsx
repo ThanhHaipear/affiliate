@@ -278,6 +278,7 @@ function AdminProductDetailPage() {
         }
         description={`Xác nhận thao tác cho ${product.name}.`}
         confirmVariant={action === "approve" || action === "show" ? "primary" : "danger"}
+        disabled={(action === "reject" || action === "hide") && rejectReason.trim().length < 5}
         onClose={() => {
           setAction(null);
           setRejectReason("");
@@ -287,10 +288,10 @@ function AdminProductDetailPage() {
       >
         {action === "reject" || action === "hide" ? (
           <Input
-            label={action === "reject" ? "Lý do từ chối" : "Lý do ẩn"}
+            label={action === "reject" ? "Lý do từ chối (bắt buộc)" : "Lý do ẩn sản phẩm (bắt buộc)"}
             value={rejectReason}
             onChange={(event) => setRejectReason(event.target.value)}
-            placeholder={action === "reject" ? "Nêu rõ vấn đề về chính sách hoặc chất lượng" : "Lý do admin ẩn sản phẩm"}
+            placeholder={action === "reject" ? "Nêu rõ vấn đề về chính sách hoặc chất lượng (tối thiểu 5 ký tự)" : "Lý do admin ẩn sản phẩm (tối thiểu 5 ký tự)"}
           />
         ) : null}
       </ConfirmModal>

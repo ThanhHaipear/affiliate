@@ -8,8 +8,10 @@ import {
 import FilterBar from "../../components/admin/FilterBar";
 import LoadingSkeleton from "../../components/admin/LoadingSkeleton";
 import Button from "../../components/common/Button";
+import ConfirmModal from "../../components/common/ConfirmModal";
 import DataTable from "../../components/common/DataTable";
 import EmptyState from "../../components/common/EmptyState";
+import Input from "../../components/common/Input";
 import PageHeader from "../../components/common/PageHeader";
 import Pagination from "../../components/common/Pagination";
 import StatusBadge from "../../components/common/StatusBadge";
@@ -30,6 +32,8 @@ function AdminAffiliateLinksPage() {
   const [selectedLinkId, setSelectedLinkId] = useState(null);
   const [submittingId, setSubmittingId] = useState("");
   const [page, setPage] = useState(1);
+  const [revokeTarget, setRevokeTarget] = useState(null);
+  const [revokeReason, setRevokeReason] = useState("");
   const requestedLinkId = searchParams.get("linkId");
 
   useEffect(() => {
@@ -141,27 +145,27 @@ function AdminAffiliateLinksPage() {
     });
   }
 
-  async function handleRevokeLink(link) {
+  function handleOpenRevokeModal(link) {
     if (link.status === "REVOKED") {
       toast.error("Link này đã bị vô hiệu hóa.");
       return;
     }
+    setRevokeTarget(link);
+    setRevokeReason("");
+  }
 
-    const shouldRevoke = window.confirm(
-      `Admin sẽ vô hiệu hóa link ${link.shortCode}. Sau khi khóa, affiliate sẽ không dùng được link này và không tự mở lại nếu link bị admin khóa.`,
-    );
-
-    if (!shouldRevoke) {
-      return;
-    }
+  async function handleConfirmRevoke() {
+    if (!revokeTarget || revokeReason.trim().length < 5) return;
 
     try {
-      setSubmittingId(String(link.id));
-      const revoked = await revokeAdminAffiliateLink(link.id);
+      setSubmittingId(String(revokeTarget.id));
+      const revoked = await revokeAdminAffiliateLink(revokeTarget.id, { reason: revokeReason.trim() });
       const mapped = mapAdminAffiliateLinkDto(revoked);
-      setLinks((current) => current.map((item) => (String(item.id) === String(link.id) ? mapped : item)));
-      syncSelectedLink(link.id);
+      setLinks((current) => current.map((item) => (String(item.id) === String(revokeTarget.id) ? mapped : item)));
+      syncSelectedLink(revokeTarget.id);
       toast.success("Đã khóa link affiliate.");
+      setRevokeTarget(null);
+      setRevokeReason("");
     } catch (submitError) {
       toast.error(submitError.response?.data?.message || "Không khóa được link affiliate.");
     } finally {
@@ -278,7 +282,7 @@ function AdminAffiliateLinksPage() {
                         size="sm"
                         variant="danger"
                         loading={submittingId === String(row.id)}
-                        onClick={() => handleRevokeLink(row)}
+                        onClick={() => handleOpenRevokeModal(row)}
                       >
                         Khóa link
                       </Button>
@@ -359,7 +363,7 @@ function AdminAffiliateLinksPage() {
                     <Button
                       variant="danger"
                       loading={submittingId === String(selectedLink.id)}
-                      onClick={() => handleRevokeLink(selectedLink)}
+                      onClick={() => handleOpenRevokeModal(selectedLink)}
                     >
                       Khóa link này
                     </Button>
@@ -383,6 +387,27 @@ function AdminAffiliateLinksPage() {
           ) : null}
         </div>
       </div>
+
+      <ConfirmModal
+        open={Boolean(revokeTarget)}
+        title="Khóa link affiliate"
+        description={`Bạn sắp khóa link ${revokeTarget?.shortCode || ""}. Hãy nhập lý do.`}
+        confirmVariant="danger"
+        disabled={revokeReason.trim().length < 5}
+        loading={submittingId === String(revokeTarget?.id)}
+        onClose={() => {
+          setRevokeTarget(null);
+          setRevokeReason("");
+        }}
+        onConfirm={handleConfirmRevoke}
+      >
+        <Input
+          label="Lý do khóa link (bắt buộc)"
+          value={revokeReason}
+          onChange={(e) => setRevokeReason(e.target.value)}
+          placeholder="Nhập lý do khóa link (tối thiểu 5 ký tự)"
+        />
+      </ConfirmModal>
     </div>
   );
 }

@@ -115,6 +115,14 @@ const ENDPOINTS = {
     vnpayUrl: (batchId) => `${API_PREFIX}/payout-batches/${batchId}/vnpay-url`,
     vnpayReturnConfirm: `${API_PREFIX}/payout-batches/vnpay-return/confirm`,
   },
+  appeals: {
+    create: `${API_PREFIX}/appeals`,
+    me: `${API_PREFIX}/appeals/me`,
+    detail: (appealId) => `${API_PREFIX}/appeals/${appealId}`,
+    sendMessage: (appealId) => `${API_PREFIX}/appeals/${appealId}/messages`,
+    adminAll: `${API_PREFIX}/appeals/admin/all`,
+    adminReply: (appealId) => `${API_PREFIX}/appeals/${appealId}/admin-reply`,
+  },
 };
 
 export { API_PREFIX, ENDPOINTS };

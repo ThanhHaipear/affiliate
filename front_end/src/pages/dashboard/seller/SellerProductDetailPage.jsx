@@ -1,6 +1,7 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getSellerProductDetail, setSellerProductVisibility } from "../../../api/productApi";
+import { createAppeal, getMyAppeals, sendAppealMessage } from "../../../api/appealApi";
 import Button from "../../../components/common/Button";
 import EmptyState from "../../../components/common/EmptyState";
 import MoneyText from "../../../components/common/MoneyText";
@@ -8,6 +9,7 @@ import PageHeader from "../../../components/common/PageHeader";
 import StatusBadge from "../../../components/common/StatusBadge";
 import { useToast } from "../../../hooks/useToast";
 import { mapProductDto } from "../../../lib/apiMappers";
+import { formatDateTime } from "../../../lib/format";
 
 function SellerProductDetailPage() {
   const { productId } = useParams();
@@ -17,6 +19,9 @@ function SellerProductDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [selectedImage, setSelectedImage] = useState("");
+  const [appealText, setAppealText] = useState("");
+  const [appealLoading, setAppealLoading] = useState(false);
+  const [existingAppeal, setExistingAppeal] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -48,6 +53,23 @@ function SellerProductDetailPage() {
     };
   }, [productId]);
 
+  useEffect(() => {
+    if (!product?.admin_hidden) return;
+    loadAppeal();
+  }, [product?.id, product?.admin_hidden]);
+
+  async function loadAppeal() {
+    try {
+      const appeals = await getMyAppeals();
+      const found = (appeals || []).find(
+        (a) => a.targetType === "PRODUCT" && String(a.targetId) === String(product?.id)
+      );
+      if (found) setExistingAppeal(found);
+    } catch {
+      // Silently ignore
+    }
+  }
+
   if (loading) {
     return <EmptyState title="Đang tải chi tiết sản phẩm" description="Hệ thống đang đọc dữ liệu từ backend." />;
   }
@@ -75,6 +97,30 @@ function SellerProductDetailPage() {
       toast.error(submitError.response?.data?.message || "Không cập nhật được trạng thái hiển thị.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleSubmitAppeal() {
+    if (!appealText.trim()) return;
+    try {
+      setAppealLoading(true);
+      if (existingAppeal && existingAppeal.status === "OPEN") {
+        const updated = await sendAppealMessage(existingAppeal.id, { content: appealText.trim() });
+        setExistingAppeal(updated);
+      } else {
+        const created = await createAppeal({
+          targetType: "PRODUCT",
+          targetId: product.id,
+          content: appealText.trim(),
+        });
+        setExistingAppeal(created);
+      }
+      setAppealText("");
+      toast.success("Kiến nghị đã được gửi thành công.");
+    } catch (appealError) {
+      toast.error(appealError.response?.data?.message || "Không gửi được kiến nghị.");
+    } finally {
+      setAppealLoading(false);
     }
   }
 
@@ -133,9 +179,64 @@ function SellerProductDetailPage() {
             </div>
 
             {product.admin_hidden ? (
-              <p className="mt-3 text-sm leading-7 text-rose-700">
-                Admin đang ẩn sản phẩm này. Seller không thể tự mở lại cho đến khi admin cho phép hiển thị.
-              </p>
+              <div className="mt-4 space-y-3">
+                <div className="rounded-[1.5rem] border border-rose-200 bg-rose-50 p-4">
+                  <p className="text-sm font-semibold text-rose-700">⚠️ Sản phẩm đang bị admin ẩn</p>
+                  <p className="mt-1 text-sm text-rose-600">Seller không thể tự mở lại cho đến khi admin cho phép hiển thị.</p>
+                  {product.raw?.lockReason ? (
+                    <div className="mt-3 rounded-xl bg-rose-100 p-3">
+                      <p className="text-xs font-medium uppercase tracking-wider text-rose-500">Lý do từ admin</p>
+                      <p className="mt-1 text-sm text-rose-800">{product.raw.lockReason}</p>
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* Appeal section */}
+                {existingAppeal?.messages?.length ? (
+                  <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Lịch sử kiến nghị</p>
+                    <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
+                      {existingAppeal.messages.map((msg) => {
+                        const isAdmin = msg.sender?.adminProfile;
+                        const senderName = isAdmin
+                          ? (msg.sender.adminProfile.fullName || "Admin")
+                          : (msg.sender?.sellers?.[0]?.shopName || msg.sender?.affiliate?.fullName || msg.sender?.email || "Bạn");
+                        return (
+                          <div key={String(msg.id)} className={`rounded-xl p-3 text-sm ${isAdmin ? "bg-sky-50 text-sky-800" : "bg-slate-50 text-slate-700"}`}>
+                            <p className="text-xs font-medium">{senderName} · {formatDateTime(msg.createdAt)}</p>
+                            <p className="mt-1">{msg.content}</p>
+                            {msg.action === "UNLOCK" ? <p className="mt-1 text-xs font-semibold text-emerald-600">✓ Đã mở khóa</p> : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {existingAppeal.status === "RESOLVED" ? (
+                      <p className="mt-3 text-xs font-medium text-emerald-600">✓ Kiến nghị đã được giải quyết</p>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {(!existingAppeal || existingAppeal.status === "OPEN") && (
+                  <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50 p-4">
+                    <p className="text-sm font-semibold text-amber-800">Gửi kiến nghị cho admin</p>
+                    <textarea
+                      value={appealText}
+                      onChange={(e) => setAppealText(e.target.value)}
+                      placeholder="Nhập nội dung kiến nghị..."
+                      rows={3}
+                      className="mt-2 w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleSubmitAppeal}
+                      loading={appealLoading}
+                      disabled={!appealText.trim()}
+                    >
+                      {existingAppeal ? "Gửi thêm tin nhắn" : "Gửi kiến nghị"}
+                    </Button>
+                  </div>
+                )}
+              </div>
             ) : null}
           </Panel>
 

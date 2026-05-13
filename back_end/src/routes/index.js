@@ -18,6 +18,7 @@ const notificationRoutes = require("../modules/notification/notification.routes"
 const uploadRoutes = require("../modules/upload/upload.routes");
 const customerAddressRoutes = require("../modules/customer-address/customer-address.routes");
 const realtimeRoutes = require("../realtime/realtime.routes");
+const appealRoutes = require("../modules/appeal/appeal.routes");
 
 const router = express.Router();
 
@@ -39,5 +40,6 @@ router.use("/notifications", notificationRoutes);
 router.use("/uploads", uploadRoutes);
 router.use("/customer-addresses", customerAddressRoutes);
 router.use("/realtime", realtimeRoutes);
+router.use("/appeals", appealRoutes);
 
 module.exports = router;

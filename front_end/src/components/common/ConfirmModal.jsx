@@ -1,4 +1,4 @@
-﻿import Button from "./Button";
+import Button from "./Button";
 import Modal from "./Modal";
 
 function ConfirmModal({
@@ -9,6 +9,7 @@ function ConfirmModal({
   cancelLabel = "Hủy",
   confirmVariant = "primary",
   loading = false,
+  disabled = false,
   onClose,
   onConfirm,
   children,
@@ -24,7 +25,7 @@ function ConfirmModal({
           <Button variant="secondary" onClick={onClose}>
             {cancelLabel}
           </Button>
-          <Button variant={confirmVariant} loading={loading} onClick={onConfirm}>
+          <Button variant={confirmVariant} loading={loading} disabled={disabled} onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </div>

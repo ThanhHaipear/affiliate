@@ -192,8 +192,8 @@ async function getAdminAffiliateLinks(params) {
   return unwrapResponseData(response);
 }
 
-async function revokeAdminAffiliateLink(linkId) {
-  const response = await axiosClient.patch(ENDPOINTS.admin.affiliateLinkRevoke(linkId), {});
+async function revokeAdminAffiliateLink(linkId, payload) {
+  const response = await axiosClient.patch(ENDPOINTS.admin.affiliateLinkRevoke(linkId), payload || {});
   return unwrapResponseData(response);
 }
 
