@@ -180,9 +180,23 @@ function mapCommissionDto(commission = {}) {
     id: commission.id,
     order_code: order.orderCode || `#${order.id ?? ""}`,
     product_name:
-      firstItem?.product?.name ||
-      firstItem?.orderItem?.productNameSnapshot ||
-      (firstItem?.productId ? `Product #${firstItem.productId}` : "Commission item"),
+      commission.items?.length > 0
+        ? commission.items
+            .map((item) => {
+              const name = item.product?.name || item.orderItem?.productNameSnapshot || `Product #${item.productId}`;
+              const qty = item.orderItem?.quantity || 1;
+              return `${name} x${qty}`;
+            })
+            .join(", ")
+        : order.items?.length > 0
+          ? order.items
+              .map((item) => {
+                const name = item.productNameSnapshot || `Product #${item.productId}`;
+                const qty = item.quantity || 1;
+                return `${name} x${qty}`;
+              })
+              .join(", ")
+          : "Commission item",
     pending_amount: pendingAmount,
     actual_amount: actualAmount,
     platform_fee_amount: platformFeeAmount,
