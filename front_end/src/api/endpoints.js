@@ -48,6 +48,7 @@ const ENDPOINTS = {
     productVisibility: (productId) => `${API_PREFIX}/seller/products/${productId}/visibility`,
     productAffiliateSetting: (productId) => `${API_PREFIX}/seller/products/${productId}/affiliate-setting`,
     affiliateSettings: `${API_PREFIX}/seller/affiliate-settings`,
+    affiliates: `${API_PREFIX}/seller/affiliates`,
   },
   affiliate: {
     stats: `${API_PREFIX}/affiliate/stats`,

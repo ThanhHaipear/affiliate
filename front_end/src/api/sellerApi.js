@@ -57,9 +57,15 @@ async function getSellerWithdrawals(params) {
   return unwrapResponseData(response);
 }
 
+async function getSellerAffiliates(params) {
+  const response = await axiosClient.get(ENDPOINTS.seller.affiliates, { params });
+  return unwrapResponseData(response);
+}
+
 export {
   confirmSellerReceivedMoney,
   cancelSellerOrder,
+  getSellerAffiliates,
   getSellerOrders,
   getSellerOverview,
   getSellerProfile,

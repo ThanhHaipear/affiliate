@@ -1,4 +1,4 @@
-﻿import { NavLink } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { useRole } from "../../hooks/useRole";
 import { cn } from "../../lib/utils";
 
@@ -22,6 +22,7 @@ const roleMenus = {
     { label: "S\u1ea3n ph\u1ea9m", to: "/dashboard/seller/products" },
     { label: "\u0110\u01a1n h\u00e0ng", to: "/dashboard/seller/orders" },
     { label: "Doanh thu", to: "/dashboard/seller/revenue" },
+    { label: "Affiliate c\u1ee7a shop", to: "/dashboard/seller/affiliates" },
     { label: "V\u00ed v\u00e0 r\u00fat ti\u1ec1n", to: "/dashboard/seller/withdrawals" },
     { label: "Th\u00f4ng b\u00e1o", to: "/dashboard/seller/notifications" },
     { label: "\u0110\u1ed5i m\u1eadt kh\u1ea9u", to: "/dashboard/seller/change-password" },

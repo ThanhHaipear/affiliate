@@ -1,6 +1,7 @@
 const prisma = require("../../config/prisma");
 const { notifyAdmins } = require("../../utils/admin-notifications");
 const { summarizeOrderFinancialStats } = require("../../utils/order-financial-stats");
+const { parsePagination } = require("../../utils/pagination");
 
 exports.findSellerByOwner = (accountId) => prisma.seller.findFirst({
   where: { ownerAccountId: accountId },
@@ -231,3 +232,146 @@ exports.setProductVisibility = (sellerId, productId, visible) => prisma.$transac
 
   return updated;
 });
+
+exports.listAffiliates = async (sellerId, query = {}) => {
+  const { page, limit, skip } = parsePagination({ page: query.page, limit: query.limit || 8 });
+  const search = (query.search || "").trim();
+  const sortBy = query.sortBy || "totalOrders";
+  const sortOrder = query.sortOrder === "asc" ? "asc" : "desc";
+
+  // Find all distinct affiliates who have affiliate links to this seller's products
+  const sellerProducts = await prisma.product.findMany({
+    where: { sellerId },
+    select: { id: true },
+  });
+  const productIds = sellerProducts.map((p) => p.id);
+
+  if (!productIds.length) {
+    return { items: [], total: 0, page, limit, totalPages: 0 };
+  }
+
+  // Find unique affiliate IDs linked to seller's products
+  const affiliateLinks = await prisma.affiliateLink.findMany({
+    where: { productId: { in: productIds } },
+    select: { affiliateId: true },
+    distinct: ["affiliateId"],
+  });
+  let affiliateIds = affiliateLinks.map((l) => l.affiliateId);
+
+  if (!affiliateIds.length) {
+    return { items: [], total: 0, page, limit, totalPages: 0 };
+  }
+
+  // If search query, filter affiliates by name or email
+  if (search) {
+    const matchingAffiliates = await prisma.affiliate.findMany({
+      where: {
+        accountId: { in: affiliateIds },
+        OR: [
+          { fullName: { contains: search } },
+          { account: { email: { contains: search } } },
+          { account: { phone: { contains: search } } },
+        ],
+      },
+      select: { accountId: true },
+    });
+    affiliateIds = matchingAffiliates.map((a) => a.accountId);
+
+    if (!affiliateIds.length) {
+      return { items: [], total: 0, page, limit, totalPages: 0 };
+    }
+  }
+
+  // Fetch affiliate profiles
+  const affiliates = await prisma.affiliate.findMany({
+    where: { accountId: { in: affiliateIds } },
+    include: {
+      account: {
+        select: { id: true, email: true, phone: true, status: true },
+      },
+    },
+  });
+
+  // Fetch order items for this seller's products that came from these affiliates
+  const orderItems = await prisma.orderItem.findMany({
+    where: {
+      affiliateId: { in: affiliateIds },
+      order: { sellerId },
+    },
+    include: {
+      order: {
+        select: { id: true, status: true, totalAmount: true },
+      },
+    },
+  });
+
+  // Aggregate stats per affiliate
+  const statsMap = new Map();
+  for (const item of orderItems) {
+    const key = item.affiliateId;
+    if (!statsMap.has(key)) {
+      statsMap.set(key, {
+        totalOrders: new Set(),
+        totalRevenue: 0,
+        totalCommission: 0,
+        completedOrders: new Set(),
+      });
+    }
+    const stat = statsMap.get(key);
+    stat.totalOrders.add(item.order.id.toString());
+    stat.totalRevenue += Number(item.lineTotal || 0);
+    stat.totalCommission += Number(item.commissionAmount || 0);
+    if (item.order.status === "COMPLETED") {
+      stat.completedOrders.add(item.order.id.toString());
+    }
+  }
+
+  // Fetch affiliate link counts
+  const linkCounts = await prisma.affiliateLink.groupBy({
+    by: ["affiliateId"],
+    where: {
+      affiliateId: { in: affiliateIds },
+      productId: { in: productIds },
+    },
+    _count: { id: true },
+  });
+  const linkCountMap = new Map(linkCounts.map((l) => [l.affiliateId, l._count.id]));
+
+  // Build result items
+  let items = affiliates.map((affiliate) => {
+    const stat = statsMap.get(affiliate.accountId) || {
+      totalOrders: new Set(),
+      totalRevenue: 0,
+      totalCommission: 0,
+      completedOrders: new Set(),
+    };
+
+    return {
+      affiliateId: affiliate.accountId,
+      fullName: affiliate.fullName || null,
+      email: affiliate.account?.email || null,
+      phone: affiliate.account?.phone || null,
+      avatarUrl: affiliate.avatarUrl || null,
+      kycStatus: affiliate.kycStatus,
+      activityStatus: affiliate.activityStatus,
+      totalLinks: linkCountMap.get(affiliate.accountId) || 0,
+      totalOrders: stat.totalOrders.size,
+      completedOrders: stat.completedOrders.size,
+      totalRevenue: stat.totalRevenue,
+      totalCommission: stat.totalCommission,
+      createdAt: affiliate.createdAt,
+    };
+  });
+
+  // Sort
+  const sortKey = ["totalOrders", "totalRevenue", "totalCommission", "totalLinks", "completedOrders"].includes(sortBy)
+    ? sortBy
+    : "totalOrders";
+  items.sort((a, b) => sortOrder === "desc" ? b[sortKey] - a[sortKey] : a[sortKey] - b[sortKey]);
+
+  const total = items.length;
+  const totalPages = Math.ceil(total / limit);
+  items = items.slice(skip, skip + limit);
+
+  return { items, total, page, limit, totalPages };
+};

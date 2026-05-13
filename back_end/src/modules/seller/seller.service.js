@@ -64,3 +64,8 @@ exports.setProductVisibility = async (accountId, productId, payload) => {
     throw new AppError(error.message, 400);
   }
 };
+
+exports.listAffiliates = async (accountId, query) => {
+  const seller = await getApprovedSellerOrThrow(accountId);
+  return sellerRepository.listAffiliates(seller.id, query);
+};

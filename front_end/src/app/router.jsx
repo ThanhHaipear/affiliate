@@ -51,6 +51,7 @@ import SellerWithdrawalsPage from "../pages/dashboard/seller/SellerWithdrawalsPa
 import SellerRevenuePage from "../pages/dashboard/seller/SellerRevenuePage";
 import SellerChangePasswordPage from "../pages/dashboard/seller/SellerChangePasswordPage";
 import SellerNotificationsPage from "../pages/dashboard/seller/SellerNotificationsPage";
+import SellerAffiliatesPage from "../pages/dashboard/seller/SellerAffiliatesPage";
 import AffiliateOverviewPage from "../pages/dashboard/affiliate/AffiliateOverviewPage";
 import AffiliateProfilePage from "../pages/dashboard/affiliate/AffiliateProfilePage";
 import AffiliateMarketplacePage from "../pages/dashboard/affiliate/AffiliateMarketplacePage";
@@ -264,6 +265,7 @@ const routes = [
               { path: "payments", element: <Navigate to="/dashboard/seller/withdrawals" replace /> },
               { path: "wallet", element: <Navigate to="/dashboard/seller/withdrawals" replace /> },
               { path: "withdrawals", element: <SellerWithdrawalsPage /> },
+              { path: "affiliates", element: <SellerAffiliatesPage /> },
               { path: "change-password", element: <SellerChangePasswordPage /> },
               { path: "notifications", element: <SellerNotificationsPage /> },
             ],

@@ -56,3 +56,8 @@ exports.setProductVisibility = asyncHandler(async (req, res) => {
   const data = await sellerService.setProductVisibility(req.user.id, req.params.productId, req.validated.body);
   successResponse(res, data, "Product visibility updated");
 });
+
+exports.listAffiliates = asyncHandler(async (req, res) => {
+  const data = await sellerService.listAffiliates(req.user.id, req.query || {});
+  successResponse(res, data, "Seller affiliates loaded");
+});

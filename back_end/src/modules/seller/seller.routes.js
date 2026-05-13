@@ -19,6 +19,7 @@ router.get("/products", requireApprovedSeller, controller.listProducts);
 router.get("/products/:productId", requireApprovedSeller, controller.getProduct);
 router.patch("/products/:productId/visibility", requireApprovedSeller, validate(productVisibilitySchema), controller.setProductVisibility);
 router.get("/affiliate-settings", requireApprovedSeller, controller.listAffiliateSettings);
+router.get("/affiliates", requireApprovedSeller, controller.listAffiliates);
 router.put(
   "/products/:productId/affiliate-setting",
   requireApprovedSeller,
