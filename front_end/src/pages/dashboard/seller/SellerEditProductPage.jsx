@@ -120,7 +120,7 @@ function SellerEditProductPage() {
       let imageUrls = values.imageUrls || [];
       if (values.imageFiles?.length) {
         const uploadedImages = await uploadSellerProductImages(values.imageFiles, "product");
-        imageUrls = uploadedImages.map((item) => item.url);
+        imageUrls = [...imageUrls, ...uploadedImages.map((item) => item.url)];
       }
 
       await updateSellerProduct(
@@ -191,7 +191,7 @@ function SellerEditProductPage() {
             <StatusBadge status={product.affiliate_setting_status} />
           </div>
           <p className="mt-4 text-sm leading-7 text-slate-600">
-            Nếu chọn bộ ảnh mới, hệ thống sẽ thay toàn bộ danh sách ảnh cũ bằng danh sách mới. Sau khi lưu, sản phẩm và cấu hình affiliate sẽ quay lại hàng chờ admin duyệt.
+            Ảnh mới được thêm vào danh sách ảnh hiện có. Bạn có thể xóa từng ảnh hoặc đổi thứ tự trước khi lưu. Sau khi lưu, sản phẩm và cấu hình affiliate sẽ quay lại hàng chờ admin duyệt.
           </p>
         </div>
       </div>

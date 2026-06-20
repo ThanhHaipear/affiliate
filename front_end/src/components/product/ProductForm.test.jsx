@@ -78,4 +78,16 @@ describe("ProductForm", () => {
     expect(description).toHaveValue("Mô tả được nhập sau khi chọn ảnh.");
     expect(screen.getByAltText("Ảnh sản phẩm 1")).toBeInTheDocument();
   });
+
+  it("adds images selected in separate uploads instead of replacing prior selections", async () => {
+    const user = userEvent.setup();
+    renderForm();
+    const imageInput = screen.getByLabelText("Ảnh sản phẩm");
+
+    await user.upload(imageInput, new File(["first"], "first.png", { type: "image/png" }));
+    await user.upload(imageInput, new File(["second"], "second.png", { type: "image/png" }));
+
+    expect(screen.getByAltText("Ảnh sản phẩm 1")).toBeInTheDocument();
+    expect(screen.getByAltText("Ảnh sản phẩm 2")).toBeInTheDocument();
+  });
 });

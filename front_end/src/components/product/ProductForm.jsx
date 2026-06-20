@@ -66,16 +66,17 @@ function ProductForm({
 
   useEffect(() => {
     if (!imageFiles.length) {
+      setImagePreviews(values.imageUrls || []);
       return undefined;
     }
 
     const objectUrls = imageFiles.map((file) => URL.createObjectURL(file));
-    setImagePreviews(objectUrls);
+    setImagePreviews([...(values.imageUrls || []), ...objectUrls]);
 
     return () => {
       objectUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [imageFiles]);
+  }, [imageFiles, values.imageUrls]);
 
   function updateField(name, nextValue) {
     setValues((currentValues) => ({
@@ -112,7 +113,13 @@ function ProductForm({
   }
 
   function handleImageChange(event) {
-    setImageFiles(Array.from(event.target.files || []));
+    const selectedFiles = Array.from(event.target.files || []);
+    if (!selectedFiles.length) {
+      return;
+    }
+
+    setImageFiles((currentFiles) => [...currentFiles, ...selectedFiles]);
+    resetImageInput();
   }
 
   function resetImageInput() {
@@ -122,33 +129,38 @@ function ProductForm({
   }
 
   function handleRemoveImage(indexToRemove) {
+    const existingImageCount = (values.imageUrls || []).length;
+
+    if (indexToRemove < existingImageCount) {
+      setValues((currentValues) => ({
+        ...currentValues,
+        imageUrls: (currentValues.imageUrls || []).filter((_, index) => index !== indexToRemove),
+      }));
+      return;
+    }
+
+    const fileIndex = indexToRemove - existingImageCount;
     if (imageFiles.length) {
-      const nextFiles = imageFiles.filter((_, index) => index !== indexToRemove);
+      const nextFiles = imageFiles.filter((_, index) => index !== fileIndex);
       setImageFiles(nextFiles);
 
       if (!nextFiles.length) {
         resetImageInput();
       }
-
-      return;
     }
-
-    setImagePreviews((currentPreviews) => currentPreviews.filter((_, index) => index !== indexToRemove));
-    setValues((currentValues) => ({
-      ...currentValues,
-      imageUrls: (currentValues.imageUrls || []).filter((_, index) => index !== indexToRemove),
-    }));
   }
 
   function handleMoveImage(indexToMove, direction) {
     const nextIndex = direction === "up" ? indexToMove - 1 : indexToMove + 1;
+    const existingImageCount = (values.imageUrls || []).length;
 
-    if (imageFiles.length) {
-      setImageFiles((currentFiles) => moveArrayItem(currentFiles, indexToMove, nextIndex));
+    if (indexToMove >= existingImageCount) {
+      const fileIndex = indexToMove - existingImageCount;
+      const nextFileIndex = nextIndex - existingImageCount;
+      setImageFiles((currentFiles) => moveArrayItem(currentFiles, fileIndex, nextFileIndex));
       return;
     }
 
-    setImagePreviews((currentPreviews) => moveArrayItem(currentPreviews, indexToMove, nextIndex));
     setValues((currentValues) => ({
       ...currentValues,
       imageUrls: moveArrayItem(currentValues.imageUrls || [], indexToMove, nextIndex),

@@ -11,6 +11,36 @@ const approvedSellerWhere = {
 
 const ACTIVE_SOLD_ORDER_STATUSES = ["PAID", "PROCESSING", "COMPLETED"];
 
+async function ensureUniqueValue(findExisting, value, currentId = null) {
+  const baseValue = String(value || "item").trim() || "item";
+  let candidate = baseValue;
+  let suffix = 2;
+
+  while (true) {
+    const existing = await findExisting(candidate);
+    if (!existing || String(existing.id) === String(currentId)) {
+      return candidate;
+    }
+
+    candidate = `${baseValue}-${suffix}`;
+    suffix += 1;
+  }
+}
+
+const ensureUniqueProductSlug = (tx, slug, productId = null) =>
+  ensureUniqueValue(
+    (candidate) => tx.product.findUnique({ where: { slug: candidate }, select: { id: true } }),
+    slug,
+    productId,
+  );
+
+const ensureUniqueVariantSku = (tx, sku, variantId = null) =>
+  ensureUniqueValue(
+    (candidate) => tx.productVariant.findUnique({ where: { sku: candidate }, select: { id: true } }),
+    sku,
+    variantId,
+  );
+
 async function attachCommerceStats(products = []) {
   if (!products.length) {
     return products;
@@ -358,12 +388,13 @@ exports.findProductById = (id) => prisma.product.findUnique({
 
 exports.createProduct = (sellerId, payload) => prisma.$transaction(async (tx) => {
   const now = new Date();
+  const productSlug = await ensureUniqueProductSlug(tx, payload.slug);
   const product = await tx.product.create({
     data: {
       sellerId,
       categoryId: payload.categoryId,
       name: payload.name,
-      slug: payload.slug,
+      slug: productSlug,
       description: payload.description,
       basePrice: BigInt(payload.basePrice),
       status: "PENDING",
@@ -378,11 +409,15 @@ exports.createProduct = (sellerId, payload) => prisma.$transaction(async (tx) =>
     });
   }
 
-  for (const variant of payload.variants) {
+  for (const [index, variant] of payload.variants.entries()) {
+    const variantSku = await ensureUniqueVariantSku(
+      tx,
+      variant.sku || `${productSlug.toUpperCase()}-${index + 1}`,
+    );
     const createdVariant = await tx.productVariant.create({
       data: {
         productId: product.id,
-        sku: variant.sku,
+        sku: variantSku,
         variantName: variant.variantName,
         options: variant.options,
         price: BigInt(variant.price),
@@ -430,12 +465,14 @@ exports.updateProduct = (productId, sellerId, payload) => prisma.$transaction(as
     return { count: 0 };
   }
 
+  const productSlug = await ensureUniqueProductSlug(tx, payload.slug, productId);
+
   await tx.product.update({
     where: { id: productId },
     data: {
       categoryId: payload.categoryId,
       name: payload.name,
-      slug: payload.slug,
+      slug: productSlug,
       description: payload.description,
       basePrice: BigInt(payload.basePrice),
       status: "PENDING",
@@ -464,12 +501,17 @@ exports.updateProduct = (productId, sellerId, payload) => prisma.$transaction(as
   for (let index = 0; index < payload.variants.length; index += 1) {
     const variant = payload.variants[index];
     const currentVariant = existingVariants[index];
+    const variantSku = await ensureUniqueVariantSku(
+      tx,
+      variant.sku || `${productSlug.toUpperCase()}-${index + 1}`,
+      currentVariant?.id,
+    );
 
     if (currentVariant) {
       await tx.productVariant.update({
         where: { id: currentVariant.id },
         data: {
-          sku: variant.sku,
+          sku: variantSku,
           variantName: variant.variantName,
           options: variant.options,
           price: BigInt(variant.price),
@@ -502,7 +544,7 @@ exports.updateProduct = (productId, sellerId, payload) => prisma.$transaction(as
     const createdVariant = await tx.productVariant.create({
       data: {
         productId,
-        sku: variant.sku,
+        sku: variantSku,
         variantName: variant.variantName,
         options: variant.options,
         price: BigInt(variant.price),
