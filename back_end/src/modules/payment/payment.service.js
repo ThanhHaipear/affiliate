@@ -13,6 +13,7 @@ const paymentRepository = require("./payment.repository");
 
 const VNPAY_SUPPORTED_METHODS = new Set(["VNPAY", "CARD"]);
 const ADMIN_REVIEW_PAYMENT_METHODS = new Set(["VNPAY", "CARD"]);
+const DEFAULT_REFUND_REASON = "Người dùng không cung cấp lý do hoàn tiền.";
 
 const buildVnpayTxnRef = (orderId) => `${orderId}-${Date.now()}`;
 const buildVnpayGroupTxnRef = (orderCode) => `G_${orderCode}_${Date.now()}`;
@@ -394,6 +395,7 @@ exports.confirmSellerReceivedMoney = async (accountId, orderId, payload) => {
 };
 
 exports.refundOrder = async (accountId, orderId, payload) => {
+  const refundReason = payload?.reason?.trim() || DEFAULT_REFUND_REASON;
   const order = await prisma.order.findUnique({
     where: { id: BigInt(orderId) },
     include: { seller: true, payments: true }
@@ -429,7 +431,7 @@ exports.refundOrder = async (accountId, orderId, payload) => {
     const refundRequest = await paymentRepository.createRefundRequest({
       orderId,
       actorId: accountId,
-      reason: payload.reason,
+      reason: refundReason,
     });
 
     return {
@@ -438,7 +440,7 @@ exports.refundOrder = async (accountId, orderId, payload) => {
     };
   }
 
-  return paymentRepository.refundOrder({ orderId, actorId: accountId, reason: payload.reason });
+  return paymentRepository.refundOrder({ orderId, actorId: accountId, reason: refundReason });
 };
 
 exports.cancelOrder = async (accountId, orderId, payload) => {
@@ -474,7 +476,7 @@ exports.cancelOrder = async (accountId, orderId, payload) => {
     const refundRequests = await paymentRepository.createRefundRequestsForOrders({
       orderIds: groupedOrders.map((order) => order.id),
       actorId: accountId,
-      reason: payload?.reason || "Customer requested cancellation after VNPAY payment",
+      reason: payload?.reason?.trim() || DEFAULT_REFUND_REASON,
     });
 
     return {

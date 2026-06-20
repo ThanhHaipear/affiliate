@@ -16,6 +16,19 @@ import { mapAdminOrderDto } from "../../lib/adminMappers";
 import { formatCompactCurrency, formatCurrency, formatDateTime, formatStatusLabel } from "../../lib/format";
 
 const ORDERS_PER_PAGE = 8;
+const DEFAULT_REFUND_REASON = "Người dùng không cung cấp lý do hoàn tiền.";
+const REFUND_REASON_PREVIEW_LENGTH = 20;
+
+function getRefundReasonLabel(row) {
+  return row.latestRefundReason || DEFAULT_REFUND_REASON;
+}
+
+function getRefundReasonPreview(row) {
+  const reason = getRefundReasonLabel(row);
+  return reason.length > REFUND_REASON_PREVIEW_LENGTH
+    ? `${reason.slice(0, REFUND_REASON_PREVIEW_LENGTH).trimEnd()}…`
+    : reason;
+}
 
 const orderStatusOptions = [
   { label: "Tất cả", value: "ALL" },
@@ -313,7 +326,12 @@ function AdminOrdersPage() {
             title: "Yêu cầu hoàn tiền",
             render: (row) =>
               row.latestRefundStatus ? (
-                <StatusBadge status={row.latestRefundStatus} />
+                <div className="min-w-44 space-y-2">
+                  <StatusBadge status={row.latestRefundStatus} />
+                  <p className="max-w-40 truncate whitespace-nowrap text-xs leading-5 text-slate-600" title={getRefundReasonLabel(row)}>
+                    Lý do: {getRefundReasonPreview(row)}
+                  </p>
+                </div>
               ) : (
                 <span className="text-sm text-slate-500">--</span>
               ),
@@ -325,7 +343,7 @@ function AdminOrdersPage() {
               row.latestRefundStatus === "PENDING" ? (
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" onClick={() => setReviewTarget(row)}>
-                    Duyệt hoàn tiền
+                    Xem & xử lý
                   </Button>
                 </div>
               ) : (
@@ -345,9 +363,9 @@ function AdminOrdersPage() {
 
       <ConfirmModal
         open={Boolean(reviewTarget)}
-        title="Duyệt yêu cầu hoàn tiền"
-        description={`Đơn ${reviewTarget?.code} đang có yêu cầu hoàn tiền chờ duyệt. Chọn duyệt để hoàn tiền, hoặc bấm nút từ chối nếu yêu cầu không hợp lệ.`}
-        confirmLabel="Duyệt"
+        title="Xử lý yêu cầu hoàn tiền"
+        description={`Đơn ${reviewTarget?.code} đang có yêu cầu hoàn tiền chờ duyệt. Đọc lý do trước khi quyết định duyệt hoặc không duyệt.`}
+        confirmLabel="Duyệt hoàn tiền"
         loading={submitting}
         onClose={() => {
           setReviewTarget(null);
@@ -355,8 +373,14 @@ function AdminOrdersPage() {
         }}
         onConfirm={() => handleReviewRefund("APPROVED")}
       >
-        <label className="mt-4 block text-sm font-medium text-slate-700" htmlFor="refund-reject-reason">
-          Lý do từ chối <span className="font-normal text-slate-500">(không bắt buộc)</span>
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Lý do người gửi yêu cầu</p>
+          <p className="mt-2 text-sm leading-6 text-slate-700">
+            {getRefundReasonLabel(reviewTarget || {})}
+          </p>
+        </div>
+        <label className="mt-4 block text-sm font-medium text-slate-100" htmlFor="refund-reject-reason">
+          Lý do từ chối <span className="font-normal text-slate-400">(không bắt buộc)</span>
         </label>
         <textarea
           id="refund-reject-reason"
@@ -365,7 +389,7 @@ function AdminOrdersPage() {
           maxLength={500}
           rows={4}
           placeholder="Nhập lý do để người gửi yêu cầu biết..."
-          className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+          className="mt-2 w-full rounded-xl border border-slate-500 bg-slate-900 px-3 py-2 text-sm text-white placeholder:text-slate-400 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-900"
         />
         <div className="mt-4 flex justify-end">
           <Button variant="danger" loading={submitting} onClick={() => handleReviewRefund("REJECTED")}>

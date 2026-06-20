@@ -243,6 +243,7 @@ function MyOrdersPage() {
   const [cancelGroup, setCancelGroup] = useState(null);
   const [actingOrderId, setActingOrderId] = useState("");
   const [actionOrder, setActionOrder] = useState(null);
+  const [refundReason, setRefundReason] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -409,12 +410,11 @@ function MyOrdersPage() {
       setCancellingGroupCode(cancelGroup.orderCode);
       const primaryOrder = cancelGroup.orders?.[0];
       await cancelCustomerOrder(primaryOrder.id, {
-        reason: canRequestRefundCancel
-          ? "Customer requested cancellation after VNPAY payment"
-          : "Customer cancelled unpaid order group",
+        ...(canRequestRefundCancel && refundReason.trim() ? { reason: refundReason.trim() } : {}),
       });
       await reloadOrders();
       setCancelGroup(null);
+      setRefundReason("");
       toast.success(
         canRequestRefundCancel
           ? "Đã gửi yêu cầu hoàn tiền cho toàn bộ cụm đơn."
@@ -437,12 +437,11 @@ function MyOrdersPage() {
     try {
       setActingOrderId(String(actionOrder.id));
       await refundCustomerOrder(actionOrder.id, {
-        reason: canRefundOrder
-          ? "Customer requested refund for this seller order after VNPAY payment"
-          : "Customer cancelled this unpaid COD seller order",
+        ...(canRefundOrder && refundReason.trim() ? { reason: refundReason.trim() } : {}),
       });
       await reloadOrders();
       setActionOrder(null);
+      setRefundReason("");
       toast.success(
         canRefundOrder
           ? "Đã gửi yêu cầu hoàn tiền cho seller-order này."
@@ -603,7 +602,7 @@ function MyOrdersPage() {
                             <div className="mt-4 flex flex-wrap gap-2">
                               <Link to={`/dashboard/customer/orders/${order.id}`}>
                                 <Button variant="secondary" size="sm">
-                                  Xem chi tiết seller-order
+                                  Xem chi tiết đơn hàng
                                 </Button>
                               </Link>
                               {sellerActions.canCancelOrder ? (
@@ -613,7 +612,7 @@ function MyOrdersPage() {
                               ) : null}
                               {sellerActions.canRefundOrder ? (
                                 <Button size="sm" variant="danger" onClick={() => setActionOrder(order)}>
-                                  Hoàn tiền seller-order này
+                                  Hoàn tiền đơn hàng
                                 </Button>
                               ) : null}
                               {isDeliveredOrder(order) ? (
@@ -678,9 +677,16 @@ function MyOrdersPage() {
             confirmLabel={cancelGroup && getGroupActions(cancelGroup).canRequestRefundCancel ? "Xác nhận hoàn tiền" : "Xác nhận hủy"}
             confirmVariant="danger"
             loading={Boolean(cancelGroup) && cancellingGroupCode === cancelGroup.orderCode}
-            onClose={() => setCancelGroup(null)}
+            onClose={() => {
+              setCancelGroup(null);
+              setRefundReason("");
+            }}
             onConfirm={handleCancelGroup}
-          />
+          >
+            {cancelGroup && getGroupActions(cancelGroup).canRequestRefundCancel ? (
+              <RefundReasonField value={refundReason} onChange={setRefundReason} />
+            ) : null}
+          </ConfirmModal>
           <ConfirmModal
             open={Boolean(actionOrder)}
             title={actionOrder && getSellerOrderActions(actionOrder).canRefundOrder ? "Hoàn tiền seller-order" : "Hủy seller-order"}
@@ -694,11 +700,37 @@ function MyOrdersPage() {
             confirmLabel={actionOrder && getSellerOrderActions(actionOrder).canRefundOrder ? "Xác nhận hoàn tiền" : "Xác nhận hủy"}
             confirmVariant="danger"
             loading={Boolean(actionOrder) && actingOrderId === String(actionOrder.id)}
-            onClose={() => setActionOrder(null)}
+            onClose={() => {
+              setActionOrder(null);
+              setRefundReason("");
+            }}
             onConfirm={handleSellerOrderAction}
-          />
+          >
+            {actionOrder && getSellerOrderActions(actionOrder).canRefundOrder ? (
+              <RefundReasonField value={refundReason} onChange={setRefundReason} />
+            ) : null}
+          </ConfirmModal>
         </>
       ) : null}
+    </div>
+  );
+}
+
+function RefundReasonField({ value, onChange }) {
+  return (
+    <div className="mt-4">
+      <label className="block text-sm font-medium text-slate-200" htmlFor="customer-refund-reason">
+        Lý do hoàn tiền <span className="font-normal text-slate-400">(không bắt buộc)</span>
+      </label>
+      <textarea
+        id="customer-refund-reason"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        maxLength={500}
+        rows={4}
+        className="mt-2 w-full rounded-2xl border border-slate-600 bg-slate-900/70 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400"
+        placeholder="Nhập lý do hoàn tiền (có thể để trống)"
+      />
     </div>
   );
 }

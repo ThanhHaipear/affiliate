@@ -47,7 +47,6 @@ function SellerOrderDetailPage() {
   const [openRefund, setOpenRefund] = useState(false);
   const [openCancel, setOpenCancel] = useState(false);
   const [refundReason, setRefundReason] = useState("");
-  const [refundReasonError, setRefundReasonError] = useState("");
   const [cancelReason, setCancelReason] = useState("");
   const [cancelReasonError, setCancelReasonError] = useState("");
 
@@ -118,15 +117,10 @@ function SellerOrderDetailPage() {
     }
 
     const normalizedReason = refundReason.trim();
-    if (normalizedReason.length < 3) {
-      setRefundReasonError("Lý do hoàn tiền phải từ 3 ký tự trở lên.");
-      return;
-    }
 
     try {
       setSubmitting(true);
-      setRefundReasonError("");
-      await refundSellerOrder(order.id, { reason: normalizedReason });
+      await refundSellerOrder(order.id, normalizedReason ? { reason: normalizedReason } : {});
       await refreshOrder();
       toast.success("Đã gửi yêu cầu hoàn tiền cho admin duyệt.");
       setOpenRefund(false);
@@ -331,28 +325,22 @@ function SellerOrderDetailPage() {
         onClose={() => {
           setOpenRefund(false);
           setRefundReason("");
-          setRefundReasonError("");
         }}
         onConfirm={handleRefundOrder}
         loading={submitting}
       >
         <label className="block text-sm font-medium text-slate-200" htmlFor="seller-order-detail-refund-reason">
-          Lý do hoàn tiền
+          Lý do hoàn tiền <span className="font-normal text-slate-400">(không bắt buộc)</span>
         </label>
         <textarea
           id="seller-order-detail-refund-reason"
           value={refundReason}
-          onChange={(event) => {
-            setRefundReason(event.target.value);
-            if (refundReasonError) {
-              setRefundReasonError("");
-            }
-          }}
+          onChange={(event) => setRefundReason(event.target.value)}
+          maxLength={500}
           rows={4}
           className="mt-2 w-full rounded-2xl border border-slate-600 bg-slate-900/70 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400"
-          placeholder="Nhập lý do hoàn tiền"
+          placeholder="Nhập lý do hoàn tiền (có thể để trống)"
         />
-        {refundReasonError ? <p className="mt-2 text-sm text-rose-300">{refundReasonError}</p> : null}
       </ConfirmModal>
 
       <ConfirmModal

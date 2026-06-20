@@ -38,7 +38,7 @@ exports.confirmReceiptSchema = z.object({
 
 exports.refundOrderSchema = z.object({
   body: z.object({
-    reason: z.string().min(3)
+    reason: z.string().trim().max(500).optional()
   })
 });
 
