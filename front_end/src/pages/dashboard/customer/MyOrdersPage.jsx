@@ -15,6 +15,7 @@ import Modal from "../../../components/common/Modal";
 import MoneyText from "../../../components/common/MoneyText";
 import PageHeader from "../../../components/common/PageHeader";
 import Pagination from "../../../components/common/Pagination";
+import SearchBar from "../../../components/common/SearchBar";
 import StatusBadge from "../../../components/common/StatusBadge";
 import { useToast } from "../../../hooks/useToast";
 import { formatDateTime } from "../../../lib/format";
@@ -237,6 +238,7 @@ function MyOrdersPage() {
   const [reviewComment, setReviewComment] = useState("");
   const [page, setPage] = useState(1);
   const [activeFilter, setActiveFilter] = useState("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
   const [payingGroupCode, setPayingGroupCode] = useState("");
   const [switchingGroupCode, setSwitchingGroupCode] = useState("");
   const [cancellingGroupCode, setCancellingGroupCode] = useState("");
@@ -277,10 +279,29 @@ function MyOrdersPage() {
   }, []);
 
   const groupedOrders = useMemo(() => groupOrdersByCode(orders), [orders]);
-  const filteredGroupedOrders = useMemo(
-    () => groupedOrders.filter((group) => groupMatchesFilter(group, activeFilter)),
-    [activeFilter, groupedOrders],
-  );
+  const filteredGroupedOrders = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
+    return groupedOrders.filter((group) => {
+      if (!groupMatchesFilter(group, activeFilter)) {
+        return false;
+      }
+
+      if (!normalizedQuery) {
+        return true;
+      }
+
+      const searchableValue = [
+        group.orderCode,
+        ...(group.orders || []).flatMap((order) => [order.code, order.raw?.seller?.shopName]),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return searchableValue.includes(normalizedQuery);
+    });
+  }, [activeFilter, groupedOrders, searchQuery]);
   const totalPages = Math.max(1, Math.ceil(filteredGroupedOrders.length / ORDER_GROUPS_PER_PAGE));
   const paginatedGroupedOrders = useMemo(() => {
     const startIndex = (page - 1) * ORDER_GROUPS_PER_PAGE;
@@ -489,6 +510,15 @@ function MyOrdersPage() {
               </Button>
             ))}
           </div>
+
+          <SearchBar
+            value={searchQuery}
+            onChange={(value) => {
+              setSearchQuery(value);
+              setPage(1);
+            }}
+            placeholder="Tìm theo mã đơn hoặc tên shop..."
+          />
 
           {filteredGroupedOrders.length ? (
             <div className="space-y-5">

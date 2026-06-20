@@ -8,6 +8,7 @@ import MoneyText from "../../../components/common/MoneyText";
 import PageHeader from "../../../components/common/PageHeader";
 import Pagination from "../../../components/common/Pagination";
 import SearchBar from "../../../components/common/SearchBar";
+import Select from "../../../components/common/Select";
 import StatusBadge from "../../../components/common/StatusBadge";
 import { useToast } from "../../../hooks/useToast";
 import { formatDateTime } from "../../../lib/format";
@@ -92,6 +93,9 @@ function SellerOrdersPage({ orders: initialOrders, onConfirmReceivedMoney }) {
   const [cancelReason, setCancelReason] = useState("");
   const [cancelReasonError, setCancelReasonError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [orderStatusFilter, setOrderStatusFilter] = useState("ALL");
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState("ALL");
+  const [refundFilter, setRefundFilter] = useState("ALL");
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -120,9 +124,26 @@ function SellerOrdersPage({ orders: initialOrders, onConfirmReceivedMoney }) {
 
   const filteredRows = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
-    const matchedRows = !normalizedQuery
+    const searchedRows = !normalizedQuery
       ? rows
-      : rows.filter((row) => String(row.code || "").toLowerCase().includes(normalizedQuery));
+      : rows.filter((row) =>
+        [row.code, row.raw?.buyer?.customerProfile?.fullName, row.raw?.buyer?.email]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(normalizedQuery),
+      );
+
+    const matchedRows = searchedRows.filter((row) => {
+      const matchesOrderStatus = orderStatusFilter === "ALL" || row.order_status === orderStatusFilter;
+      const matchesPaymentStatus = paymentStatusFilter === "ALL" || row.payment_status === paymentStatusFilter;
+      const matchesRefund =
+        refundFilter === "ALL" ||
+        (refundFilter === "PENDING" && row.hasPendingRefundRequest) ||
+        (refundFilter === "NONE" && !(row.raw?.refunds || []).length);
+
+      return matchesOrderStatus && matchesPaymentStatus && matchesRefund;
+    });
 
     return [...matchedRows].sort((left, right) => {
       const priorityDiff = getOrderSortPriority(left) - getOrderSortPriority(right);
@@ -132,7 +153,7 @@ function SellerOrdersPage({ orders: initialOrders, onConfirmReceivedMoney }) {
 
       return getOrderTimestamp(right) - getOrderTimestamp(left);
     });
-  }, [rows, searchQuery]);
+  }, [orderStatusFilter, paymentStatusFilter, refundFilter, rows, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / ORDERS_PER_PAGE));
 
@@ -143,7 +164,7 @@ function SellerOrdersPage({ orders: initialOrders, onConfirmReceivedMoney }) {
 
   useEffect(() => {
     setPage(1);
-  }, [searchQuery]);
+  }, [orderStatusFilter, paymentStatusFilter, refundFilter, searchQuery]);
 
   useEffect(() => {
     setPage((current) => Math.min(current, Math.max(1, Math.ceil(filteredRows.length / ORDERS_PER_PAGE))));
@@ -267,6 +288,44 @@ function SellerOrdersPage({ orders: initialOrders, onConfirmReceivedMoney }) {
           />
         }
       />
+
+      <div className="grid gap-4 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-3">
+        <Select
+          label="Trạng thái đơn"
+          value={orderStatusFilter}
+          onChange={(event) => setOrderStatusFilter(event.target.value)}
+          options={[
+            { label: "Tất cả", value: "ALL" },
+            { label: "Chờ thanh toán", value: "PENDING_PAYMENT" },
+            { label: "Đã thanh toán", value: "PAID" },
+            { label: "Hoàn tất", value: "COMPLETED" },
+            { label: "Đã hủy", value: "CANCELLED" },
+            { label: "Đã hoàn tiền", value: "REFUNDED" },
+          ]}
+        />
+        <Select
+          label="Trạng thái thanh toán"
+          value={paymentStatusFilter}
+          onChange={(event) => setPaymentStatusFilter(event.target.value)}
+          options={[
+            { label: "Tất cả", value: "ALL" },
+            { label: "Chờ thanh toán", value: "PENDING" },
+            { label: "Đã thanh toán", value: "PAID" },
+            { label: "Thất bại", value: "FAILED" },
+            { label: "Đã hoàn tiền", value: "REFUNDED" },
+          ]}
+        />
+        <Select
+          label="Yêu cầu hoàn tiền"
+          value={refundFilter}
+          onChange={(event) => setRefundFilter(event.target.value)}
+          options={[
+            { label: "Tất cả", value: "ALL" },
+            { label: "Đang chờ duyệt", value: "PENDING" },
+            { label: "Chưa có yêu cầu", value: "NONE" },
+          ]}
+        />
+      </div>
 
       {loading ? (
         <EmptyState title="Đang tải đơn hàng" description="Hệ thống đang lấy danh sách đơn hàng của shop từ backend." />
