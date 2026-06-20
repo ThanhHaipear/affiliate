@@ -11,6 +11,7 @@ const FileUploadField = forwardRef(function FileUploadField(
         <input
           ref={ref}
           type="file"
+          aria-label={label || "Tải tệp"}
           accept={accept}
           multiple={multiple}
           className="w-full text-sm text-slate-700 file:mr-4 file:rounded-xl file:border-0 file:bg-sky-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"

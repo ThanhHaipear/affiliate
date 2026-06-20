@@ -1110,11 +1110,11 @@ exports.reviewRefundRequest = ({ refundId, adminId, status, rejectReason }) => p
         where: { id: refund.id },
         data: {
           status: "REJECTED",
-        reviewedBy: adminId,
-        reason: rejectReason || refund.reason,
-        updatedAt: reviewedAt
-      }
-    });
+          reviewedBy: adminId,
+          rejectReason: rejectReason || null,
+          updatedAt: reviewedAt
+        }
+      });
 
     await tx.activityLog.create({
       data: {

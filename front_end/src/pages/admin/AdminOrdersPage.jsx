@@ -61,6 +61,7 @@ function AdminOrdersPage() {
   const [financialStats, setFinancialStats] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [reviewTarget, setReviewTarget] = useState(null);
+  const [refundRejectReason, setRefundRejectReason] = useState("");
   const [page, setPage] = useState(1);
   const spotlightOrderId = searchParams.get("orderId") || "";
 
@@ -121,8 +122,8 @@ function AdminOrdersPage() {
       setSubmitting(true);
       await reviewRefundRequest(reviewTarget.latestRefundId, {
         status: statusValue,
-        ...(statusValue === "REJECTED"
-          ? { rejectReason: reviewTarget.latestRefundReason || "Từ chối bởi admin" }
+        ...(statusValue === "REJECTED" && refundRejectReason.trim()
+          ? { rejectReason: refundRejectReason.trim() }
           : {}),
       });
       toast.success(
@@ -131,6 +132,7 @@ function AdminOrdersPage() {
           : "Đã từ chối yêu cầu hoàn tiền.",
       );
       setReviewTarget(null);
+      setRefundRejectReason("");
       await loadOrders();
     } catch (submitError) {
       toast.error(submitError.response?.data?.message || "Không thể xử lý yêu cầu hoàn tiền.");
@@ -347,9 +349,24 @@ function AdminOrdersPage() {
         description={`Đơn ${reviewTarget?.code} đang có yêu cầu hoàn tiền chờ duyệt. Chọn duyệt để hoàn tiền, hoặc bấm nút từ chối nếu yêu cầu không hợp lệ.`}
         confirmLabel="Duyệt"
         loading={submitting}
-        onClose={() => setReviewTarget(null)}
+        onClose={() => {
+          setReviewTarget(null);
+          setRefundRejectReason("");
+        }}
         onConfirm={() => handleReviewRefund("APPROVED")}
       >
+        <label className="mt-4 block text-sm font-medium text-slate-700" htmlFor="refund-reject-reason">
+          Lý do từ chối <span className="font-normal text-slate-500">(không bắt buộc)</span>
+        </label>
+        <textarea
+          id="refund-reject-reason"
+          value={refundRejectReason}
+          onChange={(event) => setRefundRejectReason(event.target.value)}
+          maxLength={500}
+          rows={4}
+          placeholder="Nhập lý do để người gửi yêu cầu biết..."
+          className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+        />
         <div className="mt-4 flex justify-end">
           <Button variant="danger" loading={submitting} onClick={() => handleReviewRefund("REJECTED")}>
             Từ chối

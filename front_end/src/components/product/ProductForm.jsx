@@ -45,6 +45,7 @@ function ProductForm({
     () => normalizeInitialValues(defaultValues, stockMin),
     [defaultValues, stockMin],
   );
+  const initialValuesFingerprint = JSON.stringify(initialValues);
 
   const [values, setValues] = useState(initialValues);
   const [errors, setErrors] = useState({});
@@ -61,7 +62,7 @@ function ProductForm({
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }, [initialValues]);
+  }, [initialValuesFingerprint]);
 
   useEffect(() => {
     if (!imageFiles.length) {
