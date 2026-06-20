@@ -2,11 +2,19 @@
 import { cn } from "../../lib/utils";
 
 const Input = forwardRef(function Input(
-  { label, hint, error, className, ...props },
+  { label, hint, error, className, type, onWheel, ...props },
   ref,
 ) {
   const generatedId = useId();
   const inputId = props.id || generatedId;
+
+  function handleWheel(event) {
+    if (type === "number") {
+      event.currentTarget.blur();
+    }
+
+    onWheel?.(event);
+  }
 
   return (
     <label className="block space-y-2" htmlFor={inputId}>
@@ -14,12 +22,14 @@ const Input = forwardRef(function Input(
       <input
         id={inputId}
         ref={ref}
+        type={type}
         aria-label={props["aria-label"] || label}
         className={cn(
           "w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100",
           error && "border-rose-400 focus:border-rose-400 focus:ring-rose-100",
           className,
         )}
+        onWheel={type === "number" || onWheel ? handleWheel : undefined}
         {...props}
       />
       {error ? <span className="text-xs text-rose-600">{error}</span> : null}
